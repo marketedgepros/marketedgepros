@@ -1,7 +1,7 @@
 """
 KYC (Know Your Customer) routes for document verification
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from src.database import db
 from src.models.user import User
 from src.utils.decorators import token_required, admin_required
@@ -10,6 +10,8 @@ from sqlalchemy import desc, or_
 from src.services.storage_service import storage_service
 from src.services.email_service import EmailService
 from src.services.notification_service import NotificationService
+from src.services.kyc_document_service import KycDocumentService, DOCUMENT_FIELDS
+from src.constants.roles import Roles
 
 kyc_bp = Blueprint('kyc', __name__)
 
@@ -23,9 +25,23 @@ DOCUMENT_TYPES = {
 }
 
 
+def _kyc_users_for_actor(actor):
+    query = User.query.filter_by(tenant_id=actor.tenant_id)
+    if not actor.tenant_id:
+        return query.filter(User.id == -1)
+    # Retain the existing root-reviewer privilege but restrict it to its tenant.
+    if actor.role == Roles.SUPERMASTER and actor.parent_id is None:
+        return query
+    path = actor.tree_path
+    if not isinstance(path, str) or not path:
+        return query.filter(User.id == actor.id)
+    escaped = path.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    return query.filter(or_(User.id == actor.id, User.tree_path.like(escaped + '/%', escape='\\')))
+
+
 @kyc_bp.route('/documents', methods=['GET'])
 @token_required
-def get_user_documents():
+def get_user_documents(current_user):
     """Get current user's KYC documents"""
     try:
         user = g.current_user
@@ -63,6 +79,9 @@ def get_user_documents():
             }
         }
         
+        for document_type, document in documents.items():
+            document['url'] = _document_url(user, document_type)
+
         # Count documents by status
         statuses = [doc['status'] for doc in documents.values()]
         stats = {
@@ -80,12 +99,13 @@ def get_user_documents():
         }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @kyc_bp.route('/documents/<document_type>/upload', methods=['POST'])
 @token_required
-def upload_document(document_type):
+def upload_document(current_user, document_type):
     """Upload a KYC document"""
     try:
         if document_type not in DOCUMENT_TYPES:
@@ -111,30 +131,14 @@ def upload_document(document_type):
                 'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'
             }), 400
         
-        # Upload file to DigitalOcean Spaces
-        upload_result = storage_service.upload_kyc_document(
-            file=file,
-            user_id=user.id,
-            document_type=document_type
-        )
-        
-        if not upload_result.get('success'):
-            return jsonify({
-                'error': upload_result.get('error', 'Failed to upload file')
-            }), 500
-        
-        # Update user's KYC status fields
-        status_field = f'kyc_{document_type}_status'
-        uploaded_field = f'kyc_{document_type}_uploaded_at'
-        url_field = f'kyc_{document_type}_url'
-        
-        if hasattr(user, status_field):
-            setattr(user, status_field, 'pending')
-        if hasattr(user, uploaded_field):
-            setattr(user, uploaded_field, datetime.utcnow())
-        if hasattr(user, url_field):
-            setattr(user, url_field, upload_result['url'])
-        
+        if not user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        reference = KycDocumentService.store(file, user.id, document_type)
+        field = DOCUMENT_FIELDS[document_type]
+        setattr(user, field + '_status', 'pending')
+        setattr(user, field + '_uploaded_at', datetime.utcnow())
+        setattr(user, field + '_url', reference)
+
         # Update overall KYC status to pending if all required docs are uploaded
         # Required docs: id_proof, address_proof, selfie
         if (hasattr(user, 'kyc_id_status') and user.kyc_id_status == 'pending' and
@@ -155,24 +159,30 @@ def upload_document(document_type):
             }
         }), 200
         
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'error': 'Invalid document data'}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @kyc_bp.route('/admin/submissions', methods=['GET'])
 @token_required
 @admin_required
-def get_kyc_submissions():
+def get_kyc_submissions(current_user):
     """Get all KYC submissions for admin review"""
     try:
         # Get query parameters
         status = request.args.get('status', 'pending')
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
+        page = max(1, request.args.get('page', 1, type=int))
+        per_page = min(100, max(1, request.args.get('per_page', 20, type=int)))
         
         # Build query
-        query = User.query
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        query = _kyc_users_for_actor(current_user)
         
         if status:
             query = query.filter_by(kyc_status=status)
@@ -184,10 +194,10 @@ def get_kyc_submissions():
         
         # Count by status
         stats = {
-            'pending': User.query.filter_by(kyc_status='pending').count(),
-            'approved': User.query.filter_by(kyc_status='approved').count(),
-            'rejected': User.query.filter_by(kyc_status='rejected').count(),
-            'not_submitted': User.query.filter(
+            'pending': _kyc_users_for_actor(current_user).filter_by(kyc_status='pending').count(),
+            'approved': _kyc_users_for_actor(current_user).filter_by(kyc_status='approved').count(),
+            'rejected': _kyc_users_for_actor(current_user).filter_by(kyc_status='rejected').count(),
+            'not_submitted': _kyc_users_for_actor(current_user).filter(
                 or_(User.kyc_status == None, User.kyc_status == 'not_submitted')
             ).count()
         }
@@ -216,16 +226,21 @@ def get_kyc_submissions():
         }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @kyc_bp.route('/admin/submissions/<int:user_id>', methods=['GET'])
 @token_required
 @admin_required
-def get_kyc_submission_details(user_id):
+def get_kyc_submission_details(current_user, user_id):
     """Get detailed KYC submission for a specific user"""
     try:
-        user = User.query.get_or_404(user_id)
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+        if user is None:
+            return jsonify({'error': 'Submission not found'}), 404
         
         documents = {
             'id_proof': {
@@ -234,7 +249,7 @@ def get_kyc_submission_details(user_id):
                 'status': getattr(user, 'kyc_id_status', 'not_uploaded'),
                 'uploaded_at': getattr(user, 'kyc_id_uploaded_at', None),
                 'notes': getattr(user, 'kyc_id_notes', None),
-                'url': getattr(user, 'kyc_id_url', None)  # File URL
+                'url': _document_url(user, 'id_proof')  # File URL
             },
             'address_proof': {
                 'type': 'address_proof',
@@ -242,7 +257,7 @@ def get_kyc_submission_details(user_id):
                 'status': getattr(user, 'kyc_address_status', 'not_uploaded'),
                 'uploaded_at': getattr(user, 'kyc_address_uploaded_at', None),
                 'notes': getattr(user, 'kyc_address_notes', None),
-                'url': getattr(user, 'kyc_address_url', None)
+                'url': _document_url(user, 'address_proof')
             },
             'selfie': {
                 'type': 'selfie',
@@ -250,7 +265,7 @@ def get_kyc_submission_details(user_id):
                 'status': getattr(user, 'kyc_selfie_status', 'not_uploaded'),
                 'uploaded_at': getattr(user, 'kyc_selfie_uploaded_at', None),
                 'notes': getattr(user, 'kyc_selfie_notes', None),
-                'url': getattr(user, 'kyc_selfie_url', None)
+                'url': _document_url(user, 'selfie')
             },
             'bank_statement': {
                 'type': 'bank_statement',
@@ -258,7 +273,7 @@ def get_kyc_submission_details(user_id):
                 'status': getattr(user, 'kyc_bank_status', 'not_uploaded'),
                 'uploaded_at': getattr(user, 'kyc_bank_uploaded_at', None),
                 'notes': getattr(user, 'kyc_bank_notes', None),
-                'url': getattr(user, 'kyc_bank_url', None)
+                'url': _document_url(user, 'bank_statement')
             }
         }
         
@@ -276,16 +291,21 @@ def get_kyc_submission_details(user_id):
         }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @kyc_bp.route('/admin/submissions/<int:user_id>/approve', methods=['POST'])
 @token_required
 @admin_required
-def approve_kyc(user_id):
+def approve_kyc(current_user, user_id):
     """Approve a user's KYC submission"""
     try:
-        user = User.query.get_or_404(user_id)
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+        if user is None:
+            return jsonify({'error': 'Submission not found'}), 404
         data = request.get_json() or {}
         
         # Update KYC status
@@ -339,16 +359,21 @@ def approve_kyc(user_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @kyc_bp.route('/admin/submissions/<int:user_id>/reject', methods=['POST'])
 @token_required
 @admin_required
-def reject_kyc(user_id):
+def reject_kyc(current_user, user_id):
     """Reject a user's KYC submission"""
     try:
-        user = User.query.get_or_404(user_id)
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+        if user is None:
+            return jsonify({'error': 'Submission not found'}), 404
         data = request.get_json()
         
         if not data or not data.get('reason'):
@@ -362,8 +387,10 @@ def reject_kyc(user_id):
         rejected_documents = data.get('rejected_documents', [])
         
         for doc_type in rejected_documents:
-            status_field = f'kyc_{doc_type}_status'
-            notes_field = f'kyc_{doc_type}_notes'
+            if doc_type not in DOCUMENT_FIELDS:
+                continue
+            status_field = DOCUMENT_FIELDS[doc_type] + '_status'
+            notes_field = DOCUMENT_FIELDS[doc_type] + '_notes'
             
             if hasattr(user, status_field):
                 setattr(user, status_field, 'rejected')
@@ -405,19 +432,24 @@ def reject_kyc(user_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @kyc_bp.route('/admin/submissions/<int:user_id>/documents/<document_type>', methods=['PUT'])
 @token_required
 @admin_required
-def update_document_status(user_id, document_type):
+def update_document_status(current_user, user_id, document_type):
     """Update status of a specific document"""
     try:
         if document_type not in DOCUMENT_TYPES:
             return jsonify({'error': 'Invalid document type'}), 400
         
-        user = User.query.get_or_404(user_id)
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+        if user is None:
+            return jsonify({'error': 'Submission not found'}), 404
         data = request.get_json()
         
         if not data or 'status' not in data:
@@ -428,8 +460,8 @@ def update_document_status(user_id, document_type):
             return jsonify({'error': 'Invalid status'}), 400
         
         # Update document status
-        status_field = f'kyc_{document_type}_status'
-        notes_field = f'kyc_{document_type}_notes'
+        status_field = DOCUMENT_FIELDS[document_type] + '_status'
+        notes_field = DOCUMENT_FIELDS[document_type] + '_notes'
         
         if hasattr(user, status_field):
             setattr(user, status_field, status)
@@ -451,5 +483,35 @@ def update_document_status(user_id, document_type):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error('KYC operation failed')
+        return jsonify({'error': 'KYC operation failed'}), 500
 
+
+
+
+def _document_url(user, document_type):
+    if KycDocumentService.reference(user, document_type) is None:
+        return None
+    return f'/api/v1/kyc/documents/{user.id}/{document_type}/download'
+
+
+@kyc_bp.route('/documents/<int:user_id>/<document_type>/download', methods=['GET'])
+@token_required
+def download_document(current_user, user_id, document_type):
+    # Owner access or the existing reviewer role, never arbitrary URL/filename.
+    # The existing hierarchy hook stays active for reviewer User queries.
+    if not current_user.tenant_id:
+        return jsonify({'error': 'Document not found'}), 404
+    if user_id != current_user.id and not Roles.is_admin(current_user.role):
+        return jsonify({'error': 'Document not found'}), 404
+    user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+    if user is None or document_type not in DOCUMENT_FIELDS:
+        return jsonify({'error': 'Document not found'}), 404
+    try:
+        response = KycDocumentService.download(user, document_type)
+        current_app.logger.info('KYC download actor=%s subject=%s type=%s tenant=%s',
+                                current_user.id, user.id, document_type, current_user.tenant_id)
+        return response
+    except Exception:
+        current_app.logger.warning('KYC document unavailable actor=%s subject=%s', current_user.id, user_id)
+        return jsonify({'error': 'Document not found'}), 404

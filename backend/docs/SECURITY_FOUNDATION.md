@@ -31,7 +31,7 @@ The runner creates a clean subprocess environment without inherited provider cre
 2. Rehearse on a staging copy. Test existing profile/logo URLs: only `profiles/profile_<id>.<image>`, `profiles/<id>/avatar.<image>` and `tenants/<id>/logo.<image>` are public now. Other legacy paths return 404 intentionally.
 3. Inspect reverse-proxy/object-store routes: this Flask patch cannot protect a separate Nginx alias or public Spaces bucket. Confirm no independent public KYC serving route exists.
 4. Verify real email delivery without depending on public verification/reset response codes. Existing fixtures/consumers relying on these leaked fields must be fixed; never restore disclosure for compatibility.
-5. Keep a known rollback artifact and run post-release HTTP smoke checks. KYC reviewer download requires a dedicated authorization endpoint; do not reopen the generic route to make old links work.
+5. Keep a known rollback artifact and run post-release HTTP smoke checks. Batch 2 now adds a dedicated owner/reviewer authorization endpoint; see SECURITY_BATCH2.md for its storage/hierarchy prerequisites. Do not reopen the generic route to make old links work.
 6. Deploy containment separately from test-foundation/runtime changes if a smaller risk surface is needed. No DB migration is required by this batch.
 
 ## Deferred work (not claimed fixed)

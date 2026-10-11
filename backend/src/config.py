@@ -61,6 +61,8 @@ class Config:
     # File Upload
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', '/tmp/uploads')
+    KYC_PRIVATE_UPLOAD_FOLDER = os.getenv('KYC_PRIVATE_UPLOAD_FOLDER', '/var/lib/marketedgepros/private-kyc')
+    KYC_ALLOW_PRIVATE_LOCAL_STORAGE = os.getenv('KYC_ALLOW_PRIVATE_LOCAL_STORAGE', 'false').lower() == 'true'
     
     # Pagination
     ITEMS_PER_PAGE = 20
@@ -101,6 +103,7 @@ class TestingConfig(Config):
     MT_SERVER = None
     MT_LOGIN = None
     MT_PASSWORD = None
+    KYC_ALLOW_PRIVATE_LOCAL_STORAGE = True
 
 
 class ProductionConfig(Config):

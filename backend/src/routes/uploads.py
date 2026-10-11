@@ -125,49 +125,13 @@ def _open_public_upload(upload_folder, parts):
 
 @uploads_bp.route('/kyc', methods=['POST'])
 @token_required
-def upload_kyc_document():
-    """Upload KYC document"""
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-    
-    file = request.files['file']
-    
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
+def upload_kyc_document(current_user):
+    """Legacy upload compatibility through the canonical private KYC service."""
+    from src.routes.kyc import upload_document
     document_type = request.form.get('document_type', 'id')
-    
-    try:
-        # Validate file type
-        if not FileService.allowed_file(file.filename, 'documents'):
-            return jsonify({'error': 'Invalid file type. Only PDF, DOC, DOCX allowed'}), 400
-        
-        # Validate file size (10MB max for KYC documents)
-        FileService.validate_file_size(file, max_size_mb=10)
-        
-        result = FileService.save_kyc_document(
-            file,
-            g.current_user.id,
-            document_type
-        )
-        
-        # Update user KYC status
-        if g.current_user.kyc_status == 'pending':
-            from datetime import datetime
-            g.current_user.kyc_status = 'submitted'
-            g.current_user.kyc_submitted_at = datetime.utcnow()
-            db.session.commit()
-        
-        return jsonify({
-            'message': 'KYC document uploaded successfully',
-            'file': result
-        }), 201
-        
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        logger.error(f'KYC upload failed: {str(e)}')
-        return jsonify({'error': 'Upload failed'}), 500
+    document_type = {'id': 'id_proof', 'address': 'address_proof', 'bank': 'bank_statement'}.get(document_type, document_type)
+    # Call the already-authenticated view body, not a second auth wrapper.
+    return upload_document.__wrapped__(current_user, document_type)
 
 
 @uploads_bp.route('/profile-image', methods=['POST'])

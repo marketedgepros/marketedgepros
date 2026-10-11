@@ -13,6 +13,7 @@ from src.utils.decorators import token_required, admin_required
 from src.utils.validators import validate_required_fields, validate_email_format
 from src.utils.error_messages import format_error_response
 from src.utils.hierarchy_scoping import without_hierarchy_scope
+from src.routes.kyc import _document_url, _kyc_users_for_actor
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_
 
@@ -708,7 +709,9 @@ def get_payments(current_user):
 def get_pending_kyc(current_user):
     """Get all pending KYC submissions"""
     try:
-        users = User.query.filter_by(kyc_status='pending').all()
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        users = _kyc_users_for_actor(current_user).filter_by(kyc_status='pending').limit(100).all()
         
         return jsonify({
             'pending_kyc': [{
@@ -717,15 +720,15 @@ def get_pending_kyc(current_user):
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'kyc_submitted_at': user.kyc_submitted_at.isoformat() if user.kyc_submitted_at else None,
-                'kyc_id_url': user.kyc_id_url,
-                'kyc_address_url': user.kyc_address_url,
-                'kyc_selfie_url': user.kyc_selfie_url,
-                'kyc_bank_url': user.kyc_bank_url
+                'kyc_id_url': _document_url(user, 'id_proof'),
+                'kyc_address_url': _document_url(user, 'address_proof'),
+                'kyc_selfie_url': _document_url(user, 'selfie'),
+                'kyc_bank_url': _document_url(user, 'bank_statement')
             } for user in users]
         }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @admin_bp.route('/kyc/<int:user_id>/approve', methods=['POST'])
@@ -734,7 +737,11 @@ def get_pending_kyc(current_user):
 def approve_kyc(current_user, user_id):
     """Approve user KYC"""
     try:
-        user = User.query.get_or_404(user_id)
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+        if user is None:
+            return jsonify({'error': 'Submission not found'}), 404
         
         if user.kyc_status != 'pending':
             return jsonify({'error': 'KYC is not pending'}), 400
@@ -749,7 +756,7 @@ def approve_kyc(current_user, user_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 @admin_bp.route('/kyc/<int:user_id>/reject', methods=['POST'])
@@ -758,7 +765,11 @@ def approve_kyc(current_user, user_id):
 def reject_kyc(current_user, user_id):
     """Reject user KYC"""
     try:
-        user = User.query.get_or_404(user_id)
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter_by(id=user_id).first()
+        if user is None:
+            return jsonify({'error': 'Submission not found'}), 404
         data = request.get_json()
         
         if user.kyc_status != 'pending':
@@ -779,7 +790,7 @@ def reject_kyc(current_user, user_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'KYC operation failed'}), 500
 
 
 
