@@ -34,6 +34,7 @@ export default function AdminLayout({ children }) {
     { title: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { title: 'Users', path: '/admin/users', icon: Users },
     { title: 'Programs', path: '/admin/programs', icon: BarChart3 },
+    { title: 'Challenges', path: '/admin/challenges', icon: Award },
     { title: 'Payments', path: '/admin/payments', icon: CreditCard },
     { title: 'Withdrawals', path: '/admin/withdrawals', icon: DollarSign },
     { title: 'CRM', path: '/admin/crm', icon: Users },

@@ -58,6 +58,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboardConnected'
 const AnalyticsDashboard = lazy(() => import('./pages/admin/AnalyticsDashboard'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagementConnected'));
 const ProgramsManagement = lazy(() => import('./pages/admin/ProgramsManagement'));
+const ChallengesManagement = lazy(() => import('./pages/admin/ChallengesManagement'));
 const PaymentsManagement = lazy(() => import('./pages/admin/PaymentsManagementConnected'));
 const KYCApproval = lazy(() => import('./pages/admin/KYCApprovalConnected'));
 const PaymentApprovals = lazy(() => import('./pages/admin/PaymentApprovals'));
@@ -403,6 +404,18 @@ function App() {
               <RoleGuard allowedRoles={ADMIN_ROLES}>
                 <AdminLayout>
                   <PaymentsManagement />
+                </AdminLayout>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/challenges"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={ADMIN_ROLES}>
+                <AdminLayout>
+                  <ChallengesManagement />
                 </AdminLayout>
               </RoleGuard>
             </ProtectedRoute>

@@ -1,140 +1,264 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { programsAPI } from '../../services/api';
-import { TrendingUp, Clock, CheckCircle, XCircle, ArrowRight, Loader } from 'lucide-react';
-import UserLayout from '../../components/layout/UserLayout';
+import {
+  ArrowRight, Calendar, ChevronLeft, ChevronRight, CircleAlert, Loader2, RefreshCw,
+} from 'lucide-react';
+import api from '../../services/api';
+import {
+  ChallengeViewRequestGate,
+  createChallengeViewService,
+  DEFAULT_CHALLENGE_PER_PAGE,
+  MAX_CHALLENGE_PAGE,
+} from '../../services/challengeViewService';
+
+const challengeViewService = createChallengeViewService(api);
+
+const isRequestCancelled = (error, signal) => (
+  signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError'
+);
+
+const getErrorMessage = (error, fallback) => {
+  const message = error?.response?.data?.error;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
+
+const displayRecordedValue = (value) => (value === null ? 'Unavailable' : value);
+const displayRecordedStatus = (value) => (
+  value === null || value === '' ? 'Unavailable' : value.replaceAll('_', ' ')
+);
 
 export default function MyChallenges() {
   const navigate = useNavigate();
-  const [challenges, setChallenges] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [challenges, setChallenges] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    per_page: DEFAULT_CHALLENGE_PER_PAGE,
+    total: 0,
+    pages: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const mountedRef = useRef(false);
+  const controllerRef = useRef(null);
+  const requestGateRef = useRef(new ChallengeViewRequestGate());
+  const requestedPageRef = useRef(1);
 
-  useEffect(() => {
-    fetchChallenges();
+  const loadChallenges = useCallback(async (page, { showLoading = true } = {}) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const request = requestGateRef.current.begin({ mode: 'list', page });
+
+    if (showLoading && mountedRef.current) setIsLoading(true);
+    requestedPageRef.current = page;
+    if (mountedRef.current) {
+      setChallenges(null);
+      setError(null);
+    }
+
+    try {
+      const result = await challengeViewService.getMyChallenges({
+        page,
+        perPage: DEFAULT_CHALLENGE_PER_PAGE,
+        signal: controller.signal,
+      });
+      if (!mountedRef.current || controller.signal.aborted || !requestGateRef.current.isCurrent(request)) {
+        return;
+      }
+      setChallenges(result.challenges);
+      setPagination(result.pagination);
+    } catch (requestError) {
+      if (!mountedRef.current || isRequestCancelled(requestError, controller.signal)
+        || !requestGateRef.current.isCurrent(request)) {
+        return;
+      }
+      setChallenges(null);
+      setError(getErrorMessage(requestError, 'Unable to load your recorded challenges. Please try again.'));
+    } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
+      if (showLoading && mountedRef.current && requestGateRef.current.isCurrent(request)) {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
-  const fetchChallenges = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await programsAPI.getMyChallenges();
-      setChallenges(response.data.challenges || []);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load challenges');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    mountedRef.current = true;
+    loadChallenges(1);
+
+    return () => {
+      mountedRef.current = false;
+      requestGateRef.current.invalidate();
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+    };
+  }, [loadChallenges]);
+
+  const goToPage = (page) => {
+    if (isLoading || page < 1 || page > MAX_CHALLENGE_PAGE || (pagination.pages > 0 && page > pagination.pages)) return;
+    loadChallenges(page);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'passed':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'failed':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'pending':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'active':
-        return <Clock className="w-4 h-4" />;
-      case 'passed':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4" />;
-      default:
-        return <TrendingUp className="w-4 h-4" />;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <Loader className="w-8 h-8 text-purple-500 animate-spin" />
-      </div>
-    );
-  }
+  const retry = () => loadChallenges(requestedPageRef.current);
+  const currentPageCount = challenges?.length ?? 0;
 
   return (
-    <UserLayout>
-      <div>
-        <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
           <h1 className="text-3xl font-bold text-white">My Challenges</h1>
+          <p className="mt-2 max-w-3xl text-sm text-slate-300">
+            Stored challenge records are shown for reference only. Status, payment, balance, and phase values are
+            unverified legacy data and are not proof of payment, funding, rule approval, or live trading activity.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/programs')}
+          className="inline-flex items-center justify-center rounded-lg border border-cyan-500/60 px-4 py-2 text-sm font-medium text-cyan-200 transition-colors hover:bg-cyan-500/10"
+        >
+          Browse Programs
+        </button>
+      </div>
+
+      {isLoading && challenges === null && (
+        <div className="flex min-h-[18rem] items-center justify-center rounded-xl border border-white/10 bg-slate-800/50">
+          <div className="text-center text-slate-300">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-400" />
+            <p className="mt-3">Loading recorded challenges…</p>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && error && (
+        <div className="rounded-xl border border-red-500/50 bg-red-950/30 p-5 text-red-100" role="alert">
+          <div className="flex gap-3">
+            <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <h2 className="font-semibold">Challenges could not be loaded</h2>
+              <p className="mt-1 text-sm text-red-200">{error}</p>
+              <button
+                type="button"
+                onClick={retry}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-300/60 px-3 py-2 text-sm font-medium hover:bg-red-900/30"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && !error && challenges?.length === 0 && (
+        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-12 text-center">
+          <h2 className="text-xl font-semibold text-white">
+            {pagination.total > 0 ? 'No records on this page' : 'No recorded challenges'}
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-slate-300">
+            {pagination.total > 0
+              ? `There are ${pagination.total} recorded challenges, but this page is now empty. Return to the first page to reload the current result.`
+              : 'No challenge records were returned. This does not confirm payment, funding, or provider account status.'}
+          </p>
+          {pagination.page > 1 && (
+            <button
+              type="button"
+              onClick={() => goToPage(1)}
+              className="mt-6 mr-3 rounded-lg border border-cyan-500/60 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/10"
+            >
+              Return to first page
+            </button>
+          )}
           <button
+            type="button"
             onClick={() => navigate('/programs')}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg hover:from-purple-700 hover:to-purple-900 transition-colors"
+            className="mt-6 rounded-lg border border-cyan-500/60 px-4 py-2 text-sm font-medium text-cyan-200 transition-colors hover:bg-cyan-500/10"
           >
             Browse Programs
           </button>
         </div>
+      )}
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {challenges.length === 0 ? (
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-12 text-center">
-            <h3 className="text-xl text-gray-300 mb-4">
-              You don't have any challenges yet
-            </h3>
-            <button
-              onClick={() => navigate('/programs')}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg hover:from-purple-700 hover:to-purple-900 transition-colors"
-            >
-              Start Your First Challenge
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {!isLoading && !error && challenges?.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {challenges.map((challenge) => (
-              <div
+              <article
                 key={challenge.id}
-                className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-6 transition-transform hover:-translate-y-1"
+                className="rounded-xl border border-white/10 bg-slate-800/50 p-5 shadow-lg shadow-slate-950/10"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-semibold text-white">
-                    {challenge.program_name || 'Challenge'}
-                  </h3>
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded ${getStatusColor(challenge.status)}`}>
-                    {getStatusIcon(challenge.status)}
-                    {challenge.status}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">{challenge.program.name || 'Unnamed program'}</h2>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-cyan-300">Unverified legacy record</p>
+                  </div>
+                  <span className="rounded-full border border-slate-600 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-200">
+                    Recorded: {displayRecordedStatus(challenge.legacy_status)}
                   </span>
                 </div>
 
-                <div className="mb-4 space-y-2">
-                  <p className="text-sm text-gray-400">
-                    Account Size: <span className="text-white font-semibold">${challenge.account_size?.toLocaleString()}</span>
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    Profit Target: <span className="text-green-400 font-semibold">{challenge.profit_target}%</span>
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    Max Drawdown: <span className="text-red-400 font-semibold">{challenge.max_drawdown}%</span>
-                  </p>
-                </div>
+                <dl className="mt-5 space-y-3 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-400">Recorded payment status</dt>
+                    <dd className="text-right font-medium text-slate-100">{displayRecordedStatus(challenge.legacy_payment_status)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-400">Recorded initial balance</dt>
+                    <dd className="font-mono text-slate-100">{displayRecordedValue(challenge.initial_balance)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-400">Recorded current balance</dt>
+                    <dd className="font-mono text-slate-100">{displayRecordedValue(challenge.current_balance)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-slate-400">Observed drawdown</dt>
+                    <dd className="font-mono text-slate-100">{displayRecordedValue(challenge.max_drawdown_observed)}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-3">
+                    <dt className="flex items-center gap-2 text-slate-400"><Calendar className="h-4 w-4" /> Recorded phase</dt>
+                    <dd className="text-slate-100">
+                      {displayRecordedValue(challenge.current_phase)} / {displayRecordedValue(challenge.total_phases)}
+                    </dd>
+                  </div>
+                </dl>
 
                 <button
+                  type="button"
                   onClick={() => navigate(`/challenges/${challenge.id}`)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-purple-600 text-purple-400 rounded-lg hover:bg-purple-600/10 transition-colors"
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-500/60 px-4 py-2 text-sm font-medium text-cyan-200 transition-colors hover:bg-cyan-500/10"
                 >
-                  View Details
-                  <ArrowRight className="w-4 h-4" />
+                  View recorded details
+                  <ArrowRight className="h-4 w-4" />
                 </button>
-              </div>
+              </article>
             ))}
           </div>
-        )}
-      </div>
-    </UserLayout>
+
+          <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-slate-800/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-300">
+              Page {pagination.page} of {pagination.pages} · {currentPageCount} record{currentPageCount === 1 ? '' : 's'} on this page · {pagination.total} total records
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => goToPage(pagination.page - 1)}
+                disabled={isLoading || pagination.page <= 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => goToPage(pagination.page + 1)}
+                disabled={isLoading || pagination.pages === 0 || pagination.page >= pagination.pages || pagination.page >= MAX_CHALLENGE_PAGE}
+                className="inline-flex items-center gap-1 rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

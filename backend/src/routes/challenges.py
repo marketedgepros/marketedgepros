@@ -217,6 +217,29 @@ def _admin_list_arguments():
     }, None
 
 
+def _my_challenge_list_arguments():
+    """Accept only bounded owner-list filters, without MT5 lookup controls."""
+    allowed = {'page', 'per_page', 'status'}
+    if any(key not in allowed for key in request.args):
+        return None, _error('Invalid query parameters', 400, 'QUERY_INVALID')
+    if any(len(request.args.getlist(key)) > 1 for key in allowed):
+        return None, _error('Duplicate query parameters are not allowed', 400, 'QUERY_INVALID')
+
+    page = _strict_positive_query_integer('page', '1', 1000)
+    per_page = _strict_positive_query_integer('per_page', '20', 100)
+    if page is None or per_page is None:
+        return None, _error('Invalid pagination', 400, 'PAGINATION_INVALID')
+
+    status = request.args.get('status')
+    if status is not None and (not status or len(status) > 20):
+        return None, _error('Invalid status', 400, 'QUERY_INVALID')
+    return {
+        'page': page,
+        'per_page': per_page,
+        'status': status,
+    }, None
+
+
 def _admin_challenge_query(actor):
     """Build the explicit root-or-CRM scope and require a matching program tenant."""
     query = db.session.query(Challenge, User, TradingProgram).join(
@@ -255,6 +278,51 @@ def create_challenge(current_user):
         503,
         'ORDER_SETTLEMENT_NOT_CONFIGURED',
     )
+
+
+@challenges_bp.route('/my-challenges', methods=['GET'])
+@_read_only
+@token_required
+def get_my_challenges(current_user):
+    """List the caller's tenant-consistent legacy challenge snapshots only."""
+    arguments, argument_error = _my_challenge_list_arguments()
+    if argument_error:
+        return argument_error
+
+    try:
+        query = db.session.query(Challenge, TradingProgram).join(
+            TradingProgram, Challenge.program_id == TradingProgram.id
+        ).filter(
+            Challenge.user_id == current_user.id,
+            TradingProgram.tenant_id == current_user.tenant_id,
+        )
+        if arguments['status'] is not None:
+            query = query.filter(Challenge.status == arguments['status'])
+
+        total = query.order_by(None).count()
+        offset = (arguments['page'] - 1) * arguments['per_page']
+        rows = query.order_by(desc(Challenge.created_at), desc(Challenge.id)).offset(offset).limit(
+            arguments['per_page']
+        ).all()
+        challenges = [
+            _legacy_challenge_projection(challenge, program)
+            for challenge, program in rows
+        ]
+        pages = (total + arguments['per_page'] - 1) // arguments['per_page']
+        return jsonify({
+            'challenges': challenges,
+            'pagination': {
+                'page': arguments['page'],
+                'per_page': arguments['per_page'],
+                'total': total,
+                'pages': pages,
+            },
+            'data_status': _UNVERIFIED_LEGACY,
+            'provider_authenticated': False,
+        }), 200
+    except Exception:
+        logger.exception('Owner challenge listing failed')
+        return _error('Unable to retrieve challenges', 500, 'CHALLENGE_READ_FAILED')
 
 
 @challenges_bp.route('/<int:challenge_id>/start', methods=['POST'])

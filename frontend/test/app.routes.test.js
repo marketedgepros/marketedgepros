@@ -57,3 +57,17 @@ test('frontend build script remains a Vite production build smoke command', () =
   const packageJson = JSON.parse(fs.readFileSync(path.join(frontendDirectory, 'package.json'), 'utf8'));
   assert.equal(packageJson.scripts.build, 'vite build');
 });
+
+test('challenge routes use single router-owned layouts and the administrative route retains role guards', () => {
+  const adminRoute = appSource.match(/<Route\s+path="\/admin\/challenges"[\s\S]*?<\/Route>|<Route\s+path="\/admin\/challenges"[\s\S]*?\n\s*\/>/);
+  assert.ok(adminRoute, 'administration challenge page must be wired into App');
+  assert.match(adminRoute[0], /<ProtectedRoute>/);
+  assert.match(adminRoute[0], /<RoleGuard allowedRoles=\{ADMIN_ROLES\}>/);
+  assert.match(adminRoute[0], /<AdminLayout>[\s\S]*<ChallengesManagement\s*\/>/);
+  const menu = fs.readFileSync(path.join(frontendDirectory, 'src/components/admin/AdminLayout.jsx'), 'utf8');
+  assert.match(menu, /path: '\/admin\/challenges'/);
+  for (const page of ['pages/user/MyChallenges.jsx', 'pages/ChallengeDetails.jsx']) {
+    const source = fs.readFileSync(path.join(frontendDirectory, 'src', page), 'utf8');
+    assert.doesNotMatch(source, /<UserLayout|<Layout[\s>]/);
+  }
+});

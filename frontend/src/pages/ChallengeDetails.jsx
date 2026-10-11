@@ -1,346 +1,271 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  TrendingUp, TrendingDown, DollarSign, Calendar,
-  Target, AlertCircle, CheckCircle, XCircle, Award,
-  BarChart3, Activity, ArrowLeft
+  ArrowLeft, Calendar, CircleAlert, Database, Loader2, RefreshCw, ShieldAlert,
 } from 'lucide-react';
 import api from '../services/api';
-import { useToast } from '../contexts/ToastContext';
-import { SkeletonDashboard } from '../components/common/Skeleton';
-import Layout from '../components/layout/Layout';
+import {
+  ChallengeViewRequestGate,
+  createChallengeViewService,
+  validateChallengeId,
+} from '../services/challengeViewService';
+
+const challengeViewService = createChallengeViewService(api);
+
+const isRequestCancelled = (error, signal) => (
+  signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError'
+);
+
+const getErrorMessage = (error, fallback) => {
+  const message = error?.response?.data?.error;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
+
+const routeChallengeId = (value) => {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) {
+    throw new Error('Challenge ID is invalid.');
+  }
+  return validateChallengeId(Number(value));
+};
+
+const displayRecordedValue = (value) => (value === null ? 'Unavailable' : value);
+const displayRecordedStatus = (value) => (
+  value === null || value === '' ? 'Unavailable' : value.replaceAll('_', ' ')
+);
+
+const metadataRows = (account) => [
+  ['Login', account.login],
+  ['Server', account.server],
+  ['Group', account.group],
+  ['Stored status', account.status],
+  ['Stored balance', account.balance],
+  ['Stored equity', account.equity],
+  ['Stored margin', account.margin],
+  ['Stored free margin', account.free_margin],
+  ['Stored margin level', account.margin_level],
+  ['Metadata updated', account.updated_at],
+];
 
 export default function ChallengeDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const toast = useToast();
-  const [challenge, setChallenge] = useState(null);
+  const [view, setView] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const mountedRef = useRef(false);
+  const controllerRef = useRef(null);
+  const requestGateRef = useRef(new ChallengeViewRequestGate());
+
+  const loadChallenge = useCallback(async (requestedId, { showLoading = true } = {}) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const request = requestGateRef.current.begin({ mode: 'detail', id: requestedId });
+
+    if (showLoading && mountedRef.current) setIsLoading(true);
+    if (mountedRef.current) {
+      setView(null);
+      setError(null);
+    }
+
+    try {
+      const challengeId = routeChallengeId(requestedId);
+      const result = await challengeViewService.getChallengeProgress(challengeId, { signal: controller.signal });
+      if (!mountedRef.current || controller.signal.aborted || !requestGateRef.current.isCurrent(request)) {
+        return;
+      }
+      setView(result);
+    } catch (requestError) {
+      if (!mountedRef.current || isRequestCancelled(requestError, controller.signal)
+        || !requestGateRef.current.isCurrent(request)) {
+        return;
+      }
+      setView(null);
+      setError(getErrorMessage(requestError, 'Unable to load this recorded challenge. Please try again.'));
+    } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
+      if (showLoading && mountedRef.current && requestGateRef.current.isCurrent(request)) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    loadChallenge();
-  }, [id]);
+    mountedRef.current = true;
+    loadChallenge(id);
 
-  const loadChallenge = async () => {
-    try {
-      setIsLoading(true);
-      const response = await api.get(`/traders/challenges/${id}`);
-      setChallenge(response.data.challenge);
-    } catch (error) {
-      // Show error message
-      toast.error('Failed to load challenge details');
-      navigate('/dashboard');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return () => {
+      mountedRef.current = false;
+      requestGateRef.current.invalidate();
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+    };
+  }, [id, loadChallenge]);
 
-  if (isLoading) {
+  const retry = () => loadChallenge(id);
+
+  if (isLoading || (view && String(view.challenge.id) !== id)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="text-gray-600 mt-4">Loading challenge...</p>
+      <div className="flex min-h-[20rem] items-center justify-center rounded-xl border border-white/10 bg-slate-800/50">
+        <div className="text-center text-slate-300">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-400" />
+          <p className="mt-3">Loading recorded challenge details…</p>
         </div>
       </div>
     );
   }
 
-  if (!challenge) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Challenge not found</h2>
-          <button onClick={() => navigate('/dashboard')} className="btn btn-primary mt-4">
-            Back to Dashboard
-          </button>
+      <div className="rounded-xl border border-red-500/50 bg-red-950/30 p-6 text-red-100" role="alert">
+        <div className="flex gap-3">
+          <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <h1 className="font-semibold">Challenge details could not be loaded</h1>
+            <p className="mt-1 text-sm text-red-200">{error}</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={retry}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-300/60 px-3 py-2 text-sm font-medium hover:bg-red-900/30"
+              >
+                <RefreshCw className="h-4 w-4" /> Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/challenges')}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/5"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to challenges
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  const profitProgress = (challenge.current_profit / challenge.profit_target) * 100;
-  const isProfit = challenge.current_profit >= 0;
+  if (!view) return null;
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'passed':
-        return 'bg-blue-100 text-blue-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'funded':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const { challenge, progress, mt5_account: mt5Account } = view;
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </button>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{challenge.program_name}</h1>
-              <p className="text-gray-600 mt-2">
-                Phase {challenge.phase} of {challenge.total_phases} • {challenge.days_active} days active
-              </p>
-            </div>
-            <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(challenge.status)}`}>
-              {challenge.status}
-            </span>
+    <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => navigate('/challenges')}
+        className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 transition-colors hover:text-cyan-200"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to challenges
+      </button>
+
+      <header className="rounded-xl border border-white/10 bg-slate-800/50 p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Unverified legacy record</p>
+            <h1 className="mt-2 text-3xl font-bold text-white">{challenge.program.name || 'Unnamed program'}</h1>
+            <p className="mt-2 text-sm text-slate-300">
+              All values below are stored legacy metadata. This view does not verify payment, funding, challenge rules,
+              trading evidence, or a live provider account.
+            </p>
           </div>
+          <div className="rounded-lg border border-slate-600 bg-slate-900/60 px-4 py-3 text-sm">
+            <p className="text-slate-400">Recorded status</p>
+            <p className="mt-1 font-medium text-slate-100">{displayRecordedStatus(challenge.legacy_status)}</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="rounded-xl border border-amber-400/35 bg-amber-950/20 p-4 text-sm text-amber-100">
+        <div className="flex gap-3">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+          <p>
+            <strong>Verification unavailable.</strong> Recorded payment status is not payment proof, and legacy balance
+            snapshots are not approved live progress. Approved challenge-rule progress is unavailable.
+          </p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Current Balance</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  ${challenge.current_balance.toLocaleString()}
-                </p>
-                <p className={`text-sm mt-1 ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
-                  {isProfit ? '+' : ''}{challenge.current_profit.toLocaleString()} ({((challenge.current_profit / challenge.account_size) * 100).toFixed(2)}%)
-                </p>
-              </div>
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                isProfit ? 'bg-green-100' : 'bg-red-100'
-              }`}>
-                <DollarSign className={`w-6 h-6 ${isProfit ? 'text-green-600' : 'text-red-600'}`} />
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Profit Target</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  ${challenge.profit_target.toLocaleString()}
-                </p>
-                <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-primary-600 h-2 rounded-full transition-all" 
-                    style={{ width: `${Math.min(profitProgress, 100)}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-gray-600 mt-1">{profitProgress.toFixed(1)}% achieved</p>
-              </div>
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                <Target className="w-6 h-6 text-primary-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Win Rate</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{challenge.win_rate}%</p>
-                <p className="text-sm text-gray-600 mt-1">
-                  {challenge.winning_trades}W / {challenge.losing_trades}L
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Trades</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{challenge.trades_count}</p>
-                <p className="text-sm text-gray-600 mt-1">
-                  Avg: {(challenge.trades_count / challenge.days_active).toFixed(1)}/day
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Activity className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
+      <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4" aria-label="Recorded challenge fields">
+        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+          <p className="text-sm text-slate-400">Recorded initial balance</p>
+          <p className="mt-2 font-mono text-xl font-semibold text-white">{displayRecordedValue(challenge.initial_balance)}</p>
         </div>
+        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+          <p className="text-sm text-slate-400">Recorded current balance</p>
+          <p className="mt-2 font-mono text-xl font-semibold text-white">{displayRecordedValue(challenge.current_balance)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+          <p className="text-sm text-slate-400">Observed drawdown</p>
+          <p className="mt-2 font-mono text-xl font-semibold text-white">{displayRecordedValue(challenge.max_drawdown_observed)}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+          <p className="text-sm text-slate-400">Recorded profit/loss</p>
+          <p className="mt-2 font-mono text-xl font-semibold text-white">{displayRecordedValue(progress.profit_loss)}</p>
+          <p className="mt-1 text-xs text-slate-400">Legacy estimated diagnostic, not approved live progress.</p>
+        </div>
+      </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Trading Stats */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Trading Statistics</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-5 h-5 text-green-600" />
-                    <span className="text-sm font-medium text-green-900">Best Trade</span>
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">
-                    +${challenge.best_trade}
-                  </p>
-                </div>
-
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingDown className="w-5 h-5 text-red-600" />
-                    <span className="text-sm font-medium text-red-900">Worst Trade</span>
-                  </div>
-                  <p className="text-2xl font-bold text-red-600">
-                    ${challenge.worst_trade}
-                  </p>
-                </div>
-
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">Avg Win</span>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">
-                    +${challenge.average_win}
-                  </p>
-                </div>
-
-                <div className="p-4 bg-orange-50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="w-5 h-5 text-orange-600" />
-                    <span className="text-sm font-medium text-orange-900">Avg Loss</span>
-                  </div>
-                  <p className="text-2xl font-bold text-orange-600">
-                    ${challenge.average_loss}
-                  </p>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+        <section className="rounded-xl border border-white/10 bg-slate-800/50 p-6 xl:col-span-2">
+          <h2 className="text-lg font-semibold text-white">Recorded challenge metadata</h2>
+          <dl className="mt-5 space-y-4 text-sm">
+            <div className="flex justify-between gap-5 border-b border-white/10 pb-3">
+              <dt className="text-slate-400">Recorded payment status</dt>
+              <dd className="text-right font-medium text-slate-100">{displayRecordedStatus(challenge.legacy_payment_status)}</dd>
             </div>
+            <div className="flex justify-between gap-5 border-b border-white/10 pb-3">
+              <dt className="text-slate-400">Recorded phase</dt>
+              <dd className="text-right text-slate-100">
+                {displayRecordedValue(challenge.current_phase)} / {displayRecordedValue(challenge.total_phases)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-5 border-b border-white/10 pb-3">
+              <dt className="flex items-center gap-2 text-slate-400"><Calendar className="h-4 w-4" /> Recorded start date</dt>
+              <dd className="text-right text-slate-100">{displayRecordedValue(challenge.start_date)}</dd>
+            </div>
+            <div className="flex justify-between gap-5 border-b border-white/10 pb-3">
+              <dt className="text-slate-400">Recorded end date</dt>
+              <dd className="text-right text-slate-100">{displayRecordedValue(challenge.end_date)}</dd>
+            </div>
+            <div className="flex justify-between gap-5">
+              <dt className="text-slate-400">Record created</dt>
+              <dd className="text-right text-slate-100">{displayRecordedValue(challenge.created_at)}</dd>
+            </div>
+          </dl>
+        </section>
 
-            {/* Recent Trades */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Trades</h2>
-              <div className="space-y-3">
-                {challenge.recent_trades.map((trade) => (
-                  <div key={trade.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        trade.profit >= 0 ? 'bg-green-100' : 'bg-red-100'
-                      }`}>
-                        {trade.profit >= 0 ? (
-                          <TrendingUp className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <TrendingDown className="w-5 h-5 text-red-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{trade.symbol}</p>
-                        <p className="text-sm text-gray-600 capitalize">{trade.type}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-bold ${trade.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {trade.profit >= 0 ? '+' : ''}${trade.profit}
-                      </p>
-                      <p className="text-xs text-gray-500">{trade.date}</p>
-                    </div>
+        <section className="rounded-xl border border-white/10 bg-slate-800/50 p-6 xl:col-span-3">
+          <div className="flex items-start gap-3">
+            <Database className="mt-0.5 h-5 w-5 text-cyan-300" />
+            <div>
+              <h2 className="text-lg font-semibold text-white">Stored MT5 metadata</h2>
+              <p className="mt-1 text-sm text-slate-300">Stored metadata is unverified and does not authenticate or connect to a provider.</p>
+            </div>
+          </div>
+
+          {mt5Account ? (
+            <>
+              <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-950/20 px-3 py-2 text-sm text-amber-100">
+                Provider and branch verification are unavailable. The fields below are a stored legacy snapshot only.
+              </p>
+              <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                {metadataRows(mt5Account).map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-4 border-b border-white/10 py-2 text-sm">
+                    <dt className="text-slate-400">{label}</dt>
+                    <dd className="max-w-[60%] break-words text-right font-mono text-slate-100">{displayRecordedValue(value)}</dd>
                   </div>
                 ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Challenge Rules */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Challenge Rules</h2>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Target className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Profit Target</p>
-                    <p className="text-sm text-gray-600">${challenge.rules.profit_target.toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Max Daily Loss</p>
-                    <p className="text-sm text-gray-600">${challenge.rules.max_daily_loss.toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Max Total Loss</p>
-                    <p className="text-sm text-gray-600">${challenge.rules.max_total_loss.toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Trading Days</p>
-                    <p className="text-sm text-gray-600">
-                      Min: {challenge.rules.min_trading_days} • Max: {challenge.rules.max_trading_days}
-                    </p>
-                  </div>
-                </div>
-
-                {challenge.rules.consistency_rule && (
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Consistency Rule</p>
-                      <p className="text-sm text-gray-600">No single day &gt; 40% of total profit</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Profit Split */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Profit Split</h2>
-              <div className="flex items-center justify-center">
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-24 h-24 bg-yellow-100 rounded-full mb-3">
-                    <Award className="w-12 h-12 text-yellow-600" />
-                  </div>
-                  <p className="text-4xl font-bold text-gray-900">{challenge.profit_split}%</p>
-                  <p className="text-sm text-gray-600 mt-1">Your profit share</p>
-                </div>
-              </div>
-            </div>
-
-            {/* MetaTrader Connection */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">MetaTrader</h2>
-              <div className="p-4 bg-gray-50 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-3">Connect your MT4/MT5 account</p>
-                <button className="btn btn-primary w-full">
-                  Connect Account
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+              </dl>
+            </>
+          ) : (
+            <p className="mt-5 rounded-lg border border-white/10 bg-slate-900/40 p-4 text-sm text-slate-300">
+              No owner-linked stored MT5 metadata was returned for this challenge. This view cannot verify provider or branch connection status.
+            </p>
+          )}
+        </section>
       </div>
     </div>
-    </Layout>
   );
 }
-
