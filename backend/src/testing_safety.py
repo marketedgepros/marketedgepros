@@ -44,13 +44,19 @@ def validate_testing_resources(config):
         declared = os.environ.get('TEST_DATABASE_URL')
         if not declared or make_url(declared) != url:
             raise ValueError('Testing PostgreSQL requires explicit TEST_DATABASE_URL')
-        if url.host not in ('127.0.0.1', '::1'):
-            raise ValueError('Testing PostgreSQL must be on loopback')
-        if not re.fullmatch(r'marketedgepros_test_[a-zA-Z0-9_]+', url.database or ''):
-            raise ValueError('Testing PostgreSQL requires a dedicated per-run database name')
-        # libpq connection options can override the host/database in the URL.
-        if url.query:
-            raise ValueError('Testing PostgreSQL URL must not contain connection overrides')
+        if config.get('ISOLATED_STAGING_DATABASE'):
+            # This opt-in is not a URL exemption: validate namespace, UUID DB,
+            # UID, private directory, socket identity and the exact URL first.
+            from migrations.target_safety import validate_isolated_postgresql_target
+            validate_isolated_postgresql_target(value)
+        else:
+            if url.host not in ('127.0.0.1', '::1'):
+                raise ValueError('Testing PostgreSQL must be on loopback')
+            if not re.fullmatch(r'marketedgepros_test_[a-zA-Z0-9_]+', url.database or ''):
+                raise ValueError('Testing PostgreSQL requires a dedicated per-run database name')
+            # libpq connection options can override the host/database in the URL.
+            if url.query:
+                raise ValueError('Testing PostgreSQL URL must not contain connection overrides')
     else:
         raise ValueError('Unsupported testing database backend')
 

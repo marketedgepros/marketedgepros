@@ -1,7 +1,7 @@
 """
 User routes for profile and account management
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from src.database import db
 from src.models.user import User
 from src.models.trading_program import Challenge
@@ -135,6 +135,8 @@ def update_profile():
 @token_required
 def get_users_hierarchy():
     """Get users in hierarchical tree structure based on parent_id"""
+    if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False):
+        return jsonify({'error': 'Expanded hierarchy is disabled in launch mode', 'code': 'EXPANDED_HIERARCHY_DISABLED'}), 409
     try:
         # Get all users
         users = User.query.all()

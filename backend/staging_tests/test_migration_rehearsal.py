@@ -17,9 +17,31 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 MERGE_REVISION = "20261011_000001"
-HEAD = "20261011_000004"
+HEAD = "20261011_000005"
 MAIN_OLD_HEAD = "20251110_191500"
 TOKEN_OLD_HEAD = "token_blacklist_001"
+CORE_SHAPE_COLUMNS = {
+    "tenants": (
+        "accent_color", "contact_email", "contact_phone", "custom_css",
+        "custom_domain", "favicon_url", "logo_url", "primary_color",
+        "secondary_color", "settings", "status", "subdomain", "tier",
+    ),
+    "trading_programs": (
+        "minimum_payout_amount", "payout_mode", "profit_split_percentage",
+        "rules", "type",
+    ),
+    "challenges": (
+        "account_number", "addons", "approval_status", "approved_at",
+        "approved_by", "created_by", "current_phase", "daily_drawdown_history",
+        "end_date", "max_drawdown", "passed_at", "payment_type",
+        "rejection_reason", "start_date", "total_phases",
+    ),
+    "payments": (
+        "admin_notes", "approval_status", "approved_at", "approved_by",
+        "payment_type", "rejection_reason",
+    ),
+    "program_addons": ("benefits", "price_type"),
+}
 
 
 def _rehearsal_url(primary_url: str, database: str) -> str:
@@ -61,6 +83,11 @@ def _assert_head_invariants(engine, *, expected_users: int = 0, expected_tenants
     for name in ('available_balance', 'total_withdrawn', 'payout_count'):
         assert user_columns[name]['nullable'] is True
         assert user_columns[name]['default'] is None
+    for table_name, fields in CORE_SHAPE_COLUMNS.items():
+        columns = {column['name']: column for column in inspector.get_columns(table_name)}
+        for name in fields:
+            assert columns[name]['nullable'] is True
+            assert columns[name]['default'] is None
     token_columns = {column["name"] for column in inspector.get_columns("token_blacklist")}
     assert {"jti", "token_type", "user_id", "revoked_at", "expires_at"}.issubset(token_columns)
     token_fks = inspector.get_foreign_keys("token_blacklist")
@@ -97,6 +124,12 @@ def _assert_and_remove_main_branch_sentinel(connection) -> None:
     """)).scalar_one() == 0
     values = connection.execute(text('SELECT can_create_same_role, available_balance, total_withdrawn, payout_count FROM users WHERE id = 900001')).one()
     assert tuple(values) == (False, None, None, None)
+    tenant_values = connection.execute(text(
+        'SELECT accent_color, contact_email, contact_phone, custom_css, custom_domain, '
+        'favicon_url, logo_url, primary_color, secondary_color, settings, status, subdomain, tier '
+        'FROM tenants WHERE id = 900001'
+    )).one()
+    assert tuple(tenant_values) == (None,) * len(CORE_SHAPE_COLUMNS['tenants'])
     connection.execute(text("""
         DELETE FROM users WHERE email = 'migration-rehearsal-sentinel@example.invalid'
     """))
@@ -228,7 +261,12 @@ def test_alembic_online_rehearsal_on_separate_ephemeral_database(staging_resourc
             connection.commit()
             _assert_and_remove_main_branch_sentinel(connection)
             _assert_head_invariants(engine)
-            record_property("migration_model_parity", json.dumps(_model_parity_summary(engine), sort_keys=True))
+            parity = _model_parity_summary(engine)
+            assert parity['missing_tables'] == []
+            assert parity['missing_columns'] == []
+            # Type and nullability deltas remain compatibility debt and are
+            # intentionally reported rather than concealed by this revision.
+            record_property("migration_model_parity", json.dumps(parity, sort_keys=True))
         config.attributes.pop("connection", None)
     finally:
         if engine is not None:
