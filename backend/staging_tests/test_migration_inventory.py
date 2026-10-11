@@ -13,7 +13,8 @@ SCHEMA_COMPLETION_REVISION = "20261011_000003"
 USER_SCHEMA_REVISION = "20261011_000004"
 CORE_SCHEMA_REVISION = "20261011_000005"
 PURCHASE_ORDER_REVISION = "20261011_000006"
-HEAD = "20261011_000007"
+SETTLEMENT_LEDGER_REVISION = "20261011_000007"
+HEAD = "20261011_000008"
 
 
 def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
@@ -22,7 +23,7 @@ def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
     script = ScriptDirectory.from_config(config)
     revisions = {revision.revision: revision for revision in script.walk_revisions()}
 
-    assert len(revisions) == 17
+    assert len(revisions) == 18
     assert revisions["001"].down_revision is None
     assert revisions["20251110_191500"].down_revision == "007_add_performance_indexes"
     assert revisions["token_blacklist_001"].down_revision is None
@@ -33,5 +34,6 @@ def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
     assert revisions[USER_SCHEMA_REVISION].down_revision == SCHEMA_COMPLETION_REVISION
     assert revisions[CORE_SCHEMA_REVISION].down_revision == USER_SCHEMA_REVISION
     assert revisions[PURCHASE_ORDER_REVISION].down_revision == CORE_SCHEMA_REVISION
-    assert revisions[HEAD].down_revision == PURCHASE_ORDER_REVISION
+    assert revisions[SETTLEMENT_LEDGER_REVISION].down_revision == PURCHASE_ORDER_REVISION
+    assert revisions[HEAD].down_revision == SETTLEMENT_LEDGER_REVISION
     assert script.get_heads() == [HEAD]

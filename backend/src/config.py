@@ -30,6 +30,8 @@ class Config:
     ORDER_QUOTE_CURRENCY = os.getenv('ORDER_QUOTE_CURRENCY')
     # Not environment-controlled: no provider settlement is activated by this package.
     SYNTHETIC_SETTLEMENT_ENABLED = False
+    # Rehearsal-only durable protocol; never a production dispatcher/adapter.
+    TRADING_PROTOCOL_REHEARSAL_ENABLED = False
     
     # Database
     SQLALCHEMY_TRACK_MODIFICATIONS = False
