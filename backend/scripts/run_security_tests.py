@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 BACKEND = Path(__file__).resolve().parents[1]
 SUITE = BACKEND / 'security_tests'
@@ -42,11 +43,17 @@ sys.path.insert(0, sys.argv[1])
 import pytest
 raise SystemExit(pytest.main(sys.argv[2:]))
 '''
-    command = [unshare, '--user', '--map-root-user', '--net', '--',
+    # Root already has permission to create a network namespace. Mapping root
+    # into a new user namespace would remove access to runner-owned toolcache
+    # binaries on GitHub Actions. Non-root uses a user namespace for permission.
+    namespace_args = ['--net'] if os.geteuid() == 0 else ['--user', '--map-root-user', '--net']
+    command = [unshare, *namespace_args, '--',
                sys.executable, '-I', '-c', code, str(BACKEND),
                '-p', 'xdist.plugin', '--confcutdir=' + str(SUITE),
                '-c', str(SUITE / 'pytest.ini'), str(SUITE), *sys.argv[1:]]
-    return subprocess.call(command, cwd=BACKEND, env=env)
+    with tempfile.TemporaryDirectory(prefix='marketedgepros-security-') as temporary:
+        command.append('--basetemp=' + str(Path(temporary) / 'pytest'))
+        return subprocess.call(command, cwd=BACKEND, env=env)
 
 
 if __name__ == '__main__':
