@@ -37,98 +37,14 @@ class Wallet(db.Model, TimestampMixin):
     )
     
     def add_funds(self, amount, balance_type='main', description=None, reference_type=None, reference_id=None, created_by=None):
-        """Add funds to wallet with race condition protection"""
-        if amount <= 0:
-            raise ValueError('Amount must be positive')
-        
-        if balance_type not in ['main', 'commission', 'bonus']:
-            raise ValueError('Invalid balance type')
-        
-        # Use SELECT FOR UPDATE to lock the row
-        wallet = db.session.query(Wallet).with_for_update().filter_by(id=self.id).first()
-        
-        # Get current balance
-        if balance_type == 'main':
-            balance_before = float(wallet.main_balance)
-            wallet.main_balance = float(wallet.main_balance) + amount
-            balance_after = float(wallet.main_balance)
-        elif balance_type == 'commission':
-            balance_before = float(wallet.commission_balance)
-            wallet.commission_balance = float(wallet.commission_balance) + amount
-            balance_after = float(wallet.commission_balance)
-        else:  # bonus
-            balance_before = float(wallet.bonus_balance)
-            wallet.bonus_balance = float(wallet.bonus_balance) + amount
-            balance_after = float(wallet.bonus_balance)
-        
-        wallet.last_transaction_at = datetime.utcnow()
-        
-        # Create transaction record
-        transaction = Transaction(
-            wallet_id=self.id,
-            type='deposit',
-            amount=amount,
-            balance_type=balance_type,
-            balance_before=balance_before,
-            balance_after=balance_after,
-            reference_type=reference_type,
-            reference_id=reference_id,
-            description=description,
-            created_by=created_by
-        )
-        db.session.add(transaction)
-        
-        return transaction
+        """Legacy mutation is disabled until a reconciled source-bound ledger exists."""
+        from src.services.wallet_service import WalletLedgerNotConfigured
+        raise WalletLedgerNotConfigured()
     
     def deduct_funds(self, amount, balance_type='main', description=None, reference_type=None, reference_id=None, created_by=None):
-        """Deduct funds from wallet with race condition protection and validation"""
-        if amount <= 0:
-            raise ValueError('Amount must be positive')
-        
-        if balance_type not in ['main', 'commission', 'bonus']:
-            raise ValueError('Invalid balance type')
-        
-        # Use SELECT FOR UPDATE to lock the row
-        wallet = db.session.query(Wallet).with_for_update().filter_by(id=self.id).first()
-        
-        # Get current balance and validate
-        if balance_type == 'main':
-            balance_before = float(wallet.main_balance)
-            if balance_before < amount:
-                raise ValueError(f'Insufficient main balance. Available: {balance_before}, Required: {amount}')
-            wallet.main_balance = float(wallet.main_balance) - amount
-            balance_after = float(wallet.main_balance)
-        elif balance_type == 'commission':
-            balance_before = float(wallet.commission_balance)
-            if balance_before < amount:
-                raise ValueError(f'Insufficient commission balance. Available: {balance_before}, Required: {amount}')
-            wallet.commission_balance = float(wallet.commission_balance) - amount
-            balance_after = float(wallet.commission_balance)
-        else:  # bonus
-            balance_before = float(wallet.bonus_balance)
-            if balance_before < amount:
-                raise ValueError(f'Insufficient bonus balance. Available: {balance_before}, Required: {amount}')
-            wallet.bonus_balance = float(wallet.bonus_balance) - amount
-            balance_after = float(wallet.bonus_balance)
-        
-        wallet.last_transaction_at = datetime.utcnow()
-        
-        # Create transaction record
-        transaction = Transaction(
-            wallet_id=self.id,
-            type='withdrawal',
-            amount=amount,
-            balance_type=balance_type,
-            balance_before=balance_before,
-            balance_after=balance_after,
-            reference_type=reference_type,
-            reference_id=reference_id,
-            description=description,
-            created_by=created_by
-        )
-        db.session.add(transaction)
-        
-        return transaction
+        """Legacy mutation is disabled until a reconciled source-bound ledger exists."""
+        from src.services.wallet_service import WalletLedgerNotConfigured
+        raise WalletLedgerNotConfigured()
     
     def to_dict(self):
         """Convert to dictionary"""
