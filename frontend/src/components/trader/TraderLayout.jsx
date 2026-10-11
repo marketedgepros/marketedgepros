@@ -6,6 +6,7 @@ import {
 import { useState } from 'react';
 import useAuthStore from '../../store/authStore';
 import NotificationBell from '../notifications/NotificationBell';
+import { accountHome } from '../../services/navigationService.js';
 
 export default function TraderLayout({ children }) {
   const location = useLocation();
@@ -14,11 +15,14 @@ export default function TraderLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', href: '/trader', icon: LayoutDashboard },
+    { name: 'Dashboard', href: accountHome(user), icon: LayoutDashboard },
+    { name: 'My Challenges', href: '/challenges', icon: LayoutDashboard },
     { name: 'Wallet', href: '/wallet', icon: Wallet },
-    { name: 'Trading History', href: '/trader/history', icon: TrendingUp },
-    { name: 'Withdrawals', href: '/trader/withdrawals', icon: DollarSign },
-    { name: 'Documents', href: '/trader/documents', icon: FileText },
+    ...(user?.role === 'trader' ? [
+      { name: 'Trading History', href: '/trader/history', icon: TrendingUp },
+      { name: 'Withdrawals', href: '/trader/withdrawals', icon: DollarSign },
+    ] : []),
+    { name: 'Documents', href: '/documents', icon: FileText },
     { name: 'Profile', href: '/profile', icon: User },
     { name: 'My Support Tickets', href: '/support/my-tickets', icon: MessageSquare },
   ];
@@ -47,7 +51,7 @@ export default function TraderLayout({ children }) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
-            <Link to="/trader" className="flex items-center space-x-2">
+            <Link to={accountHome(user)} className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">M</span>
               </div>
@@ -78,7 +82,7 @@ export default function TraderLayout({ children }) {
             </div>
             <div className="mt-3">
               <span className="inline-block px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-400 rounded-full border border-blue-500/30">
-                Trader
+                {user?.role === 'trader' ? 'Trader' : 'Member'}
               </span>
             </div>
           </div>
@@ -92,6 +96,7 @@ export default function TraderLayout({ children }) {
                 <Link
                   key={item.name}
                   to={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                     isActive
                       ? 'bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-white font-medium border border-blue-500/30 shadow-lg shadow-blue-500/10'
@@ -128,7 +133,7 @@ export default function TraderLayout({ children }) {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <Link to="/trader" className="lg:hidden flex items-center space-x-2">
+          <Link to={accountHome(user)} className="lg:hidden flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">M</span>
             </div>

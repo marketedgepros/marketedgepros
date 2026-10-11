@@ -1,27 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
-import { ADMIN_ROLES } from '../constants/roles';
+import { accountHome } from '../services/navigationService.js';
 
 export default function RoleBasedDashboard() {
   const { user } = useAuthStore();
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (ADMIN_ROLES.includes(user.role)) {
-    return <Navigate to="/admin" replace />;
-  }
-  
-  if (user.role === 'affiliate') {
-    return <Navigate to="/affiliate" replace />;
-  }
-  
-  if (user.role === 'trader') {
-    return <Navigate to="/trader" replace />;
-  }
-  
-  // Regular users stay on /dashboard or redirect to home
-  return <Navigate to="/" replace />;
+  return <Navigate to={user ? accountHome(user) : '/login'} replace />;
 }
-

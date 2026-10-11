@@ -5,7 +5,7 @@ import Layout from '../components/layout/Layout';
 import SEO from '../components/SEO';
 import StructuredData from '../components/seo/StructuredData';
 import api from "../services/api";
-import useAuthStore from '../store/authStore';
+import { programCheckoutPath } from '../services/navigationService.js';
 
 
 
@@ -30,14 +30,8 @@ export default function LightningChallenge() {
     }
   };
 
-  const { user } = useAuthStore();
-
   const handleGetStarted = (programId) => {
-    if (!user) {
-      navigate(`/register?program=${programId}`);
-    } else {
-      navigate(`/checkout/${programId}`);
-    }
+    navigate(programCheckoutPath(programId));
   };
 
   const features = [

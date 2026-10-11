@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Search, Filter, Download, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
-import TraderLayout from '../../components/trader/TraderLayout';
 import api from '../../services/api';
 
 export default function TradingHistory() {
@@ -84,19 +83,19 @@ export default function TradingHistory() {
 
   if (isLoading) {
     return (
-      <TraderLayout>
+      <>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             <p className="text-gray-300 mt-4">Loading trading history...</p>
           </div>
         </div>
-      </TraderLayout>
+      </>
     );
   }
 
   return (
-    <TraderLayout>
+    <>
       <div className="min-h-screen bg-slate-900">
         {/* Header */}
         <div className="bg-slate-800/50 border-b border-white/10">
@@ -251,7 +250,7 @@ export default function TradingHistory() {
           </div>
         </div>
       </div>
-    </TraderLayout>
+    </>
   );
 }
 

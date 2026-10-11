@@ -14,7 +14,7 @@ export default function AffiliateLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', href: '/affiliate', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/affiliate/dashboard', icon: LayoutDashboard },
     { name: 'My Traders', href: '/affiliate/traders', icon: Users },
     { name: 'Commissions', href: '/affiliate/commissions', icon: DollarSign },
     { name: 'Reports', href: '/affiliate/reports', icon: BarChart3 },
@@ -46,7 +46,7 @@ export default function AffiliateLayout({ children }) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
-            <Link to="/affiliate" className="flex items-center space-x-2">
+            <Link to="/affiliate/dashboard" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">M</span>
               </div>
@@ -91,6 +91,7 @@ export default function AffiliateLayout({ children }) {
                 <Link
                   key={item.name}
                   to={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                     isActive
                       ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white font-medium border border-purple-500/30 shadow-lg shadow-purple-500/10'
@@ -127,7 +128,7 @@ export default function AffiliateLayout({ children }) {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <Link to="/affiliate" className="lg:hidden flex items-center space-x-2">
+          <Link to="/affiliate/dashboard" className="lg:hidden flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">M</span>
             </div>

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Fragment, lazy, Suspense } from 'react';
 import useAuthStore from '../../store/authStore';
 import { ADMIN_ROLES } from '../../constants/roles';
 
@@ -37,6 +37,8 @@ export default function UserLayout({ children }) {
 
   // Detect role and render appropriate layout
   const role = user.role;
+  const identityKey = JSON.stringify([user.id ?? null, user.tenant_id ?? user.tenantId ?? user.tenant?.id ?? null, role]);
+  const accountContent = <Fragment key={identityKey}>{children}</Fragment>;
 
   // Admin roles
   if (ADMIN_ROLES.includes(role)) {
@@ -49,7 +51,7 @@ export default function UserLayout({ children }) {
           </div>
         </div>
       }>
-        <AdminLayout>{children}</AdminLayout>
+        <AdminLayout>{accountContent}</AdminLayout>
       </Suspense>
     );
   }
@@ -65,7 +67,7 @@ export default function UserLayout({ children }) {
           </div>
         </div>
       }>
-        <AffiliateLayout>{children}</AffiliateLayout>
+        <AffiliateLayout>{accountContent}</AffiliateLayout>
       </Suspense>
     );
   }
@@ -80,7 +82,7 @@ export default function UserLayout({ children }) {
         </div>
       </div>
     }>
-      <TraderLayout>{children}</TraderLayout>
+      <TraderLayout>{accountContent}</TraderLayout>
     </Suspense>
   );
 }

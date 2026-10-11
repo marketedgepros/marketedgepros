@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { postLoginDestination } from '../services/navigationService.js';
 import Layout from '../components/layout/Layout';
 import useAuthStore from '../store/authStore';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     login,
     login2FA,
@@ -46,17 +48,7 @@ export default function Login() {
         setRequires2FA(true);
         setUserId(result.userId);
       } else {
-        // Redirect based on user role
-        const userRole = result.user?.role || 'user';
-        if (userRole === 'supermaster' || userRole === 'admin_master' || userRole === 'master') {
-          navigate('/admin');
-        } else if (userRole === 'affiliate') {
-          navigate('/affiliate');
-        } else if (userRole === 'user') {
-          navigate('/');
-        } else {
-          navigate('/dashboard');
-        }
+        navigate(postLoginDestination(result.user, location.search), { replace: true });
       }
     } catch (err) {
     } finally {
@@ -70,17 +62,7 @@ export default function Login() {
 
     try {
       const result = await login2FA(userId, twoFactorToken);
-      // Redirect based on user role
-      const userRole = result.user?.role || 'user';
-      if (userRole === 'supermaster' || userRole === 'admin_master' || userRole === 'master') {
-        navigate('/admin');
-      } else if (userRole === 'affiliate') {
-        navigate('/affiliate');
-      } else if (userRole === 'user') {
-        navigate('/');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate(postLoginDestination(result.user, location.search), { replace: true });
     } catch (err) {
       // Verification failures deliberately invalidate the single-use pending challenge.
       setRequires2FA(false);

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, Clock, CheckCircle, XCircle, Plus, AlertCircle } from 'lucide-react';
-import TraderLayout from '../../components/trader/TraderLayout';
 import api from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { SkeletonDashboard } from '../../components/common/Skeleton';
@@ -149,19 +148,19 @@ export default function Withdrawals() {
 
   if (isLoading) {
     return (
-      <TraderLayout>
+      <>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             <p className="text-gray-300 mt-4">Loading withdrawals...</p>
           </div>
         </div>
-      </TraderLayout>
+      </>
     );
   }
 
   return (
-    <TraderLayout>
+    <>
       <div className="min-h-screen bg-slate-900">
         {/* Header */}
         <div className="bg-slate-800/50 border-b border-white/10">
@@ -407,7 +406,7 @@ export default function Withdrawals() {
           </div>
         )}
       </div>
-    </TraderLayout>
+    </>
   );
 }
 

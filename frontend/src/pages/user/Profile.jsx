@@ -7,7 +7,6 @@ import {
   User, Mail, Phone, Lock, Shield, CheckCircle,
   AlertCircle, Camera, Trash2, Upload
 } from 'lucide-react';
-import UserLayout from '../../components/layout/UserLayout';
 
 export default function Profile() {
   const { user, updateUser } = useAuthStore();
@@ -138,7 +137,7 @@ export default function Profile() {
   };
 
   return (
-    <UserLayout>
+    <>
       <div className="min-h-screen bg-slate-900">
         {/* Header */}
         <div className="bg-slate-800/50 backdrop-blur-sm border-b border-white/10">
@@ -405,6 +404,6 @@ export default function Profile() {
           </div>
         </div>
       </div>
-    </UserLayout>
+    </>
   );
 }

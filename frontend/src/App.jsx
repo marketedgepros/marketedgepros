@@ -4,6 +4,8 @@ import useAuthStore from './store/authStore';
 import Notification from './components/Notification';
 import ChatWidget from './components/ChatWidget';
 import { ADMIN_ROLES } from './constants/roles';
+import { postLoginDestination } from './services/navigationService.js';
+import { useLocation } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import useNotificationStore from './stores/notificationStore.js';
 
@@ -35,6 +37,7 @@ const Article = lazy(() => import("./pages/support/Article"));
 const Blog = lazy(() => import('./pages/Blog'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
 const AffiliateLanding = lazy(() => import('./pages/affiliate/AffiliateLanding'));
+const AffiliateDashboard = lazy(() => import('./pages/affiliate/AffiliateDashboard'));
 const AffiliatePayout = lazy(() => import('./pages/affiliate/AffiliatePayout'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -91,6 +94,7 @@ import RoleGuard from './components/guards/RoleGuard';
 // Protected Route Component
 function ProtectedRoute({ children, adminOnly = false, userOnly = false }) {
   const { isAuthenticated, isLoading, user } = useAuthStore();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -104,7 +108,7 @@ function ProtectedRoute({ children, adminOnly = false, userOnly = false }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
   // Check if admin trying to access user-only pages
@@ -120,6 +124,7 @@ function ProtectedRoute({ children, adminOnly = false, userOnly = false }) {
 // Public Route Component (redirect if already logged in)
 function PublicRoute({ children }) {
   const { isAuthenticated, isLoading, user } = useAuthStore();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -133,21 +138,7 @@ function PublicRoute({ children }) {
   }
 
   if (isAuthenticated && user) {
-    // Redirect based on user role
-    if (ADMIN_ROLES.includes(user.role)) {
-      return <Navigate to="/admin" replace />;
-    }
-    
-    if (user.role === 'affiliate') {
-      return <Navigate to="/affiliate" replace />;
-    }
-    
-    if (user.role === 'trader') {
-      return <Navigate to="/trader" replace />;
-    }
-    
-    // Regular users go to home
-    return <Navigate to="/" replace />;
+    return <Navigate to={postLoginDestination(user, location.search)} replace />;
   }
 
   return children;
@@ -204,7 +195,7 @@ function App() {
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/affiliate" element={<AffiliateLanding />} />
-        <Route path="/affiliate/payout" element={<ProtectedRoute><AffiliatePayout /></ProtectedRoute>} />
+        <Route path="/affiliate/payout" element={<ProtectedRoute><RoleGuard allowedRoles={['affiliate']}><UserLayout><AffiliatePayout /></UserLayout></RoleGuard></ProtectedRoute>} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -241,9 +232,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <UserLayout>
-                <RoleBasedDashboard />
-              </UserLayout>
+              <RoleBasedDashboard />
             </ProtectedRoute>
           }
         />
@@ -506,11 +495,12 @@ function App() {
 
         {/* Affiliate Routes */}
         <Route
-          path="/affiliate"
+          path="/affiliate/dashboard"
           element={
             <ProtectedRoute>
               <RoleGuard allowedRoles={['affiliate']}>
                 <UserLayout>
+                  <AffiliateDashboard />
                 </UserLayout>
               </RoleGuard>
             </ProtectedRoute>
@@ -552,6 +542,10 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/user/dashboard" element={
+          <ProtectedRoute><RoleGuard allowedRoles={['user']}><UserLayout><TraderDashboard /></UserLayout></RoleGuard></ProtectedRoute>
+        } />
 
         {/* Trader Routes */}
         <Route

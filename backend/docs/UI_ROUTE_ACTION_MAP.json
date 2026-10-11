@@ -1,0 +1,3590 @@
+{
+  "source": "reachable imports from frontend/src/main.jsx",
+  "router": "frontend/src/App.jsx",
+  "routeCount": 67,
+  "reachableJsFiles": 109,
+  "actionCount": 379,
+  "missingImports": [],
+  "routeDeclarations": [
+    {
+      "path": "/"
+    },
+    {
+      "path": "/home"
+    },
+    {
+      "path": "/programs"
+    },
+    {
+      "path": "/programs/:programId/checkout"
+    },
+    {
+      "path": "/programs/:id"
+    },
+    {
+      "path": "/about"
+    },
+    {
+      "path": "/how-it-works"
+    },
+    {
+      "path": "/faq"
+    },
+    {
+      "path": "/contact"
+    },
+    {
+      "path": "/free-course"
+    },
+    {
+      "path": "/lightning-challenge"
+    },
+    {
+      "path": "/support"
+    },
+    {
+      "path": "/support/create-ticket"
+    },
+    {
+      "path": "/support/my-tickets"
+    },
+    {
+      "path": "/support/ticket/:ticketNumber"
+    },
+    {
+      "path": "/support/:slug"
+    },
+    {
+      "path": "/blog"
+    },
+    {
+      "path": "/blog/:slug"
+    },
+    {
+      "path": "/affiliate"
+    },
+    {
+      "path": "/affiliate/payout"
+    },
+    {
+      "path": "/terms-of-service"
+    },
+    {
+      "path": "/terms"
+    },
+    {
+      "path": "/privacy-policy"
+    },
+    {
+      "path": "/privacy"
+    },
+    {
+      "path": "/risk-disclosure"
+    },
+    {
+      "path": "/trading-rules"
+    },
+    {
+      "path": "/refund-policy"
+    },
+    {
+      "path": "/cookie-policy"
+    },
+    {
+      "path": "/careers"
+    },
+    {
+      "path": "/login"
+    },
+    {
+      "path": "/register"
+    },
+    {
+      "path": "/verify-email"
+    },
+    {
+      "path": "/forgot-password"
+    },
+    {
+      "path": "/reset-password"
+    },
+    {
+      "path": "/dashboard"
+    },
+    {
+      "path": "/scaling"
+    },
+    {
+      "path": "/kyc"
+    },
+    {
+      "path": "/profile"
+    },
+    {
+      "path": "/challenges"
+    },
+    {
+      "path": "/challenges/:id"
+    },
+    {
+      "path": "/documents"
+    },
+    {
+      "path": "/wallet"
+    },
+    {
+      "path": "/settings"
+    },
+    {
+      "path": "/notifications"
+    },
+    {
+      "path": "/settings/notifications"
+    },
+    {
+      "path": "/admin"
+    },
+    {
+      "path": "/admin/dashboard"
+    },
+    {
+      "path": "/admin/analytics"
+    },
+    {
+      "path": "/admin/users"
+    },
+    {
+      "path": "/admin/programs"
+    },
+    {
+      "path": "/admin/payments"
+    },
+    {
+      "path": "/admin/challenges"
+    },
+    {
+      "path": "/admin/kyc-approval"
+    },
+    {
+      "path": "/admin/payment-approvals"
+    },
+    {
+      "path": "/admin/withdrawals"
+    },
+    {
+      "path": "/admin/crm"
+    },
+    {
+      "path": "/admin/crm/:id"
+    },
+    {
+      "path": "/admin/settings"
+    },
+    {
+      "path": "/affiliate/dashboard"
+    },
+    {
+      "path": "/affiliate/traders"
+    },
+    {
+      "path": "/affiliate/commissions"
+    },
+    {
+      "path": "/affiliate/reports"
+    },
+    {
+      "path": "/user/dashboard"
+    },
+    {
+      "path": "/trader"
+    },
+    {
+      "path": "/trader/history"
+    },
+    {
+      "path": "/trader/withdrawals"
+    },
+    {
+      "path": "/trader/documents"
+    }
+  ],
+  "actions": [
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 111,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 118,
+      "kind": "to",
+      "destination": "/admin",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 141,
+      "kind": "to",
+      "destination": null,
+      "expression": "{postLoginDestination(user, location.search)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 200,
+      "kind": "to",
+      "destination": "/terms-of-service",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 202,
+      "kind": "to",
+      "destination": "/privacy-policy",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 608,
+      "kind": "href",
+      "destination": "/",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "asset-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/Notification.jsx",
+      "line": 83,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => removeNotification(notification.id)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/ChatWidget.jsx",
+      "line": 91,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(true)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/ChatWidget.jsx",
+      "line": 117,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsMinimized(!isMinimized)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/ChatWidget.jsx",
+      "line": 124,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(false)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/ChatWidget.jsx",
+      "line": 174,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleQuickQuestion(question)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/ChatWidget.jsx",
+      "line": 201,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{sendMessage}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/contexts/ToastContext.jsx",
+      "line": 112,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClose}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Login.jsx",
+      "line": 97,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handle2FASubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Login.jsx",
+      "line": 125,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                    cancel2FA();\n                    setRequires2FA(false);\n                    setUserId(null);\n                    setTwoFactorToken('');\n                    clearError();\n                  }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Login.jsx",
+      "line": 172,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Login.jsx",
+      "line": 214,
+      "kind": "to",
+      "destination": "/forgot-password",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/Login.jsx",
+      "line": 231,
+      "kind": "to",
+      "destination": "/register",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/Register.jsx",
+      "line": 88,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Register.jsx",
+      "line": 225,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/VerifyEmail.jsx",
+      "line": 124,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/VerifyEmail.jsx",
+      "line": 170,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleResend}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/VerifyEmail.jsx",
+      "line": 184,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/ForgotPassword.jsx",
+      "line": 69,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/ForgotPassword.jsx",
+      "line": 92,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ForgotPassword.jsx",
+      "line": 122,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/ResetPassword.jsx",
+      "line": 132,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ResetPassword.jsx",
+      "line": 179,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowPassword(!showPassword)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ResetPassword.jsx",
+      "line": 206,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowConfirmPassword(!showConfirmPassword)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ResetPassword.jsx",
+      "line": 228,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 212,
+      "kind": "to",
+      "destination": "/programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 220,
+      "kind": "to",
+      "destination": "/free-course",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 359,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSelectedPhase('one')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 369,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSelectedPhase('two')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 379,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSelectedPhase('three')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 389,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSelectedPhase('instant')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 425,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/programs/${program.id}`}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 637,
+      "kind": "to",
+      "destination": "/faq",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/NewHomePage.jsx",
+      "line": 653,
+      "kind": "to",
+      "destination": "/programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/ProgramsNew.jsx",
+      "line": 202,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab(tab.id)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramsNew.jsx",
+      "line": 239,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{loadPrograms}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramsNew.jsx",
+      "line": 314,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleGetStarted(program.id)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramsNew.jsx",
+      "line": 397,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveFaq(activeFaq === index ? null : index)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 66,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 207,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 227,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 299,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => toggleAddon(addon)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 360,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowCheckout(true)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 376,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setPaymentMethod('crypto')}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 388,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setPaymentMethod('stripe')}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ProgramDetails.jsx",
+      "line": 423,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowCheckout(false)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Checkout.jsx",
+      "line": 184,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Checkout.jsx",
+      "line": 258,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => toggleAddon(addon.id)}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Checkout.jsx",
+      "line": 353,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{requestQuote}",
+      "phase": "UI-2",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/AboutUs.jsx",
+      "line": 355,
+      "kind": "href",
+      "destination": "/programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/HowItWorks.jsx",
+      "line": 167,
+      "kind": "href",
+      "destination": "/programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/FAQ.jsx",
+      "line": 235,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => toggleQuestion(item.index)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/FAQ.jsx",
+      "line": 275,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => toggleQuestion(index)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/FAQ.jsx",
+      "line": 314,
+      "kind": "href",
+      "destination": "/contact",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/Contact.jsx",
+      "line": 66,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/FreeCourse.jsx",
+      "line": 136,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/FreeCourse.jsx",
+      "line": 260,
+      "kind": "href",
+      "destination": "#",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "anchor-review-required"
+    },
+    {
+      "file": "frontend/src/pages/FreeCourse.jsx",
+      "line": 260,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{(e) => {\n                  e.preventDefault();\n                  window.scrollTo({ top: 0, behavior: 'smooth' });\n                }}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/LightningChallenge.jsx",
+      "line": 168,
+      "kind": "href",
+      "destination": "#programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "anchor-review-required"
+    },
+    {
+      "file": "frontend/src/pages/LightningChallenge.jsx",
+      "line": 175,
+      "kind": "href",
+      "destination": "#comparison",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "anchor-review-required"
+    },
+    {
+      "file": "frontend/src/pages/LightningChallenge.jsx",
+      "line": 396,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleGetStarted(program.id)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/LightningChallenge.jsx",
+      "line": 409,
+      "kind": "to",
+      "destination": "/programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/LightningChallenge.jsx",
+      "line": 430,
+      "kind": "href",
+      "destination": "#programs",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "anchor-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/SupportHub.jsx",
+      "line": 128,
+      "kind": "href",
+      "destination": null,
+      "expression": "{link.link}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/SupportHub.jsx",
+      "line": 141,
+      "kind": "to",
+      "destination": null,
+      "expression": "{link.link}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/SupportHub.jsx",
+      "line": 184,
+      "kind": "to",
+      "destination": null,
+      "expression": "{article.link}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/SupportHub.jsx",
+      "line": 215,
+      "kind": "to",
+      "destination": null,
+      "expression": "{article.link}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/SupportHub.jsx",
+      "line": 244,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/SupportHub.jsx",
+      "line": 251,
+      "kind": "href",
+      "destination": "https://discord.gg/jKbmeSe7",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/CreateTicket.jsx",
+      "line": 115,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate(`/support/ticket/${encodeURIComponent(createdTicket.ticketNumber)}`)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/CreateTicket.jsx",
+      "line": 122,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                    setCreatedTicket(null);\n                    setDraft(EMPTY_DRAFT);\n                    setError('');\n                  }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/CreateTicket.jsx",
+      "line": 171,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 131,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{loadTickets}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 134,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 147,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => selectStatus(filter.value)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 160,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{loadTickets}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 167,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 175,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/support/ticket/${encodeURIComponent(ticket.ticketNumber)}`}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 196,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setPage((current) => Math.max(1, current - 1))}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/MyTickets.jsx",
+      "line": 198,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setPage((current) => current + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 192,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{loadTicket}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 193,
+      "kind": "to",
+      "destination": "/support/my-tickets",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 214,
+      "kind": "to",
+      "destination": "/support/my-tickets",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 215,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{loadTicket}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 227,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleClose}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 248,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setMessagePage((current) => Math.max(1, current - 1))}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 248,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setMessagePage((current) => current + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 255,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleRate(rating)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/TicketDetail.jsx",
+      "line": 260,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSendMessage}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/Article.jsx",
+      "line": 141,
+      "kind": "to",
+      "destination": "/support",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/Article.jsx",
+      "line": 163,
+      "kind": "to",
+      "destination": "/support",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/support/Article.jsx",
+      "line": 231,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/support/${related.slug}`}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/Article.jsx",
+      "line": 259,
+      "kind": "href",
+      "destination": "mailto:info@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/support/Article.jsx",
+      "line": 265,
+      "kind": "to",
+      "destination": "/support",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 163,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => fetchPosts()}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 177,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/blog/${post.slug}`}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 206,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handlePageChange(page)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 238,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleNewsletterSubmit}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 287,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleCategoryChange('all')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 298,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleCategoryChange(cat.slug)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Blog.jsx",
+      "line": 339,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/blog/${post.slug}`}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/BlogPost.jsx",
+      "line": 115,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/blog')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/BlogPost.jsx",
+      "line": 147,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/blog')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/BlogPost.jsx",
+      "line": 242,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => shareOnSocial('facebook')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/BlogPost.jsx",
+      "line": 248,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => shareOnSocial('twitter')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/BlogPost.jsx",
+      "line": 254,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => shareOnSocial('linkedin')}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/BlogPost.jsx",
+      "line": 272,
+      "kind": "to",
+      "destination": null,
+      "expression": "{`/blog/${relatedPost.slug}`}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateLanding.jsx",
+      "line": 221,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateLanding.jsx",
+      "line": 231,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleRegister}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateLanding.jsx",
+      "line": 316,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleRegister}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 178,
+      "kind": "to",
+      "destination": "/affiliate/traders",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 179,
+      "kind": "to",
+      "destination": "/affiliate/commissions",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 180,
+      "kind": "to",
+      "destination": "/affiliate/reports",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 181,
+      "kind": "to",
+      "destination": "/affiliate/payout",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 182,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 200,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 219,
+      "kind": "to",
+      "destination": "/affiliate/payout",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 258,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => copyReferralUrl(link.shareUrl)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliateDashboard.jsx",
+      "line": 336,
+      "kind": "to",
+      "destination": null,
+      "expression": "{to}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliatePayout.jsx",
+      "line": 9,
+      "kind": "to",
+      "destination": "/affiliate/dashboard",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliatePayout.jsx",
+      "line": 48,
+      "kind": "to",
+      "destination": "/affiliate/commissions",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/affiliate/AffiliatePayout.jsx",
+      "line": 54,
+      "kind": "to",
+      "destination": "/support/create-ticket",
+      "expression": null,
+      "phase": "UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/pages/TermsOfService.jsx",
+      "line": 123,
+      "kind": "href",
+      "destination": "mailto:legal@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/PrivacyPolicy.jsx",
+      "line": 151,
+      "kind": "href",
+      "destination": "mailto:privacy@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/RiskDisclosure.jsx",
+      "line": 157,
+      "kind": "href",
+      "destination": "mailto:info@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/TradingRules.jsx",
+      "line": 106,
+      "kind": "href",
+      "destination": "mailto:info@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/RefundPolicy.jsx",
+      "line": 87,
+      "kind": "href",
+      "destination": "mailto:info@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/CookiePolicy.jsx",
+      "line": 100,
+      "kind": "href",
+      "destination": "mailto:info@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Careers.jsx",
+      "line": 93,
+      "kind": "href",
+      "destination": "mailto:careers@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Careers.jsx",
+      "line": 105,
+      "kind": "href",
+      "destination": "mailto:careers@marketedgepros.com",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Dashboard.jsx",
+      "line": 148,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Dashboard.jsx",
+      "line": 162,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/profile')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Dashboard.jsx",
+      "line": 177,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{loadChallenges}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Dashboard.jsx",
+      "line": 196,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Dashboard.jsx",
+      "line": 248,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate(`/challenges/${challenge.id}`)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ScalingProgress.jsx",
+      "line": 192,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onScaleUp}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/RoleBasedDashboard.jsx",
+      "line": 7,
+      "kind": "to",
+      "destination": null,
+      "expression": "{user ? accountHome(user) : '/login'}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 98,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/dashboard')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 118,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/dashboard')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 162,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 291,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                            setFiles({ ...files, document_front: null });\n                            setPreviews({ ...previews, document_front: null });\n                          }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 326,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                            setFiles({ ...files, document_back: null });\n                            setPreviews({ ...previews, document_back: null });\n                          }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 360,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                            setFiles({ ...files, proof_of_address: null });\n                            setPreviews({ ...previews, proof_of_address: null });\n                          }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 395,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                            setFiles({ ...files, selfie: null });\n                            setPreviews({ ...previews, selfie: null });\n                          }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/KYC.jsx",
+      "line": 432,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/dashboard')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Profile.jsx",
+      "line": 176,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleAvatarClick}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Profile.jsx",
+      "line": 185,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleDeleteAvatar}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Profile.jsx",
+      "line": 214,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab('personal')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Profile.jsx",
+      "line": 225,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab('security')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Profile.jsx",
+      "line": 241,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handlePersonalUpdate}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Profile.jsx",
+      "line": 310,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handlePasswordUpdate}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 115,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 140,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{retry}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 164,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 172,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/programs')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 225,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate(`/challenges/${challenge.id}`)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 242,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(pagination.page - 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/MyChallenges.jsx",
+      "line": 250,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(pagination.page + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ChallengeDetails.jsx",
+      "line": 127,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{retry}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ChallengeDetails.jsx",
+      "line": 134,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/challenges')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/ChallengeDetails.jsx",
+      "line": 154,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/challenges')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 80,
+      "kind": "to",
+      "destination": "/",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "asset-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 91,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsMobileMenuOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 125,
+      "kind": "to",
+      "destination": null,
+      "expression": "{item.path}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 125,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsMobileMenuOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 156,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleLogout}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 167,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsMobileMenuOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 178,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsMobileMenuOpen(true)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminLayout.jsx",
+      "line": 192,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                    setIsSearchOpen(!isSearchOpen);\n                  }}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/AdminDashboardConnected.jsx",
+      "line": 70,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{fetchDashboardStats}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/AdminDashboardConnected.jsx",
+      "line": 256,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/admin/analytics')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/AdminDashboardConnected.jsx",
+      "line": 308,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/admin/users')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/AdminDashboardConnected.jsx",
+      "line": 328,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/admin/payments')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 236,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setViewMode('table')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 247,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setViewMode('tree')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 259,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n              // Set default role to first creatable role\n              if (currentUser) {\n                const creatableRoles = getCreatableRoles(currentUser.role);\n                if (creatableRoles.length > 0) {\n                  setFormData(prev => ({\n                    ...prev,\n                    role: creatableRoles[0].value\n                  }));\n                }\n              }\n              setShowAddModal(true);\n            }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 466,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                        setSelectedUserId(user.id);\n                        setShowViewModal(true);\n                      }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 475,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                        setSelectedUserId(user.id);\n                        setShowEditModal(true);\n                      }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 484,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleDeleteUser(user.id, `${user.first_name} ${user.last_name}`)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 503,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handlePageChange(pagination.page - 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 513,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handlePageChange(pagination.page + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 531,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowAddModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 545,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleAddUser}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/UserManagementConnected.jsx",
+      "line": 652,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowAddModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 147,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleOpenDialog()}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 244,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleViewProgram(program)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 251,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleOpenDialog(program)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 258,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleDelete(program)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 280,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleCloseDialog}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 368,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleCloseDialog}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ProgramsManagement.jsx",
+      "line": 374,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleSave}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ChallengesManagement.jsx",
+      "line": 117,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{fetchChallenges}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ChallengesManagement.jsx",
+      "line": 218,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setCurrentPage((page) => Math.max(1, page - 1))}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/ChallengesManagement.jsx",
+      "line": 219,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setCurrentPage((page) => Math.min(1000, totalPages, page + 1))}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentsManagementConnected.jsx",
+      "line": 270,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handlePageChange(pagination.page - 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentsManagementConnected.jsx",
+      "line": 280,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handlePageChange(pagination.page + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/KYCApprovalConnected.jsx",
+      "line": 256,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleApprove(kyc.id)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/KYCApprovalConnected.jsx",
+      "line": 262,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleReject(kyc.id)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentApprovals.jsx",
+      "line": 257,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleOpenDialog(request, 'approve')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentApprovals.jsx",
+      "line": 264,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleOpenDialog(request, 'reject')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentApprovals.jsx",
+      "line": 284,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleCloseDialog}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentApprovals.jsx",
+      "line": 285,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{(e) => e.stopPropagation()}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentApprovals.jsx",
+      "line": 340,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleCloseDialog}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/PaymentApprovals.jsx",
+      "line": 347,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{actionType === 'approve' ? handleApprove : handleReject}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/Settings.jsx",
+      "line": 115,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleGeneralSave}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/Settings.jsx",
+      "line": 192,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handlePaymentSave}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/WithdrawalManagement.jsx",
+      "line": 211,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n            setSelectedWithdrawal(row);\n            setShowDetailsModal(true);\n          }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/WithdrawalManagement.jsx",
+      "line": 299,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSelectedStatus(status)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/WithdrawalManagement.jsx",
+      "line": 329,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowDetailsModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/WithdrawalManagement.jsx",
+      "line": 416,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleApprove(selectedWithdrawal.id)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/WithdrawalManagement.jsx",
+      "line": 424,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleReject(selectedWithdrawal.id)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/WithdrawalManagement.jsx",
+      "line": 435,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleComplete(selectedWithdrawal.id)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 202,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowAddModal(true)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 277,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setView('table')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 287,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setView('pipeline')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 365,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate(`/admin/crm/${lead.id}`)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 449,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowAddModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 457,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleCreateLead}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/CRM.jsx",
+      "line": 567,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowAddModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 237,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/admin/crm')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 253,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/admin/crm')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 261,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleEdit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 268,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleDelete}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 309,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab('overview')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 319,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab('notes')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 329,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab('activity')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 412,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleAddNote}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 453,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleSendEmail}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 460,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleScheduleFollowup}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 467,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleConvertToCustomer}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 482,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleStatusChange(status)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 504,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowFollowupModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 535,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleSubmitFollowup}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 541,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowFollowupModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 560,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowEditModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 676,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleSubmitEdit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/admin/LeadDetails.jsx",
+      "line": 682,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowEditModal(false)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 88,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => fetchNotifications(1, filters)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 97,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => markAllAsRead()}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 106,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/settings/notifications')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 120,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setActiveTab(tab.value)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 140,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => fetchNotifications(1, filters)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 162,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleNotificationClick(notification)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 185,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{(event) => {\n                      event.stopPropagation();\n                      deleteNotification(notification.id);\n                    }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 202,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => changePage(currentPage - 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/Notifications.jsx",
+      "line": 213,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => changePage(currentPage + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/settings/NotificationSettings.jsx",
+      "line": 103,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => fetchPreferences()}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/settings/NotificationSettings.jsx",
+      "line": 222,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleSave}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/agent/Commissions.jsx",
+      "line": 118,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{exportLoadedCommissions}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/UserDashboard.jsx",
+      "line": 83,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setRequestVersion((version) => version + 1)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/trader/TradingHistory.jsx",
+      "line": 108,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{exportTrades}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/trader/Withdrawals.jsx",
+      "line": 173,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setShowModal(true)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/trader/Withdrawals.jsx",
+      "line": 332,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/trader/Withdrawals.jsx",
+      "line": 385,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n                      setShowModal(false);\n                      setFormData({ amount: '', method: 'bank_transfer', accountDetails: '' });\n                    }}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Documents.jsx",
+      "line": 228,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => loadDocuments({ showLoading: true })}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Documents.jsx",
+      "line": 345,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleDownload(documentInfo)}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Wallet.jsx",
+      "line": 144,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => navigate('/trader/withdrawals')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Wallet.jsx",
+      "line": 162,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setFilter('all')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Wallet.jsx",
+      "line": 172,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setFilter('credit')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/pages/user/Wallet.jsx",
+      "line": 182,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setFilter('debit')}",
+      "phase": "UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/guards/RoleGuard.jsx",
+      "line": 26,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/guards/RoleGuard.jsx",
+      "line": 43,
+      "kind": "href",
+      "destination": "/dashboard",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/CryptoCheckout.jsx",
+      "line": 104,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{createPayment}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/CryptoCheckout.jsx",
+      "line": 150,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => copyToClipboard(paymentData.pay_amount.toString())}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/CryptoCheckout.jsx",
+      "line": 163,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => copyToClipboard(paymentData.pay_address)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/SEO.jsx",
+      "line": 28,
+      "kind": "href",
+      "destination": null,
+      "expression": "{canonicalUrl}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/SEO.jsx",
+      "line": 59,
+      "kind": "href",
+      "destination": "/favicon.ico",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "asset-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/SEO.jsx",
+      "line": 60,
+      "kind": "href",
+      "destination": "/apple-touch-icon.png",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "asset-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/SEO.jsx",
+      "line": 61,
+      "kind": "href",
+      "destination": "/favicon-32x32.png",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "unmatched-review-required"
+    },
+    {
+      "file": "frontend/src/components/SEO.jsx",
+      "line": 62,
+      "kind": "href",
+      "destination": "/favicon-16x16.png",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "unmatched-review-required"
+    },
+    {
+      "file": "frontend/src/components/notifications/NotificationBell.jsx",
+      "line": 52,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleClick}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardCard.jsx",
+      "line": 89,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClick}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardTable.jsx",
+      "line": 95,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => onRowClick && onRowClick(row)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardTable.jsx",
+      "line": 126,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(1)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardTable.jsx",
+      "line": 133,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(currentPage - 1)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardTable.jsx",
+      "line": 151,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(page)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardTable.jsx",
+      "line": 177,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(currentPage + 1)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/dashboard/DashboardTable.jsx",
+      "line": 184,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(totalPages)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserDetailsModal.jsx",
+      "line": 66,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClose}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserDetailsModal.jsx",
+      "line": 88,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClose}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserDetailsModal.jsx",
+      "line": 327,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClose}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserEditModal.jsx",
+      "line": 110,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClose}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserEditModal.jsx",
+      "line": 129,
+      "kind": "onSubmit",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserEditModal.jsx",
+      "line": 273,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClose}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserEditModal.jsx",
+      "line": 280,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleSubmit}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/ReferralCodeDisplay.jsx",
+      "line": 32,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleCopy}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/UserTreeView.jsx",
+      "line": 100,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => onUserClick && onUserClick(user)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/DataTable.jsx",
+      "line": 98,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => onRowClick && onRowClick(row)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/DataTable.jsx",
+      "line": 129,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(1)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/DataTable.jsx",
+      "line": 136,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(currentPage - 1)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/DataTable.jsx",
+      "line": 154,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(page)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/DataTable.jsx",
+      "line": 180,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(currentPage + 1)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/DataTable.jsx",
+      "line": 187,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => goToPage(totalPages)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/common/StatsCard.jsx",
+      "line": 89,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{onClick}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 19,
+      "kind": "menu-href",
+      "destination": "/challenges",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 20,
+      "kind": "menu-href",
+      "destination": "/wallet",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 22,
+      "kind": "menu-href",
+      "destination": "/trader/history",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 23,
+      "kind": "menu-href",
+      "destination": "/trader/withdrawals",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 25,
+      "kind": "menu-href",
+      "destination": "/documents",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 26,
+      "kind": "menu-href",
+      "destination": "/profile",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 27,
+      "kind": "menu-href",
+      "destination": "/support/my-tickets",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 39,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 54,
+      "kind": "to",
+      "destination": null,
+      "expression": "{accountHome(user)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 60,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 96,
+      "kind": "to",
+      "destination": null,
+      "expression": "{item.href}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 96,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 115,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleLogout}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 130,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(true)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/trader/TraderLayout.jsx",
+      "line": 136,
+      "kind": "to",
+      "destination": null,
+      "expression": "{accountHome(user)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 17,
+      "kind": "menu-href",
+      "destination": "/#how-it-works",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 18,
+      "kind": "menu-to",
+      "destination": "/programs",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 20,
+      "kind": "menu-to",
+      "destination": "/about",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 21,
+      "kind": "menu-to",
+      "destination": "/blog",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 22,
+      "kind": "menu-to",
+      "destination": "/support",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 30,
+      "kind": "to",
+      "destination": "/",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "asset-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 39,
+      "kind": "to",
+      "destination": null,
+      "expression": "{link.to}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 47,
+      "kind": "href",
+      "destination": null,
+      "expression": "{link.href}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 62,
+      "kind": "to",
+      "destination": "/dashboard",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 71,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleLogout}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 81,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 87,
+      "kind": "to",
+      "destination": "/register",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 98,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(!isOpen)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 111,
+      "kind": "to",
+      "destination": null,
+      "expression": "{link.to}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 111,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 120,
+      "kind": "href",
+      "destination": null,
+      "expression": "{link.href}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 120,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 133,
+      "kind": "to",
+      "destination": "/dashboard",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 133,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 140,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => { handleLogout(); setIsOpen(false); }}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 150,
+      "kind": "to",
+      "destination": "/login",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 150,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 157,
+      "kind": "to",
+      "destination": "/register",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingNavbar.jsx",
+      "line": 157,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setIsOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 11,
+      "kind": "menu-to",
+      "destination": "/about",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 12,
+      "kind": "menu-to",
+      "destination": "/how-it-works",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 13,
+      "kind": "menu-to",
+      "destination": "/blog",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 14,
+      "kind": "menu-to",
+      "destination": "/careers",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 15,
+      "kind": "menu-to",
+      "destination": "/contact",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 21,
+      "kind": "menu-to",
+      "destination": "/programs?filter=one-phase",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 22,
+      "kind": "menu-to",
+      "destination": "/programs?filter=two-phase",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 23,
+      "kind": "menu-to",
+      "destination": "/programs?filter=three-phase",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 31,
+      "kind": "menu-to",
+      "destination": "/support",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 32,
+      "kind": "menu-to",
+      "destination": "/faq",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 33,
+      "kind": "menu-to",
+      "destination": "/trading-rules",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 34,
+      "kind": "menu-to",
+      "destination": "/affiliate",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 41,
+      "kind": "menu-to",
+      "destination": "/terms-of-service",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 42,
+      "kind": "menu-to",
+      "destination": "/privacy-policy",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 43,
+      "kind": "menu-to",
+      "destination": "/risk-disclosure",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 44,
+      "kind": "menu-to",
+      "destination": "/refund-policy",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 45,
+      "kind": "menu-to",
+      "destination": "/cookie-policy",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 66,
+      "kind": "to",
+      "destination": "/",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "asset-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 77,
+      "kind": "href",
+      "destination": null,
+      "expression": "{social.href}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 98,
+      "kind": "to",
+      "destination": null,
+      "expression": "{link.to}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 139,
+      "kind": "to",
+      "destination": "/terms-of-service",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 140,
+      "kind": "to",
+      "destination": "/privacy-policy",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/layout/LandingFooter.jsx",
+      "line": 141,
+      "kind": "to",
+      "destination": "/risk-disclosure",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/notifications/NotificationDropdown.jsx",
+      "line": 65,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => markAllAsRead()}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/notifications/NotificationDropdown.jsx",
+      "line": 92,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => handleNotificationClick(notification)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/notifications/NotificationDropdown.jsx",
+      "line": 114,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{(event) => handleDelete(event, notification.id)}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/notifications/NotificationDropdown.jsx",
+      "line": 129,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => {\n              navigate('/notifications');\n              onClose?.();\n            }}",
+      "phase": "UI-3/UI-4",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 17,
+      "kind": "menu-href",
+      "destination": "/affiliate/dashboard",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 18,
+      "kind": "menu-href",
+      "destination": "/affiliate/traders",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 19,
+      "kind": "menu-href",
+      "destination": "/affiliate/commissions",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 20,
+      "kind": "menu-href",
+      "destination": "/affiliate/reports",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 21,
+      "kind": "menu-href",
+      "destination": "/profile",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 22,
+      "kind": "menu-href",
+      "destination": "/support/my-tickets",
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 34,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 49,
+      "kind": "to",
+      "destination": "/affiliate/dashboard",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 55,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 91,
+      "kind": "to",
+      "destination": null,
+      "expression": "{item.href}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 91,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(false)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 110,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{handleLogout}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 125,
+      "kind": "onClick",
+      "destination": null,
+      "expression": "{() => setSidebarOpen(true)}",
+      "phase": "UI-1/UI-5",
+      "status": "handler-or-external-review-required"
+    },
+    {
+      "file": "frontend/src/components/agent/AgentLayout.jsx",
+      "line": 131,
+      "kind": "to",
+      "destination": "/affiliate/dashboard",
+      "expression": null,
+      "phase": "UI-1/UI-5",
+      "status": "route-exists-static-only"
+    }
+  ],
+  "limitations": "Static inventory: computed menu targets still require runtime role testing; source callbacks are not browser evidence. UI-2/UI-3/UI-4 and UI-6 must test actions and server outcomes. Historical/unreachable files excluded."
+}
