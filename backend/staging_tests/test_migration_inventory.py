@@ -9,7 +9,8 @@ from alembic.script import ScriptDirectory
 
 BACKEND = Path(__file__).resolve().parents[1]
 MERGE_REVISION = "20261011_000001"
-HEAD = "20261011_000002"
+SCHEMA_COMPLETION_REVISION = "20261011_000003"
+HEAD = "20261011_000004"
 
 
 def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
@@ -23,5 +24,7 @@ def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
     assert revisions["token_blacklist_001"].down_revision is None
     assert revisions["token_blacklist_001"].dependencies == "001"
     assert revisions[MERGE_REVISION].down_revision == ("20251110_191500", "token_blacklist_001")
-    assert revisions[HEAD].down_revision == MERGE_REVISION
+    assert revisions["20261011_000002"].down_revision == MERGE_REVISION
+    assert revisions[SCHEMA_COMPLETION_REVISION].down_revision == "20261011_000002"
+    assert revisions[HEAD].down_revision == SCHEMA_COMPLETION_REVISION
     assert script.get_heads() == [HEAD]

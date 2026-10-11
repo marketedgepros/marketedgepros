@@ -17,7 +17,7 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 MERGE_REVISION = "20261011_000001"
-HEAD = "20261011_000002"
+HEAD = "20261011_000004"
 MAIN_OLD_HEAD = "20251110_191500"
 TOKEN_OLD_HEAD = "token_blacklist_001"
 
@@ -56,6 +56,11 @@ def _assert_head_invariants(engine, *, expected_users: int = 0, expected_tenants
     user_columns = {column["name"]: column for column in inspector.get_columns("users")}
     assert user_columns["token_version"]["nullable"] is False
     assert user_columns["token_version"]["default"] in {"0", "'0'::integer"}
+    assert user_columns['can_create_same_role']['nullable'] is False
+    assert user_columns['can_create_same_role']['default'] in {'false', "'false'::boolean"}
+    for name in ('available_balance', 'total_withdrawn', 'payout_count'):
+        assert user_columns[name]['nullable'] is True
+        assert user_columns[name]['default'] is None
     token_columns = {column["name"] for column in inspector.get_columns("token_blacklist")}
     assert {"jti", "token_type", "user_id", "revoked_at", "expires_at"}.issubset(token_columns)
     token_fks = inspector.get_foreign_keys("token_blacklist")
@@ -90,6 +95,8 @@ def _assert_and_remove_main_branch_sentinel(connection) -> None:
         SELECT token_version FROM users
         WHERE email = 'migration-rehearsal-sentinel@example.invalid'
     """)).scalar_one() == 0
+    values = connection.execute(text('SELECT can_create_same_role, available_balance, total_withdrawn, payout_count FROM users WHERE id = 900001')).one()
+    assert tuple(values) == (False, None, None, None)
     connection.execute(text("""
         DELETE FROM users WHERE email = 'migration-rehearsal-sentinel@example.invalid'
     """))
@@ -108,6 +115,9 @@ def _normalized_type(type_) -> str:
 def _model_parity_summary(engine) -> dict[str, list[str]]:
     """Describe, rather than hide, the reachable-head/model metadata delta."""
     from src.database import db
+    from src.schema_inventory import load_complete_model_inventory
+
+    load_complete_model_inventory()
 
     inspector = inspect(engine)
     actual_tables = set(inspector.get_table_names())
@@ -124,8 +134,10 @@ def _model_parity_summary(engine) -> dict[str, list[str]]:
             ) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
                 declared_tables.add(node.value.value)
     missing_tables = sorted(set(model_tables) - actual_tables)
+    missing_columns: list[str] = []
     missing_required_columns: list[str] = []
     type_mismatches: list[str] = []
+    nullability_mismatches: list[str] = []
     server_default_mismatches: list[str] = []
     for table_name, model_table in sorted(model_tables.items()):
         if table_name not in actual_tables:
@@ -135,11 +147,14 @@ def _model_parity_summary(engine) -> dict[str, list[str]]:
             actual_column = actual_columns.get(model_column.name)
             qualified_name = f"{table_name}.{model_column.name}"
             if actual_column is None:
+                missing_columns.append(qualified_name)
                 if not model_column.nullable:
                     missing_required_columns.append(qualified_name)
                 continue
             if _normalized_type(model_column.type) != _normalized_type(actual_column["type"]):
                 type_mismatches.append(qualified_name)
+            if model_column.nullable != actual_column['nullable']:
+                nullability_mismatches.append(qualified_name)
             if model_column.server_default is not None:
                 expected_default = str(model_column.server_default.arg).replace(" ", "")
                 actual_default = (actual_column["default"] or "").replace(" ", "")
@@ -149,8 +164,10 @@ def _model_parity_summary(engine) -> dict[str, list[str]]:
         "missing_tables": missing_tables,
         "unloaded_declared_tables": sorted(declared_tables - set(model_tables)),
         "missing_declared_tables": sorted(declared_tables - actual_tables),
+        "missing_columns": sorted(missing_columns),
         "missing_required_columns": sorted(missing_required_columns),
         "type_mismatches": sorted(type_mismatches),
+        "nullability_mismatches": sorted(nullability_mismatches),
         "server_default_mismatches": sorted(server_default_mismatches),
     }
 
