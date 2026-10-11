@@ -1,502 +1,375 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { CreditCard, Lock, CheckCircle, Copy, ExternalLink, Plus, Check } from 'lucide-react';
-import api from "../services/api";
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Check, CheckCircle, Lock, Plus, RefreshCw } from 'lucide-react';
+import api from '../services/api';
 import useAuthStore from '../store/authStore';
 import { ADMIN_ROLES } from '../constants/roles';
+import {
+  OrderQuoteIdempotencyKeys,
+  formatUsdFromMinorUnits,
+  normalizeQuoteContext,
+  orderQuoteErrorMessage,
+  requestOrderQuote,
+} from '../services/orderQuoteViewService';
+
+const isPositiveRouteId = (value) => /^\d+$/.test(String(value || '')) && Number(value) > 0 && Number(value) <= 2147483647;
 
 const Checkout = () => {
   const { programId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-
-  // Authentication and authorization check
-  useEffect(() => {
-    if (!user) {
-      // Not logged in - redirect to login with return URL
-      navigate('/login', { 
-        replace: true, 
-        state: { from: `/programs/${programId}/checkout` } 
-      });
-    } else if (ADMIN_ROLES.includes(user.role)) {
-      // Admin/support cannot purchase - redirect to dashboard
-      navigate('/admin', { replace: true });
-    }
-  }, [user, navigate, programId]);
   const [program, setProgram] = useState(null);
   const [addons, setAddons] = useState([]);
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'crypto'
-  const [cryptoPayment, setCryptoPayment] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [quote, setQuote] = useState(null);
+  const [quoteState, setQuoteState] = useState('idle');
+  const [quoteError, setQuoteError] = useState('');
+  const mountedRef = useRef(true);
+  const programRequestRef = useRef({ id: 0, controller: null });
+  const quoteRequestRef = useRef({ id: 0, controller: null });
+  const quoteKeysRef = useRef(new OrderQuoteIdempotencyKeys());
+
+  const isAdmin = Boolean(user && ADMIN_ROLES.includes(user.role));
+  // A quote is not a purchase. Keep the server's existing quote authorization;
+  // payment/entitlement prerequisites belong to their separate server contracts.
 
   useEffect(() => {
-    fetchProgramDetails();
+    if (!user) {
+      navigate('/login', {
+        replace: true,
+        state: { from: `/programs/${programId}/checkout` },
+      });
+    } else if (ADMIN_ROLES.includes(user.role)) {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, navigate, programId]);
+
+  useEffect(() => {
+    quoteRequestRef.current.controller?.abort();
+    quoteRequestRef.current.id += 1;
+    quoteKeysRef.current.invalidate();
+    setQuote(null);
+    setQuoteState('idle');
+    setQuoteError('');
+  }, [user?.id]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      programRequestRef.current.controller?.abort();
+      quoteRequestRef.current.controller?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    programRequestRef.current.controller?.abort();
+    quoteRequestRef.current.controller?.abort();
+    quoteRequestRef.current.id += 1;
+    quoteKeysRef.current.invalidate();
+    setProgram(null);
+    setAddons([]);
+    setSelectedAddons([]);
+    setQuote(null);
+    setQuoteState('idle');
+    setQuoteError('');
+    setLoadError('');
+
+    if (!isPositiveRouteId(programId)) {
+      setLoading(false);
+      setLoadError('The program identifier is invalid.');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const requestId = programRequestRef.current.id + 1;
+    programRequestRef.current = { id: requestId, controller };
+    setLoading(true);
+
+    api.get(`/programs/${Number(programId)}`, { signal: controller.signal })
+      .then((response) => {
+        if (!mountedRef.current || programRequestRef.current.id !== requestId) return;
+        const data = response?.data;
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('The program response was invalid.');
+        }
+        setProgram(data);
+        setAddons(Array.isArray(data.addons) ? data.addons : []);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || !mountedRef.current || programRequestRef.current.id !== requestId) return;
+        setLoading(false);
+        setLoadError(error?.response?.data?.error || error?.message || 'Program details could not be loaded.');
+      });
+
+    return () => controller.abort();
   }, [programId]);
 
-  useEffect(() => {
-    let interval;
-    if (cryptoPayment && cryptoPayment.payment_id) {
-      interval = setInterval(() => {
-        checkPaymentStatus(cryptoPayment.payment_id);
-      }, 10000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [cryptoPayment]);
-
-  const fetchProgramDetails = async () => {
-    try {
-      const response = await api.get(`/programs/${programId}`);
-      setProgram(response.data);
-      setAddons(response.data.addons || []);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching program:', error);
-      setError('Failed to load program details');
-      setLoading(false);
-    }
+  const invalidateQuote = () => {
+    quoteRequestRef.current.controller?.abort();
+    quoteRequestRef.current.id += 1;
+    quoteKeysRef.current.invalidate();
+    setQuote(null);
+    setQuoteState('idle');
+    setQuoteError('');
   };
 
   const toggleAddon = (addonId) => {
-    setSelectedAddons(prev => 
-      prev.includes(addonId) 
-        ? prev.filter(id => id !== addonId)
-        : [...prev, addonId]
-    );
+    if (!Number.isSafeInteger(addonId) || addonId < 1) return;
+    invalidateQuote();
+    setSelectedAddons((current) => (
+      current.includes(addonId)
+        ? current.filter((id) => id !== addonId)
+        : [...current, addonId]
+    ));
   };
 
-  const calculateTotal = () => {
-    if (!program) return 0;
-    let total = parseFloat(program.price);
-    
-    selectedAddons.forEach(addonId => {
-      const addon = addons.find(a => a.id === addonId);
-      if (addon) {
-        total += parseFloat(addon.price);
-      }
-    });
-    
-    return total;
-  };
+  const requestQuote = async () => {
+    if (!program || !user || isAdmin) return;
 
-  const handleCheckout = async () => {
-    if (paymentMethod === 'card') {
-      handleStripeCheckout();
-    } else if (paymentMethod === 'crypto') {
-      handleCryptoCheckout();
+    let context;
+    try {
+      context = normalizeQuoteContext(Number(programId), selectedAddons);
+    } catch (error) {
+      setQuote(null);
+      setQuoteState('error');
+      setQuoteError(orderQuoteErrorMessage(error));
+      return;
     }
-  };
 
-  const handleStripeCheckout = async () => {
-    setProcessing(true);
-    setError('');
+    quoteRequestRef.current.controller?.abort();
+    const controller = new AbortController();
+    const requestId = quoteRequestRef.current.id + 1;
+    quoteRequestRef.current = { id: requestId, controller };
+    setQuote(null);
+    setQuoteError('');
+    setQuoteState('loading');
 
     try {
-      const response = await api.post(
-        '/payments/create-checkout',
-        {
-          program_id: programId,
-          addon_ids: selectedAddons
-        }
-      );
-
-      if (response.data.checkout_url) {
-        window.location.href = response.data.checkout_url;
-      } else {
-        setError('Failed to create checkout session');
-        setProcessing(false);
-      }
+      const idempotencyKey = quoteKeysRef.current.forContext(context);
+      const nextQuote = await requestOrderQuote({
+        programId: context.programId,
+        addonIds: context.addonIds,
+        idempotencyKey,
+        signal: controller.signal,
+      });
+      if (!mountedRef.current || quoteRequestRef.current.id !== requestId || controller.signal.aborted) return;
+      setQuote(nextQuote);
+      setQuoteState('quoted');
     } catch (error) {
-      console.error('Checkout error:', error);
-      setError(error.response?.data?.message || 'Failed to process checkout');
-      setProcessing(false);
+      if (!mountedRef.current || quoteRequestRef.current.id !== requestId || controller.signal.aborted) return;
+      setQuote(null);
+      setQuoteState('error');
+      // Retry deliberately retains the same key for this unchanged selection.
+      setQuoteError(orderQuoteErrorMessage(error));
     }
-  };
-
-  const handleCryptoCheckout = async () => {
-    setProcessing(true);
-    setError('');
-
-    try {
-      const userEmail = user?.email || 'user@example.com';
-      const totalAmount = calculateTotal();
-
-      const response = await api.post(
-        '/crypto/create-payment',
-        {
-          program_id: programId,
-          addon_ids: selectedAddons,
-          amount: totalAmount,
-          email: userEmail,
-          order_id: `order_${programId}_${Date.now()}`
-        }
-      );
-
-      if (response.data.success) {
-        setCryptoPayment(response.data);
-        setProcessing(false);
-      } else {
-        setError('Failed to create crypto payment');
-        setProcessing(false);
-      }
-    } catch (error) {
-      console.error('Crypto checkout error:', error);
-      setError(error.response?.data?.error || 'Failed to process crypto payment');
-      setProcessing(false);
-    }
-  };
-
-  const checkPaymentStatus = async (paymentId) => {
-    try {
-      const response = await api.get(
-        `/crypto/payment-status/${paymentId}`
-      );
-
-      if (response.data.status) {
-        setPaymentStatus(response.data.status);
-        
-        if (response.data.status === 'finished') {
-          setTimeout(() => {
-            navigate('/dashboard');
-          }, 2000);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-    }
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="text-white text-xl">Loading program details…</div>
       </div>
     );
   }
 
-  if (!program) {
+  if (loadError || !program) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Program not found</div>
-      </div>
-    );
-  }
-
-  // Show crypto payment screen if payment is initiated
-  if (cryptoPayment) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700">
-            <h2 className="text-3xl font-bold text-white mb-6 text-center">
-              Complete Your USDT Payment
-            </h2>
-
-            {paymentStatus === 'finished' ? (
-              <div className="bg-green-500/10 border border-green-500 rounded-lg p-6 mb-6">
-                <div className="flex items-center justify-center text-green-400 mb-2">
-                  <CheckCircle className="mr-2 text-3xl" />
-                  <span className="text-2xl font-bold">Payment Successful!</span>
-                </div>
-                <p className="text-center text-gray-300">Redirecting to dashboard...</p>
-              </div>
-            ) : (
-              <>
-                <div className="bg-cyan-500/10 border border-cyan-500 rounded-lg p-6 mb-6">
-                  <div className="text-center mb-4">
-                    <p className="text-gray-300 mb-2">Send exactly</p>
-                    <p className="text-4xl font-bold text-cyan-400">{cryptoPayment.pay_amount} USDT</p>
-                    <p className="text-sm text-gray-400 mt-1">TRC20 (Tron Network)</p>
-                  </div>
-
-                  <div className="bg-slate-900/50 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-gray-400 mb-2">Payment Address:</p>
-                    <div className="flex items-center justify-between bg-slate-800 rounded p-3">
-                      <p className="text-white font-mono text-sm break-all mr-2">{cryptoPayment.pay_address}</p>
-                      <button
-                        onClick={() => copyToClipboard(cryptoPayment.pay_address)}
-                        className="text-cyan-400 hover:text-cyan-300 flex-shrink-0"
-                      >
-                        <Copy className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <p className="text-sm text-gray-400 mb-2">Payment ID: {cryptoPayment.payment_id}</p>
-                    {paymentStatus && (
-                      <p className="text-sm text-cyan-400">Status: {paymentStatus}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-yellow-500/10 border border-yellow-500 rounded-lg p-4 mb-6">
-                  <p className="text-yellow-400 font-semibold mb-2">⚠️ Important Instructions:</p>
-                  <ul className="text-sm text-gray-300 space-y-1">
-                    <li>• Send ONLY USDT (TRC20) to this address</li>
-                    <li>• Send the EXACT amount shown above</li>
-                    <li>• Use Tron (TRC20) network - fees are ~$0-$1</li>
-                    <li>• Payment will be confirmed automatically</li>
-                    <li>• Do not close this page until payment is confirmed</li>
-                  </ul>
-                </div>
-
-                {cryptoPayment.payment_url && (
-                  <a
-                    href={cryptoPayment.payment_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-cyan-500 text-white py-3 rounded-lg font-bold flex items-center justify-center hover:bg-cyan-600 transition mb-4"
-                  >
-                    Open Payment Page
-                    <ExternalLink className="ml-2 w-5 h-5" />
-                  </a>
-                )}
-              </>
-            )}
-
-            <button
-              onClick={() => {
-                setCryptoPayment(null);
-                setPaymentStatus(null);
-              }}
-              className="w-full bg-slate-700 text-white py-3 rounded-lg font-bold hover:bg-slate-600 transition"
-            >
-              Cancel Payment
-            </button>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
+        <div className="max-w-lg bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 text-center">
+          <p className="text-red-400 font-semibold">{loadError || 'Program not found.'}</p>
+          <button
+            onClick={() => navigate('/programs')}
+            className="mt-5 bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 transition"
+          >
+            Back to programs
+          </button>
         </div>
       </div>
     );
   }
+
+  const quoteButtonDisabled = quoteState === 'loading' || !user || isAdmin;
+  const quoteButtonLabel = quoteState === 'loading'
+    ? 'Requesting server quote…'
+    : quoteState === 'error'
+      ? 'Retry server quote'
+      : quote
+        ? 'Refresh server quote'
+        : 'Request server quote';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Complete Your Purchase</h1>
-          <p className="text-gray-400">You're one step away from getting funded!</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Review your program</h1>
+          <p className="text-gray-400">Select add-ons, then request an immutable server-priced quote.</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Program Details */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">Program Details</h2>
-            
+          <section className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+            <h2 className="text-2xl font-bold text-white mb-4">Program details</h2>
             <div className="space-y-4">
               <div>
                 <h3 className="text-xl font-bold text-cyan-400 mb-2">{program.name}</h3>
-                <p className="text-gray-400">{program.description}</p>
+                {program.description && <p className="text-gray-400">{program.description}</p>}
               </div>
 
-              <div className="border-t border-slate-700 pt-4">
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">Account Size</span>
-                  <span className="text-white font-semibold">${program.account_size?.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">Profit Target</span>
-                  <span className="text-green-400 font-semibold">{program.profit_target}%</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">Max Daily Loss</span>
-                  <span className="text-red-400 font-semibold">{program.max_daily_loss}%</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">Profit Split</span>
-                  <span className="text-cyan-400 font-semibold">{program.profit_split}%</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">Base Price</span>
-                  <span className="text-white font-semibold">${program.price}</span>
-                </div>
+              <div className="border-t border-slate-700 pt-4 space-y-2">
+                {program.account_size !== undefined && program.account_size !== null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400">Account size</span>
+                    <span className="text-white font-semibold">{String(program.account_size)}</span>
+                  </div>
+                )}
+                {program.profit_target !== undefined && program.profit_target !== null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400">Profit target</span>
+                    <span className="text-green-400 font-semibold">{String(program.profit_target)}%</span>
+                  </div>
+                )}
+                {program.max_daily_loss !== undefined && program.max_daily_loss !== null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400">Max daily loss</span>
+                    <span className="text-red-400 font-semibold">{String(program.max_daily_loss)}%</span>
+                  </div>
+                )}
+                {program.profit_split !== undefined && program.profit_split !== null && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400">Profit split</span>
+                    <span className="text-cyan-400 font-semibold">{String(program.profit_split)}%</span>
+                  </div>
+                )}
               </div>
 
-              {/* Add-ons Section */}
-              {addons && addons.length > 0 && (
+              {addons.length > 0 && (
                 <div className="border-t border-slate-700 pt-4">
                   <h3 className="text-lg font-bold text-white mb-3 flex items-center">
                     <Plus className="mr-2 text-cyan-400" />
-                    Optional Add-ons
+                    Optional add-ons
                   </h3>
                   <div className="space-y-2">
-                    {addons.map(addon => (
-                      <div
-                        key={addon.id}
-                        onClick={() => toggleAddon(addon.id)}
-                        className={`cursor-pointer p-3 rounded-lg border transition-all ${
-                          selectedAddons.includes(addon.id)
-                            ? 'bg-cyan-500/20 border-cyan-500'
-                            : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-2 ${
-                                selectedAddons.includes(addon.id)
-                                  ? 'bg-cyan-500 border-cyan-500'
-                                  : 'border-slate-600'
-                              }`}>
-                                {selectedAddons.includes(addon.id) && (
-                                  <Check className="w-3 h-3 text-white" />
-                                )}
-                              </div>
-                              <span className="font-semibold text-white">{addon.name}</span>
+                    {addons.map((addon) => {
+                      const selected = selectedAddons.includes(addon.id);
+                      return (
+                        <button
+                          type="button"
+                          key={addon.id}
+                          onClick={() => toggleAddon(addon.id)}
+                          className={`w-full text-left p-3 rounded-lg border transition-all ${
+                            selected
+                              ? 'bg-cyan-500/20 border-cyan-500'
+                              : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-start">
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 ${
+                              selected ? 'bg-cyan-500 border-cyan-500' : 'border-slate-600'
+                            }`}>
+                              {selected && <Check className="w-3 h-3 text-white" />}
                             </div>
-                            <p className="text-sm text-gray-400 ml-7 mt-1">{addon.description}</p>
+                            <div>
+                              <span className="font-semibold text-white">{addon.name}</span>
+                              {addon.description && <p className="text-sm text-gray-400 mt-1">{addon.description}</p>}
+                            </div>
                           </div>
-                          <span className="text-cyan-400 font-bold ml-2">+${addon.price}</span>
-                        </div>
-                      </div>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Total */}
               <div className="border-t border-slate-700 pt-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-xl font-bold text-white">Total</span>
-                  <span className="text-3xl font-bold text-cyan-400">${calculateTotal().toFixed(2)}</span>
+                <div className="flex justify-between items-center gap-4">
+                  <span className="text-xl font-bold text-white">Server quote</span>
+                  <span className="text-right text-cyan-400 font-bold">
+                    {quote ? formatUsdFromMinorUnits(quote.order.amountMinor) : 'Not requested'}
+                  </span>
                 </div>
-                {selectedAddons.length > 0 && (
-                  <p className="text-sm text-gray-400 mt-1">
-                    Base: ${program.price} + Add-ons: ${(calculateTotal() - parseFloat(program.price)).toFixed(2)}
-                  </p>
-                )}
-                <p className="text-sm text-gray-400 mt-1">One-time payment</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Totals are calculated only by the server after you request a quote.
+                </p>
               </div>
             </div>
+          </section>
 
-            {/* Features */}
-            <div className="mt-6 space-y-2">
-              <div className="flex items-center text-green-400">
-                <CheckCircle className="mr-2" />
-                <span>Instant Account Activation</span>
-              </div>
-              <div className="flex items-center text-green-400">
-                <CheckCircle className="mr-2" />
-                <span>24/7 Support</span>
-              </div>
-              <div className="flex items-center text-green-400">
-                <CheckCircle className="mr-2" />
-                <span>Fast Payouts</span>
-              </div>
-              <div className="flex items-center text-green-400">
-                <CheckCircle className="mr-2" />
-                <span>No Hidden Fees</span>
-              </div>
-            </div>
-          </div>
+          <section className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+            <h2 className="text-2xl font-bold text-white mb-4">Quote status</h2>
 
-          {/* Payment Method */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">Payment Method</h2>
-
-            {error && (
-              <div className="bg-red-500/10 border border-red-500 text-red-400 px-4 py-3 rounded-lg mb-4">
-                {error}
+            {isAdmin && (
+              <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-300 px-4 py-3 rounded-lg mb-4">
+                Administrative accounts cannot purchase programs.
+              </div>
+            )}
+            {quoteError && (
+              <div className="bg-red-500/10 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4" role="alert">
+                {quoteError}
               </div>
             )}
 
-            {/* Payment Method Selection */}
-            <div className="space-y-3 mb-6">
-              {/* Card Payment */}
-              <div
-                onClick={() => setPaymentMethod('card')}
-                className={`cursor-pointer p-4 rounded-lg border-2 transition-all ${
-                  paymentMethod === 'card'
-                    ? 'border-cyan-500 bg-cyan-500/10'
-                    : 'border-slate-700 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <CreditCard className="text-cyan-400 mr-3" />
-                    <div>
-                      <div className="font-semibold text-white">Credit / Debit Card</div>
-                      <div className="text-sm text-gray-400">Visa, Mastercard, Amex</div>
-                    </div>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${
-                    paymentMethod === 'card'
-                      ? 'border-cyan-500 bg-cyan-500'
-                      : 'border-slate-600'
-                  }`}>
-                    {paymentMethod === 'card' && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Crypto Payment */}
-              <div
-                onClick={() => setPaymentMethod('crypto')}
-                className={`cursor-pointer p-4 rounded-lg border-2 transition-all ${
-                  paymentMethod === 'crypto'
-                    ? 'border-cyan-500 bg-cyan-500/10'
-                    : 'border-slate-700 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="text-2xl mr-3">₮</div>
-                    <div>
-                      <div className="font-semibold text-white">USDT (TRC20)</div>
-                      <div className="text-sm text-gray-400">Cryptocurrency - Low fees (~$1)</div>
-                    </div>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 ${
-                    paymentMethod === 'crypto'
-                      ? 'border-cyan-500 bg-cyan-500'
-                      : 'border-slate-600'
-                  }`}>
-                    {paymentMethod === 'crypto' && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Checkout Button */}
-            <button
-              onClick={handleCheckout}
-              disabled={processing}
-              className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-4 rounded-lg font-bold text-lg hover:shadow-lg hover:shadow-cyan-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {processing ? (
-                'Processing...'
-              ) : (
+            <div className="bg-slate-900/50 rounded-lg border border-slate-700 p-4 mb-5">
+              <p className="text-sm text-gray-400">Current state</p>
+              <p className="text-lg font-semibold text-white mt-1">
+                {quoteState === 'loading' && 'Requesting quote'}
+                {quoteState === 'quoted' && 'Quoted'}
+                {quoteState === 'error' && 'Quote request failed'}
+                {quoteState === 'idle' && 'Not requested'}
+              </p>
+              {quote && (
                 <>
-                  <Lock className="mr-2" />
-                  Proceed to Secure Checkout
+                  <p className="text-sm text-cyan-300 mt-2">Order state: {quote.order.state}</p>
+                  <p className="text-sm text-gray-300">Payment status: not paid</p>
+                  {quote.replayed && <p className="text-sm text-gray-400 mt-2">Existing quote returned for this selection.</p>}
                 </>
               )}
+            </div>
+
+            {quote && (
+              <div className="border-t border-slate-700 pt-4 mb-5">
+                <h3 className="text-lg font-bold text-white mb-3">Immutable quote summary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-400">Base amount</span>
+                    <span className="text-white">USD {quote.order.snapshot.baseAmount}</span>
+                  </div>
+                  {quote.order.snapshot.addons.map((addon) => (
+                    <div className="flex justify-between gap-4" key={addon.id}>
+                      <span className="text-gray-400">{addon.name}</span>
+                      <span className="text-white">USD {addon.amount}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-slate-700 pt-2 flex justify-between gap-4 font-semibold">
+                    <span className="text-white">Quoted total</span>
+                    <span className="text-cyan-400">{formatUsdFromMinorUnits(quote.order.amountMinor)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={requestQuote}
+              disabled={quoteButtonDisabled}
+              className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-4 rounded-lg font-bold text-lg hover:shadow-lg hover:shadow-cyan-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {quoteState === 'error' ? <RefreshCw className="mr-2" /> : <Lock className="mr-2" />}
+              {quoteButtonLabel}
             </button>
 
-            {/* Security Badge */}
-            <div className="mt-4 flex items-center justify-center text-gray-400 text-sm">
-              <Lock className="w-4 h-4 mr-1" />
-              Secure SSL encrypted payment
+            <div className="mt-5 bg-cyan-500/10 border border-cyan-500/50 rounded-lg p-4">
+              <div className="flex items-start text-cyan-100">
+                <CheckCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-cyan-400" />
+                <p className="text-sm">
+                  Payment integrations must be verified and enabled by the server before payment can be offered.
+                  This page only creates an unpaid quote; it does not initiate a provider, wallet transfer, account activation, or funding.
+                </p>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>
@@ -504,4 +377,3 @@ const Checkout = () => {
 };
 
 export default Checkout;
-
