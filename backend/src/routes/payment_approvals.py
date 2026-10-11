@@ -123,97 +123,22 @@ def get_my_requests():
 @token_required
 @role_required('supermaster', 'master')
 def create_approval_request():
-    """
-    Create a new payment approval request
-    
-    Body:
-    {
-        "challenge_id": 123,
-        "payment_id": 456,  // optional
-        "requested_for": 789,  // trader user_id
-        "amount": 299.00,
-        "payment_type": "cash"  // or "free"
-    }
-    """
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['requested_for', 'amount', 'payment_type']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing required field: {field}'
-                }), 400
-        
-        # Create approval request
-        approval_request = PaymentApprovalService.create_approval_request(
-            challenge_id=data.get('challenge_id'),
-            payment_id=data.get('payment_id'),
-            requested_by_id=g.current_user.id,
-            requested_for_id=data['requested_for'],
-            amount=data['amount'],
-            payment_type=data['payment_type']
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': 'Approval request created successfully',
-            'data': approval_request.to_dict()
-        }), 201
-        
-    except ValueError as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+    """Legacy cash/free settlement requires a canonical attested order."""
+    return jsonify({
+        "error": "Order settlement is not configured",
+        "code": "ORDER_SETTLEMENT_NOT_CONFIGURED",
+    }), 503
 
 
 @bp.route('/<int:request_id>/approve', methods=['POST'])
 @token_required
 @role_required('supermaster')
 def approve_request(request_id):
-    """
-    Approve a payment approval request (Super Admin only)
-    
-    Body:
-    {
-        "admin_notes": "Approved - verified cash payment"  // optional
-    }
-    """
-    try:
-        data = request.get_json() or {}
-        
-        approval_request = PaymentApprovalService.approve_request(
-            approval_request_id=request_id,
-            admin_id=g.current_user.id,
-            admin_notes=data.get('admin_notes')
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': 'Payment approved successfully',
-            'data': approval_request.to_dict()
-        }), 200
-        
-    except ValueError as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+    """Legacy cash/free settlement requires a canonical attested order."""
+    return jsonify({
+        "error": "Order settlement is not configured",
+        "code": "ORDER_SETTLEMENT_NOT_CONFIGURED",
+    }), 503
 
 
 @bp.route('/<int:request_id>/reject', methods=['POST'])

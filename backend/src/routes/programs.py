@@ -155,7 +155,15 @@ def create_addon(program_id):
 @programs_bp.route('/<int:program_id>/purchase', methods=['POST'])
 @token_required
 def purchase_program(program_id):
-    """Purchase a trading program"""
+    """Legacy purchase route disabled pending canonical order settlement."""
+    # Legacy purchase path disabled until a valid canonical order and verified
+    # settlement event can grant entitlement. Do not create a payment,
+    # challenge, or approval request from request-controlled payment fields.
+    return jsonify({
+        'error': 'Order settlement is not configured',
+        'code': 'ORDER_SETTLEMENT_NOT_CONFIGURED'
+    }), 503
+
     from src.models import User, PaymentApprovalRequest
     from src.services.payment_approval_service import PaymentApprovalService
     
@@ -281,4 +289,3 @@ def get_challenge(challenge_id):
     response['program'] = challenge.program.to_dict()
     
     return jsonify(response), 200
-

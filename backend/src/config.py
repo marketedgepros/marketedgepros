@@ -25,6 +25,9 @@ class Config:
     # Single-brand ownership is pinned by a reviewed stable DB ID, not email.
     PLATFORM_ROOT_USER_ID = os.getenv('PLATFORM_ROOT_USER_ID')
     EXPANDED_HIERARCHY_ENABLED = False
+    # Quote-only foundation: explicit opt-in and no implied merchant currency.
+    ORDER_QUOTES_ENABLED = os.getenv('ORDER_QUOTES_ENABLED', 'false').lower() == 'true'
+    ORDER_QUOTE_CURRENCY = os.getenv('ORDER_QUOTE_CURRENCY')
     
     # Database
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -91,6 +94,8 @@ class TestingConfig(Config):
     TESTING = True
     # Existing legacy-feature suites remain explicit future-mode regressions.
     EXPANDED_HIERARCHY_ENABLED = True
+    ORDER_QUOTES_ENABLED = False
+    ORDER_QUOTE_CURRENCY = None
     SECRET_KEY = 'isolated-test-secret-not-for-production'
     JWT_SECRET_KEY = 'isolated-test-jwt-secret-not-for-production'
     SQLALCHEMY_DATABASE_URI = os.getenv('TEST_DATABASE_URL', 'sqlite:///:memory:')

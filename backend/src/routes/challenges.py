@@ -23,7 +23,15 @@ challenges_bp = Blueprint('challenges', __name__)
 @challenges_bp.route('/', methods=['POST'])
 @token_required
 def create_challenge(current_user):
-    """Create a new challenge for the user"""
+    """Legacy direct challenge creation disabled pending canonical settlement."""
+    # Legacy direct creation is disabled until a valid canonical order and
+    # verified settlement event grants entitlement. Request fields cannot
+    # create an unpaid challenge or substitute for settlement verification.
+    return jsonify({
+        'error': 'Order settlement is not configured',
+        'code': 'ORDER_SETTLEMENT_NOT_CONFIGURED'
+    }), 503
+
     try:
         user_id = g.current_user.id
         data = request.get_json()
@@ -80,7 +88,15 @@ def create_challenge(current_user):
 @challenges_bp.route('/<int:challenge_id>/start', methods=['POST'])
 @token_required
 def start_challenge(current_user, challenge_id):
-    """Start a challenge (after payment confirmation)"""
+    """Legacy challenge activation disabled pending canonical settlement."""
+    # Legacy activation is disabled until a valid canonical order and verified
+    # settlement event grants entitlement. This must happen before loading the
+    # requested challenge so foreign identifiers do not disclose its existence.
+    return jsonify({
+        'error': 'Order settlement is not configured',
+        'code': 'ORDER_SETTLEMENT_NOT_CONFIGURED'
+    }), 503
+
     try:
         user_id = g.current_user.id
         

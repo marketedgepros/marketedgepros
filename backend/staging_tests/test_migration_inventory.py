@@ -11,7 +11,8 @@ BACKEND = Path(__file__).resolve().parents[1]
 MERGE_REVISION = "20261011_000001"
 SCHEMA_COMPLETION_REVISION = "20261011_000003"
 USER_SCHEMA_REVISION = "20261011_000004"
-HEAD = "20261011_000005"
+CORE_SCHEMA_REVISION = "20261011_000005"
+HEAD = "20261011_000006"
 
 
 def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
@@ -20,7 +21,7 @@ def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
     script = ScriptDirectory.from_config(config)
     revisions = {revision.revision: revision for revision in script.walk_revisions()}
 
-    assert len(revisions) == 15
+    assert len(revisions) == 16
     assert revisions["001"].down_revision is None
     assert revisions["20251110_191500"].down_revision == "007_add_performance_indexes"
     assert revisions["token_blacklist_001"].down_revision is None
@@ -29,5 +30,6 @@ def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
     assert revisions["20261011_000002"].down_revision == MERGE_REVISION
     assert revisions[SCHEMA_COMPLETION_REVISION].down_revision == "20261011_000002"
     assert revisions[USER_SCHEMA_REVISION].down_revision == SCHEMA_COMPLETION_REVISION
-    assert revisions[HEAD].down_revision == USER_SCHEMA_REVISION
+    assert revisions[CORE_SCHEMA_REVISION].down_revision == USER_SCHEMA_REVISION
+    assert revisions[HEAD].down_revision == CORE_SCHEMA_REVISION
     assert script.get_heads() == [HEAD]

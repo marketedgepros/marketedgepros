@@ -86,7 +86,7 @@ def create_app(config_name=None, *, config_overrides=None):
          resources={r"/api/*": {
              "origins": cors_origins,
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
+             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token", "Idempotency-Key"],
              "supports_credentials": True
          }})
     
@@ -129,6 +129,7 @@ def create_app(config_name=None, *, config_overrides=None):
     from src.routes.profile import profile_bp
     from src.routes.programs import programs_bp
     from src.routes.payments import payments_bp
+    from src.routes.orders import orders_bp
     from src.routes.uploads import uploads_bp
     from src.routes.agents import agents_bp
     from src.routes.admin import admin_bp
@@ -162,6 +163,7 @@ def create_app(config_name=None, *, config_overrides=None):
     app.register_blueprint(profile_bp, url_prefix='/api/v1/profile')
     app.register_blueprint(programs_bp, url_prefix='/api/v1/programs')
     app.register_blueprint(payments_bp, url_prefix='/api/v1/payments')
+    app.register_blueprint(orders_bp, url_prefix='/api/v1/orders')
     app.register_blueprint(payouts_bp)
     app.register_blueprint(scaling_bp)
     app.register_blueprint(uploads_bp, url_prefix='/api/v1/uploads')
