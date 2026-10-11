@@ -71,9 +71,9 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const NotificationSettings = lazy(() => import('./pages/settings/NotificationSettings'));
 
 // Affiliate Pages (Lazy Loaded)
-const TradersManagement = lazy(() => import('./pages/affiliate/TradersManagement'));
-const Commissions = lazy(() => import('./pages/affiliate/Commissions'));
-const Reports = lazy(() => import('./pages/affiliate/Reports'));
+const TradersManagement = lazy(() => import('./pages/agent/TradersManagement'));
+const Commissions = lazy(() => import('./pages/agent/Commissions'));
+const Reports = lazy(() => import('./pages/agent/Reports'));
 
 // Trader Pages (Lazy Loaded)
 const TraderDashboard = lazy(() => import('./pages/user/UserDashboard'));
@@ -603,4 +603,3 @@ function App() {
 }
 
 export default App;
-

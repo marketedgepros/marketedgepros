@@ -1,4 +1,4 @@
-"""Inventory migration topology only; SQL generation is performed by the runner with --sql."""
+"""Inventory the explicit two-root dependency graph and its singleton merge head."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,18 +8,20 @@ from alembic.script import ScriptDirectory
 
 
 BACKEND = Path(__file__).resolve().parents[1]
+MERGE_REVISION = "20261011_000001"
+HEAD = "20261011_000002"
 
 
-def test_alembic_inventory_records_the_current_disconnected_token_blacklist_head():
+def test_alembic_inventory_records_roots_dependencies_and_explicit_merge_head():
     config = Config(str(BACKEND / "migrations" / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND / "migrations"))
     script = ScriptDirectory.from_config(config)
-    revisions = {revision.revision: revision.down_revision for revision in script.walk_revisions()}
-    heads = set(script.get_heads())
+    revisions = {revision.revision: revision for revision in script.walk_revisions()}
 
-    assert revisions["001"] is None
-    assert revisions["20251110_191500"] == "007_add_performance_indexes"
-    assert revisions["token_blacklist_001"] is None
-    assert "20251110_191500" in heads
-    assert "token_blacklist_001" in heads
-    assert len(heads) == 2, "a merge migration is required before an online upgrade can have one head"
+    assert revisions["001"].down_revision is None
+    assert revisions["20251110_191500"].down_revision == "007_add_performance_indexes"
+    assert revisions["token_blacklist_001"].down_revision is None
+    assert revisions["token_blacklist_001"].dependencies == "001"
+    assert revisions[MERGE_REVISION].down_revision == ("20251110_191500", "token_blacklist_001")
+    assert revisions[HEAD].down_revision == MERGE_REVISION
+    assert script.get_heads() == [HEAD]

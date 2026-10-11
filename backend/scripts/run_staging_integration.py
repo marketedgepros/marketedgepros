@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import configparser
 import os
+import pwd
 from pathlib import Path
 import shutil
 import socket
@@ -26,6 +27,7 @@ import sys
 import tempfile
 import time
 import uuid
+from urllib.parse import quote
 
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -130,6 +132,9 @@ def _wait_for_socket(path: Path, *, timeout: float, label: str) -> None:
 
 
 def _start_postgres(root: Path, env: dict[str, str]) -> tuple[Path, Path, str, str]:
+    runtime_user = env.get("STAGING_RUNTIME_USER")
+    if not runtime_user:
+        raise RuntimeError("STAGING_RUNTIME_USER is required for the isolated PostgreSQL cluster")
     for binary in ("initdb", "pg_ctl", "createdb"):
         if not (PG_BIN / binary).is_file():
             raise RuntimeError(f"PostgreSQL 18 binary is required: {PG_BIN / binary}")
@@ -138,7 +143,7 @@ def _start_postgres(root: Path, env: dict[str, str]) -> tuple[Path, Path, str, s
     socket_dir.mkdir(mode=0o700)
     os.chmod(socket_dir, 0o700)
     init = _run(
-        [str(PG_BIN / "initdb"), "-D", str(data_dir), "--username", "ubuntu",
+        [str(PG_BIN / "initdb"), "-D", str(data_dir), "--username", runtime_user,
          "--auth", "trust", "--encoding", "UTF8", "--no-locale"],
         env=env,
         timeout=60,
@@ -164,7 +169,7 @@ def _start_postgres(root: Path, env: dict[str, str]) -> tuple[Path, Path, str, s
     db_name = f"marketedgepros_test_{uuid.uuid4().hex}"
     createdb = _run(
         [str(PG_BIN / "createdb"), "-h", str(socket_dir), "-p", PG_PORT,
-         "-O", "ubuntu", db_name],
+         "-O", runtime_user, db_name],
         env=env,
         timeout=30,
         capture=True,
@@ -173,7 +178,7 @@ def _start_postgres(root: Path, env: dict[str, str]) -> tuple[Path, Path, str, s
         raise RuntimeError(f"createdb failed:\n{createdb.stdout[-4000:]}")
     # No hostname is present.  libpq uses the explicitly validated private socket
     # query value instead of any TCP address.
-    pg_url = f"postgresql+psycopg2://ubuntu@/{db_name}?host={socket_dir}&port={PG_PORT}"
+    pg_url = f"postgresql+psycopg2://{quote(runtime_user, safe='')}@/{db_name}?host={socket_dir}&port={PG_PORT}"
     return data_dir, socket_dir, db_name, pg_url
 
 
@@ -261,6 +266,20 @@ def _inner_main(pytest_args: list[str]) -> int:
     data_dir: Path | None = None
     redis_process: subprocess.Popen[str] | None = None
     env = dict(INNER_ENV)
+    runtime_user = os.environ.get("STAGING_RUNTIME_USER")
+    runtime_uid_value = os.environ.get("STAGING_RUNTIME_UID")
+    if not runtime_user or not runtime_uid_value:
+        raise RuntimeError("Outer runner did not provide STAGING_RUNTIME_USER and STAGING_RUNTIME_UID")
+    try:
+        runtime_uid = int(runtime_uid_value)
+    except ValueError as exc:
+        raise RuntimeError("STAGING_RUNTIME_UID must be an integer") from exc
+    if os.getuid() != runtime_uid or os.geteuid() != runtime_uid:
+        raise RuntimeError("Inner runner UID does not match STAGING_RUNTIME_UID")
+    if pwd.getpwuid(runtime_uid).pw_name != runtime_user:
+        raise RuntimeError("STAGING_RUNTIME_USER does not map to STAGING_RUNTIME_UID")
+    env["STAGING_RUNTIME_USER"] = runtime_user
+    env["STAGING_RUNTIME_UID"] = str(runtime_uid)
     try:
         root = Path(tempfile.mkdtemp(prefix="marketedgepros-staging-"))
         os.chmod(root, 0o700)
@@ -303,18 +322,22 @@ def _inner_main(pytest_args: list[str]) -> int:
 def _outer_main(pytest_args: list[str]) -> int:
     _require_clean_python()
     if os.geteuid() == 0:
-        raise RuntimeError("Invoke as ubuntu; the runner itself will use sudo only for unshare")
+        raise RuntimeError("Invoke as an unprivileged user; the runner uses sudo only for unshare")
     unshare = shutil.which("unshare")
     runuser = shutil.which("runuser")
     sudo = shutil.which("sudo")
     if not all((unshare, runuser, sudo)):
         raise RuntimeError("sudo, unshare, and runuser are required for the isolated runner")
-    # Root is used only for CLONE_NEWNET.  runuser immediately drops to ubuntu, so
-    # initdb and both daemons run unprivileged with no user-namespace root mapping.
+    # Root is used only for CLONE_NEWNET.  runuser immediately drops to the
+    # invoking unprivileged account, so initdb and daemons have no root mapping.
+    runtime_uid = os.getuid()
+    runtime_user = pwd.getpwuid(runtime_uid).pw_name
     command = [
         sudo, "-n", unshare, "--net", "--fork", "--kill-child", "--mount-proc", "--",
-        runuser, "-u", "ubuntu", "--", "/usr/bin/env", "-i",
+        runuser, "-u", runtime_user, "--", "/usr/bin/env", "-i",
         *[f"{key}={value}" for key, value in INNER_ENV.items()],
+        f"STAGING_RUNTIME_USER={runtime_user}",
+        f"STAGING_RUNTIME_UID={runtime_uid}",
         str(CLEAN_PYTHON), str(Path(__file__).resolve()), "--inner", *pytest_args,
     ]
     result = subprocess.run(command, cwd=BACKEND, timeout=MAX_SUBPROCESS_SECONDS + 180)

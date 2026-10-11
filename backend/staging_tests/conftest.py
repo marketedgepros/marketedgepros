@@ -26,6 +26,7 @@ def staging_resources():
     """Validate the runner-issued resources before any model import or I/O."""
     assert os.environ.get("FLASK_TESTING") == "true"
     assert os.environ.get("MARKETEDGEPROS_STAGING_INNER") == "1"
+    assert int(os.environ["STAGING_RUNTIME_UID"]) == os.geteuid()
     leaked = PROVIDER_SECRET_NAMES.intersection(os.environ)
     assert not leaked, f"staging runner inherited forbidden secret/resource variables: {leaked}"
 
@@ -45,7 +46,7 @@ def staging_resources():
     assert pg_url.get_backend_name() == "postgresql"
     assert pg_url.database == db_name
     assert pg_url.host is None and pg_url.password is None
-    assert pg_url.username == "ubuntu"
+    assert pg_url.username == os.environ["STAGING_RUNTIME_USER"]
     assert dict(pg_url.query) == {"host": str(pg_socket_dir), "port": os.environ["STAGING_PG_PORT"]}
     pg_server_socket = pg_socket_dir / f".s.PGSQL.{os.environ['STAGING_PG_PORT']}"
     assert stat.S_ISSOCK(pg_server_socket.stat().st_mode)

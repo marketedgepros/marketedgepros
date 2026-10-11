@@ -1,13 +1,16 @@
-"""Challenge management tables
+"""Challenge management tables.
 
 Revision ID: 005
 Revises: 004
 Create Date: 2025-10-18
 
+``challenges`` is owned by revision 001.  A historical duplicate CREATE TABLE
+here made an empty-database upgrade impossible; this revision now creates only
+its distinct tables and indexes the existing challenge table.
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers
 revision = '005'
@@ -15,9 +18,10 @@ down_revision = '004'
 branch_labels = None
 depends_on = None
 
-def upgrade():
-    # Programs table
-    op.create_table('programs',
+
+def upgrade() -> None:
+    op.create_table(
+        'programs',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(length=100), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
@@ -38,11 +42,10 @@ def upgrade():
         sa.Column('is_featured', sa.Boolean(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.PrimaryKeyConstraint('id')
+        sa.PrimaryKeyConstraint('id'),
     )
-    
-    # Payments table
-    op.create_table('payments',
+    op.create_table(
+        'payments',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('amount', sa.Numeric(precision=10, scale=2), nullable=False),
@@ -56,47 +59,12 @@ def upgrade():
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
         sa.Column('completed_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('transaction_id')
+        sa.UniqueConstraint('transaction_id'),
     )
-    
-    # Challenges table
-    op.create_table('challenges',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('program_id', sa.Integer(), nullable=False),
-        sa.Column('challenge_number', sa.String(length=50), nullable=False),
-        sa.Column('status', sa.String(length=50), nullable=True),
-        sa.Column('account_number', sa.String(length=100), nullable=True),
-        sa.Column('account_password', sa.String(length=255), nullable=True),
-        sa.Column('server', sa.String(length=100), nullable=True),
-        sa.Column('platform', sa.String(length=50), nullable=True),
-        sa.Column('current_balance', sa.Numeric(precision=15, scale=2), nullable=True),
-        sa.Column('highest_balance', sa.Numeric(precision=15, scale=2), nullable=True),
-        sa.Column('lowest_balance', sa.Numeric(precision=15, scale=2), nullable=True),
-        sa.Column('total_profit', sa.Numeric(precision=15, scale=2), nullable=True),
-        sa.Column('total_loss', sa.Numeric(precision=15, scale=2), nullable=True),
-        sa.Column('trading_days', sa.Integer(), nullable=True),
-        sa.Column('profit_target_reached', sa.Boolean(), nullable=True),
-        sa.Column('daily_loss_violated', sa.Boolean(), nullable=True),
-        sa.Column('total_loss_violated', sa.Boolean(), nullable=True),
-        sa.Column('started_at', sa.DateTime(), nullable=True),
-        sa.Column('completed_at', sa.DateTime(), nullable=True),
-        sa.Column('expires_at', sa.DateTime(), nullable=True),
-        sa.Column('payment_id', sa.Integer(), nullable=True),
-        sa.Column('amount_paid', sa.Numeric(precision=10, scale=2), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['payment_id'], ['payments.id'], ),
-        sa.ForeignKeyConstraint(['program_id'], ['programs.id'], ),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('challenge_number')
-    )
-    
-    # Trades table
-    op.create_table('trades',
+    op.create_table(
+        'trades',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('challenge_id', sa.Integer(), nullable=False),
         sa.Column('ticket', sa.String(length=100), nullable=True),
@@ -115,12 +83,10 @@ def upgrade():
         sa.Column('close_time', sa.DateTime(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['challenge_id'], ['challenges.id'], ),
+        sa.ForeignKeyConstraint(['challenge_id'], ['challenges.id']),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('ticket')
+        sa.UniqueConstraint('ticket'),
     )
-    
-    # Create indexes
     op.create_index('idx_programs_active', 'programs', ['is_active'])
     op.create_index('idx_challenges_user', 'challenges', ['user_id'])
     op.create_index('idx_challenges_status', 'challenges', ['status'])
@@ -128,7 +94,8 @@ def upgrade():
     op.create_index('idx_payments_status', 'payments', ['status'])
     op.create_index('idx_trades_challenge', 'trades', ['challenge_id'])
 
-def downgrade():
+
+def downgrade() -> None:
     op.drop_index('idx_trades_challenge', table_name='trades')
     op.drop_index('idx_payments_status', table_name='payments')
     op.drop_index('idx_payments_user', table_name='payments')
@@ -136,7 +103,5 @@ def downgrade():
     op.drop_index('idx_challenges_user', table_name='challenges')
     op.drop_index('idx_programs_active', table_name='programs')
     op.drop_table('trades')
-    op.drop_table('challenges')
     op.drop_table('payments')
     op.drop_table('programs')
-

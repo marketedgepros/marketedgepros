@@ -10,9 +10,10 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers
 revision = "token_blacklist_001"
-down_revision = None  # Will be set to latest migration
+# Retain this historical root; users must exist before its foreign key can apply.
+down_revision = None
 branch_labels = None
-depends_on = None
+depends_on = "001"
 
 
 def upgrade():
@@ -30,18 +31,12 @@ def upgrade():
     )
     op.create_index(op.f("ix_token_blacklist_jti"), "token_blacklist", ["jti"], unique=True)
     
-    # Add token_version column to users table if it doesn't exist
-    try:
-        op.add_column("users", sa.Column("token_version", sa.Integer(), nullable=True, server_default="0"))
-    except:
-        pass  # Column already exists
+    # ``token_version`` is a required security invariant for new installations.
+    op.add_column("users", sa.Column("token_version", sa.Integer(), nullable=False, server_default="0"))
 
 
 def downgrade():
     op.drop_index(op.f("ix_token_blacklist_jti"), table_name="token_blacklist")
     op.drop_table("token_blacklist")
     
-    try:
-        op.drop_column("users", "token_version")
-    except:
-        pass
+    op.drop_column("users", "token_version")

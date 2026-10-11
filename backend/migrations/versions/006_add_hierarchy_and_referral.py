@@ -68,12 +68,7 @@ def upgrade() -> None:
     op.add_column('users', sa.Column('kyc_bank_uploaded_at', sa.DateTime(), nullable=True))
     op.add_column('users', sa.Column('kyc_bank_notes', sa.Text(), nullable=True))
     
-    # Add avatar_url if not exists (from migration 003)
-    # This is safe to add even if it exists - SQLAlchemy will skip if column exists
-    try:
-        op.add_column('users', sa.Column('avatar_url', sa.String(length=500), nullable=True))
-    except:
-        pass  # Column already exists
+    # avatar_url is owned by revision 003; do not add it again here.
 
 
 def downgrade() -> None:
