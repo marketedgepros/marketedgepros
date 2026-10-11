@@ -5,6 +5,7 @@ import Notification from './components/Notification';
 import ChatWidget from './components/ChatWidget';
 import { ADMIN_ROLES } from './constants/roles';
 import { ToastProvider } from './contexts/ToastContext';
+import useNotificationStore from './stores/notificationStore.js';
 
 // Auth Pages (Lazy Loaded)
 const Login = lazy(() => import('./pages/Login'));
@@ -156,7 +157,16 @@ function App() {
   const { init } = useAuthStore();
 
   useEffect(() => {
+    // Invalidate notification requests synchronously when the verified principal changes.
+    const identity = (state) => JSON.stringify([
+      state.isAuthenticated, state.user?.id ?? null,
+      state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null,
+    ]);
+    const unsubscribe = useAuthStore.subscribe((state, previous) => {
+      if (identity(state) !== identity(previous)) useNotificationStore.getState().reset();
+    });
     init();
+    return unsubscribe;
   }, [init]);
 
   return (
@@ -187,9 +197,9 @@ function App() {
         <Route path="/lightning-challenge" element={<LightningChallenge />} />
         <Route path="/support" element={<SupportHub />} />
 
-        <Route path="/support/create-ticket" element={<CreateTicket />} />
-        <Route path="/support/my-tickets" element={<MyTickets />} />
-        <Route path="/support/ticket/:ticketNumber" element={<TicketDetail />} />
+        <Route path="/support/create-ticket" element={<ProtectedRoute><CreateTicket /></ProtectedRoute>} />
+        <Route path="/support/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
+        <Route path="/support/ticket/:ticketNumber" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
         <Route path="/support/:slug" element={<Article />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />

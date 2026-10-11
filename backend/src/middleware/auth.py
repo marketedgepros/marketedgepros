@@ -28,7 +28,12 @@ def jwt_required(f):
         
         try:
             from src.services.session_service import SessionService
-            current_user, payload = SessionService.authenticate(token, 'access')
+            # Authentication is a read boundary.  It must not flush unrelated
+            # pending ORM state before an authenticated read-only handler gets
+            # a chance to preserve that state as well.
+            from src.database import db
+            with db.session.no_autoflush:
+                current_user, payload = SessionService.authenticate(token, 'access')
         except ValueError:
             return jsonify({'error': 'Invalid or revoked session'}), 401
         except Exception:

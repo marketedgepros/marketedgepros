@@ -15,17 +15,15 @@ import {
   Shield,
   ChevronRight,
   Search,
-  Bell,
   FileText,
   Mail,
   Award,
 } from 'lucide-react';
-import NotificationDropdown from '../notifications/NotificationDropdown';
+import NotificationBell from '../notifications/NotificationBell';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -59,14 +57,11 @@ export default function AdminLayout({ children }) {
       if (isSearchOpen && !e.target.closest('.search-dropdown')) {
         setIsSearchOpen(false);
       }
-      if (isNotificationsOpen && !e.target.closest('.notifications-dropdown')) {
-        setIsNotificationsOpen(false);
-      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isSearchOpen, isNotificationsOpen]);
+  }, [isSearchOpen]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
@@ -197,7 +192,6 @@ export default function AdminLayout({ children }) {
                 <button 
                   onClick={() => {
                     setIsSearchOpen(!isSearchOpen);
-                    setIsNotificationsOpen(false);
                   }}
                   className="p-2 rounded-xl bg-slate-700/30 hover:bg-slate-700/50 text-gray-300 hover:text-white transition-all duration-200"
                 >
@@ -219,25 +213,7 @@ export default function AdminLayout({ children }) {
               </div>
               
               {/* Notifications */}
-              <div className="relative notifications-dropdown">
-                <button 
-                  onClick={() => {
-                    setIsNotificationsOpen(!isNotificationsOpen);
-                    setIsSearchOpen(false);
-                  }}
-                  className="relative p-2 rounded-xl bg-slate-700/30 hover:bg-slate-700/50 text-gray-300 hover:text-white transition-all duration-200"
-                >
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                </button>
-                
-                {/* Notifications Dropdown */}
-                {isNotificationsOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-96 bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-30">
-                    <NotificationDropdown onClose={() => setIsNotificationsOpen(false)} />
-                  </div>
-                )}
-              </div>
+              <NotificationBell />
             </div>
           </div>
         </div>

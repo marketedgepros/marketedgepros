@@ -35,7 +35,8 @@ def token_required(f):
         
         try:
             from src.services.session_service import SessionService
-            current_user, payload = SessionService.authenticate(token, 'access')
+            with db.session.no_autoflush:
+                current_user, payload = SessionService.authenticate(token, 'access')
         except ValueError:
             return jsonify({'error': 'Invalid or revoked session'}), 401
         except Exception:

@@ -69,7 +69,7 @@ def get_tenant_from_request():
     # This middleware runs before token_required establishes a request scope.
     # Keep the configuration lookup explicitly unscoped even if a prior handler
     # set one, and do not retain either object beyond this request.
-    with without_hierarchy_scope(db.session):
+    with db.session.no_autoflush, without_hierarchy_scope(db.session):
         row = db.session.execute(
             statement.execution_options(skip_hierarchy_scope=True, populate_existing=True)
         ).one_or_none()

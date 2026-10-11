@@ -1,10 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, TrendingUp, DollarSign, FileText, 
-  User, LogOut, Menu, X, Wallet 
+  User, LogOut, Menu, X, Wallet, MessageSquare
 } from 'lucide-react';
 import { useState } from 'react';
 import useAuthStore from '../../store/authStore';
+import NotificationBell from '../notifications/NotificationBell';
 
 export default function TraderLayout({ children }) {
   const location = useLocation();
@@ -19,6 +20,7 @@ export default function TraderLayout({ children }) {
     { name: 'Withdrawals', href: '/trader/withdrawals', icon: DollarSign },
     { name: 'Documents', href: '/trader/documents', icon: FileText },
     { name: 'Profile', href: '/profile', icon: User },
+    { name: 'My Support Tickets', href: '/support/my-tickets', icon: MessageSquare },
   ];
 
   const handleLogout = () => {
@@ -118,21 +120,21 @@ export default function TraderLayout({ children }) {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        {/* Mobile header */}
-        <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between h-16 px-4 bg-slate-800/95 backdrop-blur-sm border-b border-white/10">
+        {/* One header and one notification consumer at every viewport width. */}
+        <div className="sticky top-0 z-30 flex items-center justify-between lg:justify-end h-16 px-4 bg-slate-800/95 backdrop-blur-sm border-b border-white/10">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-300 hover:text-white transition-colors"
+            className="lg:hidden text-gray-300 hover:text-white transition-colors"
           >
             <Menu className="w-6 h-6" />
           </button>
-          <Link to="/trader" className="flex items-center space-x-2">
+          <Link to="/trader" className="lg:hidden flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">M</span>
             </div>
             <span className="text-white font-bold text-lg">MarketEdgePros</span>
           </Link>
-          <div className="w-6" /> {/* Spacer for centering */}
+          <NotificationBell />
         </div>
 
         {/* Page content */}
@@ -141,4 +143,3 @@ export default function TraderLayout({ children }) {
     </div>
   );
 }
-

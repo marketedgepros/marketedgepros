@@ -71,3 +71,29 @@ test('challenge routes use single router-owned layouts and the administrative ro
     assert.doesNotMatch(source, /<UserLayout|<Layout[\s>]/);
   }
 });
+
+test('support account views are protected without making public help articles private', () => {
+  for (const [route, component] of [
+    ['/support/create-ticket', 'CreateTicket'],
+    ['/support/my-tickets', 'MyTickets'],
+    ['/support/ticket/:ticketNumber', 'TicketDetail'],
+  ]) {
+    assert.ok(appSource.includes(`path="${route}" element={<ProtectedRoute><${component} /></ProtectedRoute>}`));
+  }
+  assert.ok(appSource.includes('path="/support" element={<SupportHub />}'));
+  assert.ok(appSource.includes('path="/support/:slug" element={<Article />}'));
+});
+
+test('notification views have one router-owned layout and one bell in each active layout', () => {
+  for (const page of ['pages/Notifications.jsx', 'pages/settings/NotificationSettings.jsx']) {
+    const source = fs.readFileSync(path.join(frontendDirectory, 'src', page), 'utf8');
+    assert.doesNotMatch(source, /<UserLayout[\s>]/);
+  }
+  for (const layout of ['admin/AdminLayout.jsx', 'trader/TraderLayout.jsx', 'agent/AgentLayout.jsx']) {
+    const source = fs.readFileSync(path.join(frontendDirectory, 'src/components', layout), 'utf8');
+    assert.equal([...source.matchAll(/<NotificationBell\s*\/>/g)].length, 1, layout);
+    assert.doesNotMatch(source, /<NotificationDropdown[\s>]/);
+  }
+  assert.match(appSource, /useAuthStore\.subscribe/);
+  assert.match(appSource, /useNotificationStore\.getState\(\)\.reset\(\)/);
+});

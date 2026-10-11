@@ -99,14 +99,16 @@ class SupportTicket(db.Model):
     
     @staticmethod
     def generate_ticket_number():
-        """Generate unique ticket number"""
-        import random
-        import string
-        
-        while True:
-            number = 'TICKET-' + ''.join(random.choices(string.digits, k=6))
-            if not SupportTicket.query.filter_by(ticket_number=number).first():
-                return number
+        """Return one URL-safe candidate; the database unique index resolves races.
+
+        Allocation retries belong to the write transaction so this method never
+        loops or performs a racy preflight query.  Eight bytes provide 64 bits of
+        entropy while the ``TICKET-`` prefix keeps the persisted value under the
+        existing 20-character column limit.
+        """
+        import secrets
+
+        return 'TICKET-' + secrets.token_urlsafe(8).rstrip('=')
 
 
 class TicketMessage(db.Model):
@@ -201,4 +203,3 @@ class FAQ(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
-
