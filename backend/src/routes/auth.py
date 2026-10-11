@@ -48,12 +48,11 @@ def register():
         
         return jsonify({
             'message': 'User registered successfully. Please check your email for verification code.',
-            'user': user.to_dict(),
-            'verification_code': verification_token.code  # Remove in production
+            'user': user.to_dict()
         }), 201
         
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': 'Registration failed'}), 400
     except Exception as e:
         return jsonify({'error': 'Registration failed'}), 500
 
@@ -396,12 +395,10 @@ def verify_email_with_code():
 
 @auth_bp.route("/resend-verification", methods=["POST"])
 @limiter.limit("5 per hour")
+@validate_schema(PasswordResetRequestSchema)
 def resend_verification():
     """Resend verification code"""
-    data = request.get_json()
-    
-    if 'email' not in data:
-        return jsonify({'error': 'Email is required'}), 400
+    data = request.validated_data
     
     try:
         verification_token = AuthService.resend_verification_code(data['email'])
@@ -412,24 +409,24 @@ def resend_verification():
         
         # Always return success (don't reveal if email exists)
         return jsonify({
-            'message': 'If the email exists and is not verified, a new verification code has been sent',
-            'code': verification_token.code if verification_token else None  # Remove in production
+            'message': 'If the email exists and is not verified, a new verification code has been sent'
         }), 200
         
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+        # Keep the response uniform for nonexistent and already-verified accounts.
+        return jsonify({
+            'message': 'If the email exists and is not verified, a new verification code has been sent'
+        }), 200
     except Exception as e:
         return jsonify({'error': 'Failed to resend verification code'}), 500
 
 
 @auth_bp.route("/password/reset-request", methods=["POST"])
 @limiter.limit("5 per hour")
+@validate_schema(PasswordResetRequestSchema)
 def request_password_reset():
     """Request password reset"""
-    data = request.get_json()
-    
-    if 'email' not in data:
-        return jsonify({'error': 'Email is required'}), 400
+    data = request.validated_data
     
     try:
         reset_token = AuthService.request_password_reset(data['email'])
@@ -440,8 +437,7 @@ def request_password_reset():
         
         # Always return success (don't reveal if email exists)
         return jsonify({
-            'message': 'If the email exists, a password reset code has been sent',
-            'reset_code': reset_token.code if reset_token else None  # Remove in production
+            'message': 'If the email exists, a password reset code has been sent'
         }), 200
         
     except Exception as e:
@@ -617,4 +613,3 @@ def get_current_user():
     return jsonify({
         'user': g.current_user.to_dict(include_sensitive=True)
     }), 200
-

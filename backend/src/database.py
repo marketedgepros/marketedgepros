@@ -14,11 +14,14 @@ redis_client = None
 
 def init_db(app):
     """Initialize database with Flask app"""
+    from src.testing_safety import validate_testing_resources
+    validate_testing_resources(app.config)
     db.init_app(app)
     migrate.init_app(app, db)
     
     # Initialize Redis
     global redis_client
+    redis_client = None
     redis_url = app.config.get("REDIS_URL")
     if redis_url:
         try:

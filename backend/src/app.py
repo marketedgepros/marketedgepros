@@ -1,14 +1,17 @@
 """
 Main Flask application factory
 """
+import os
 # GPT-5 FIX #3: Make gevent cooperative for true async concurrency
 # MUST be at the very top before any other imports
-import gevent.monkey
-gevent.monkey.patch_all()
+if os.environ.get('FLASK_TESTING', '').lower() != 'true':
+    import gevent.monkey
+    gevent.monkey.patch_all()
 
-# Patch psycopg2 to work with gevent
-from psycogreen.gevent import patch_psycopg
-patch_psycopg()
+    # Production-only cooperative I/O. Tests retain normal socket semantics
+    # so their outbound-network deny fixture cannot be bypassed by patching.
+    from psycogreen.gevent import patch_psycopg
+    patch_psycopg()
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -24,7 +27,7 @@ import logging
 from prometheus_flask_exporter import PrometheusMetrics
 
 
-def create_app(config_name=None):
+def create_app(config_name=None, *, config_overrides=None):
     """Create and configure Flask application"""
     app = Flask(__name__)
     
@@ -35,10 +38,20 @@ def create_app(config_name=None):
     else:
         config_class = get_config()
         app.config.from_object(config_class)
-    
+
+    # Overrides must precede extension initialization (not be applied later by
+    # a fixture, when the production engine has already been constructed).
+    testing_requested = bool(app.config.get('TESTING')) or config_name == 'testing'
+    if config_overrides is not None:
+        if testing_requested and not config_overrides.get('TESTING', True):
+            raise ValueError('Testing configuration cannot be disabled by overrides')
+        app.config.update(config_overrides)
+    from src.testing_safety import validate_testing_resources
+    validate_testing_resources(app.config)
+
     # Initialize extensions
     # Initialize Prometheus metrics
-    metrics = PrometheusMetrics(app, group_by="endpoint")
+    metrics = PrometheusMetrics(app, group_by="endpoint") if not app.testing else None
     init_db(app)
     
     # Initialize hierarchy scoping system
@@ -49,7 +62,11 @@ def create_app(config_name=None):
     
     # Initialize caching
     from src import cache
-    cache.init_app(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': 'redis://localhost:6379/0', 'CACHE_DEFAULT_TIMEOUT': 300})
+    if app.testing:
+        cache.init_app(app)
+    else:
+        # Keep production cache behavior unchanged in this containment batch.
+        cache.init_app(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': 'redis://localhost:6379/0', 'CACHE_DEFAULT_TIMEOUT': 300})
     
     # Initialize tenant middleware
     init_tenant_middleware(app)
@@ -85,8 +102,7 @@ def create_app(config_name=None):
         app.limiter = limiter
     
     # Initialize Talisman for security headers (skip in testing)
-    import os
-    if not os.environ.get('FLASK_TESTING') == 'true':
+    if not app.testing:
         Talisman(app, force_https=False)
 
     @app.after_request

@@ -8,7 +8,8 @@ from sqlalchemy.pool import NullPool
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+if os.environ.get('FLASK_TESTING', '').lower() != 'true':
+    load_dotenv()
 
 
 import secrets
@@ -81,25 +82,25 @@ class DevelopmentConfig(Config):
 
 
 class TestingConfig(Config):
-    """Testing configuration"""
+    """Isolated defaults; PostgreSQL requires an explicit per-run test URL."""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'TEST_DATABASE_URL',
-        'postgresql://postgres:postgres@localhost:5432/proptradepro_test'
-    )
+    SECRET_KEY = 'isolated-test-secret-not-for-production'
+    JWT_SECRET_KEY = 'isolated-test-jwt-secret-not-for-production'
+    SQLALCHEMY_DATABASE_URI = os.getenv('TEST_DATABASE_URL', 'sqlite:///:memory:')
+    SQLALCHEMY_ENGINE_OPTIONS = {}
+    REDIS_URL = None
+    CACHE_TYPE = 'SimpleCache'
+    CACHE_REDIS_URL = None
     RATELIMIT_ENABLED = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 100,  # Increased for 9 workers
-        'max_overflow': 200,  # 2x pool_size
-        'pool_timeout': 60,  # Increased timeout
-        'pool_recycle': 3600,  # 1 hour
-        'pool_pre_ping': True,  # Test connections
-        'connect_args': {
-            'connect_timeout': 10,
-            'application_name': 'MarketEdgePros',
-            'options': '-c statement_timeout=30000'  # 30s query timeout
-        }
-    }
+    RATELIMIT_STORAGE_URL = 'memory://'
+    WTF_CSRF_ENABLED = False
+    MAIL_SUPPRESS_SEND = True
+    SENDGRID_API_KEY = None
+    STRIPE_SECRET_KEY = None
+    STRIPE_WEBHOOK_SECRET = None
+    MT_SERVER = None
+    MT_LOGIN = None
+    MT_PASSWORD = None
 
 
 class ProductionConfig(Config):
@@ -160,4 +161,3 @@ def get_config():
     env = os.getenv('FLASK_ENV', 'production')  # Default to production
     config_class = config.get(env, config['production'])
     return config_class
-

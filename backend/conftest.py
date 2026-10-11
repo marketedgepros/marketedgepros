@@ -9,6 +9,9 @@ from flask import Flask
 from sqlalchemy.orm import scoped_session, sessionmaker
 from datetime import datetime, timedelta
 
+# Test mode must be selected before app.py can patch sockets or initialize I/O.
+os.environ["FLASK_TESTING"] = "true"
+
 # Import app factory
 from src.app import create_app
 from src.database import db as _db
@@ -48,12 +51,13 @@ def app(request):
     os.environ['FLASK_TESTING'] = 'true'
     
     # Create app
-    app = create_app()
-    
-    # Apply test configuration
-    app.config.from_object(TestingConfig)
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://testuser:testpass123@localhost:5432/marketedgepros_test'
+    if request.config.getoption('--use-postgres'):
+        test_url = os.environ.get('TEST_DATABASE_URL')
+        if not test_url:
+            raise pytest.UsageError('--use-postgres requires an isolated TEST_DATABASE_URL')
+    else:
+        test_url = 'sqlite:///:memory:'
+    app = create_app('testing', config_overrides={'SQLALCHEMY_DATABASE_URI': test_url})
     
     # Establish application context
     ctx = app.app_context()
@@ -117,7 +121,7 @@ def session(app, database):
             
             # Clear Redis cache to prevent test contamination
             try:
-                from src.extensions import redis_client
+                from src.database import redis_client
                 if redis_client:
                     redis_client.flushdb()
             except Exception:

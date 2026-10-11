@@ -1,0 +1,36 @@
+name: Focused security regressions
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/security-foundation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-security.lock
+      - name: Install isolated locked dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --require-hashes -r backend/requirements-security.lock
+      - name: Run focused HTTP and resource-isolation regressions
+        run: sudo .venv/bin/python backend/scripts/run_security_tests.py -q --junitxml=security-junit.xml
+      - name: Verify worker isolation
+        run: sudo .venv/bin/python backend/scripts/run_security_tests.py -q -n 4 --junitxml=security-parallel-junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focused-security-junit
+          path: security*-junit.xml
