@@ -87,7 +87,7 @@ class OrderService:
             # Bind explicitly to public, the frozen migration's owned namespace.
             ready = db.session.execute(text("""
                 SELECT EXISTS (
-                    SELECT 1 FROM public.alembic_version WHERE version_num = '20261011_000006'
+                    SELECT 1 FROM public.alembic_version WHERE version_num IN ('20261011_000006', '20261011_000007')
                 ) AND EXISTS (
                     SELECT 1 FROM pg_trigger t
                     JOIN pg_class c ON c.oid = t.tgrelid

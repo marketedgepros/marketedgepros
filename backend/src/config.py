@@ -28,6 +28,8 @@ class Config:
     # Quote-only foundation: explicit opt-in and no implied merchant currency.
     ORDER_QUOTES_ENABLED = os.getenv('ORDER_QUOTES_ENABLED', 'false').lower() == 'true'
     ORDER_QUOTE_CURRENCY = os.getenv('ORDER_QUOTE_CURRENCY')
+    # Not environment-controlled: no provider settlement is activated by this package.
+    SYNTHETIC_SETTLEMENT_ENABLED = False
     
     # Database
     SQLALCHEMY_TRACK_MODIFICATIONS = False

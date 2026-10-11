@@ -17,8 +17,8 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 MERGE_REVISION = "20261011_000001"
-HEAD = "20261011_000006"
-EXPECTED_MODEL_TABLE_COUNT = 47
+HEAD = "20261011_000007"
+EXPECTED_MODEL_TABLE_COUNT = 50
 MAIN_OLD_HEAD = "20251110_191500"
 TOKEN_OLD_HEAD = "token_blacklist_001"
 CORE_SHAPE_COLUMNS = {
@@ -74,7 +74,8 @@ def _assert_head_invariants(engine, *, expected_users: int = 0, expected_tenants
     assert {
         "tenants", "users", "email_verification_tokens", "password_reset_tokens",
         "challenges", "payments", "trades", "token_blacklist", "account_scaling",
-        "scaling_tiers", "purchase_orders",
+        "scaling_tiers", "purchase_orders", "payment_event_receipts",
+        "settlement_journals", "settlement_entries",
     }.issubset(tables)
     user_columns = {column["name"]: column for column in inspector.get_columns("users")}
     assert user_columns["token_version"]["nullable"] is False

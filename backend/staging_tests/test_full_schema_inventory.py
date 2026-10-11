@@ -52,7 +52,7 @@ PREEXISTING_MODEL_TABLES = frozenset({
 EXPECTED_NEW_TABLES = EXPECTED_DECLARED_TABLES - PREEXISTING_MODEL_TABLES
 assert len(EXPECTED_DECLARED_TABLES) == 46
 assert len(EXPECTED_NEW_TABLES) == 34
-CURRENT_DECLARED_TABLES = EXPECTED_DECLARED_TABLES | {'purchase_orders'}
+CURRENT_DECLARED_TABLES = EXPECTED_DECLARED_TABLES | {'purchase_orders', 'payment_event_receipts', 'settlement_journals', 'settlement_entries'}
 
 
 def _alembic_config(url: str) -> Config:
@@ -207,7 +207,7 @@ def test_complete_active_model_inventory_imports_every_source_module(staging_res
     from src.schema_inventory import load_complete_model_inventory
 
     inventory = load_complete_model_inventory()
-    assert len(inventory.modules) == 27
+    assert len(inventory.modules) == 28
     assert set(inventory.declared_tables) == CURRENT_DECLARED_TABLES
     assert set(inventory.metadata_tables) == CURRENT_DECLARED_TABLES
     assert dict(inventory.external_foreign_key_targets) == {"affiliate_referrals": ("programs",)}
