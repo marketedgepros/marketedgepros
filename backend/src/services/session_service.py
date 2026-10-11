@@ -44,6 +44,19 @@ class SessionService:
             user = db.session.execute(query.execution_options(populate_existing=True)).scalar_one_or_none()
         if user is None or not user.is_active:
             raise ValueError('Invalid session')
+        if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False):
+            from src.utils.hierarchy_scoping import configured_platform_root_id, platform_root_scope, tenant_hierarchy_scope
+            if user.role == 'supermaster':
+                if not platform_root_scope(user):
+                    raise ValueError('Role unavailable in launch mode')
+            elif user.role not in {'trader', 'affiliate', 'agent', 'guest'}:
+                raise ValueError('Role unavailable in launch mode')
+            else:
+                owner_id = configured_platform_root_id()
+                with without_hierarchy_scope(db.session):
+                    owner = User.query.filter(User.id == owner_id).populate_existing().first() if owner_id else None
+                if owner is None or not platform_root_scope(owner) or not tenant_hierarchy_scope(owner) or user.tenant_id != owner.tenant_id:
+                    raise ValueError('Brand unavailable in launch mode')
         if payload.get('token_version', 0) != (user.token_version or 0):
             raise ValueError('Session revoked')
         return user

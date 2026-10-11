@@ -13,78 +13,65 @@ class AuthService:
     
     @staticmethod
     def register_user(email, password, first_name, last_name, referral_code=None, **kwargs):
-        """Register a new user"""
+        """Atomically register within the configured owner's existing brand."""
         from src.models import Agent, Referral
-        from flask import request
-        
-        # Check if user already exists
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_user:
-            raise ValueError('Email already registered')
-        
-        # Create new user
-        user = User(
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            **kwargs
-        )
-        user.set_password(password)
-        
-        db.session.add(user)
-        db.session.flush()  # Get user.id before update_tree_path()
-        
-        # Assign to root user (for MLM hierarchy)
-        root_user = User.query.filter_by(
-            parent_id=None,
-            role='supermaster',
-            can_create_same_role=True
-        ).first()
-        if root_user:
-            user.parent_id = root_user.id
+        from flask import has_request_context, request
+        from src.utils.hierarchy_scoping import configured_platform_root_id, platform_root_scope, tenant_hierarchy_scope
+
+        notify_upline = None
+        try:
+            root_id = configured_platform_root_id()
+            root_user = User.query.filter(User.id == root_id).first() if root_id else None
+            if root_user is None or not platform_root_scope(root_user) or not tenant_hierarchy_scope(root_user):
+                raise ValueError('Registration is unavailable until platform ownership is configured')
+            if 'tenant_id' in kwargs and kwargs['tenant_id'] != root_user.tenant_id:
+                raise ValueError('Invalid registration ownership')
+            kwargs.setdefault('role', 'trader')
+            if kwargs.get('role', 'guest') not in {'guest', 'trader'}:
+                raise ValueError('Invalid registration role')
+            if User.query.filter_by(email=email).first():
+                raise ValueError('Email already registered')
+            kwargs['tenant_id'] = root_user.tenant_id
+            parent = root_user
+            agent = None
+            if referral_code:
+                agent = Agent.query.filter_by(agent_code=referral_code, is_active=True).with_for_update().first()
+                if agent is not None:
+                    parent = User.query.filter(User.id == agent.user_id, User.tenant_id == root_user.tenant_id).first()
+                    if parent is None or not parent.is_active or not tenant_hierarchy_scope(parent):
+                        raise ValueError('Invalid registration ownership')
+                    if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False) and parent.role not in {'affiliate', 'agent'}:
+                        raise ValueError('Referral owner is unavailable in launch mode')
+            user = User(email=email, first_name=first_name, last_name=last_name, **kwargs)
+            user.set_password(password)
+            user.parent_id = parent.id
+            db.session.add(user)
+            db.session.flush()
             user.update_tree_path()
-        db.session.commit()
-        
-        # Handle referral code if provided
-        if referral_code:
-            agent = Agent.query.filter_by(agent_code=referral_code, is_active=True).first()
-            if agent:
-                # Create referral record
-                referral = Referral(
-                    agent_id=agent.id,
-                    referred_user_id=user.id,
-                    referral_code=referral_code,
-                    ip_address=request.remote_addr if request else None,
-                    user_agent=request.headers.get('User-Agent') if request else None,
+            if agent is not None:
+                db.session.add(Referral(
+                    agent_id=agent.id, referred_user_id=user.id, referral_code=referral_code,
+                    ip_address=request.remote_addr if has_request_context() else None,
+                    user_agent=request.headers.get('User-Agent') if has_request_context() else None,
                     status='pending'
-                )
-                db.session.add(referral)
-                
-                # Set parent relationship
-                user.parent_id = agent.user_id
-                user.update_tree_path()
-                
-                # Update agent stats
+                ))
                 agent.referral_count += 1
-                db.session.commit()
-                
-                # Send email notification to upline (agent owner)
-                try:
-                    from src.services.email_service import EmailService
-                    upline_user = agent.user
-                    EmailService.send_new_downline_email(upline_user, user)
-                except Exception as e:
-                    # Log error but don't fail registration
-                    import logging
-                    logging.error(f'Failed to send downline notification email: {str(e)}')
-        
-        # Generate email verification token
-        verification_token = EmailVerificationToken(user.id)
-        db.session.add(verification_token)
-        db.session.commit()
-        
+                notify_upline = parent
+            verification_token = EmailVerificationToken(user.id)
+            db.session.add(verification_token)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        # External notification occurs only after successful commit.
+        if notify_upline is not None:
+            try:
+                from src.services.email_service import EmailService
+                EmailService.send_new_downline_email(notify_upline, user)
+            except Exception:
+                current_app.logger.warning('Downline notification unavailable after registration')
         return user, verification_token
-    
+
     @staticmethod
     def login_user(email, password, ip_address=None):
         """Login user with email and password"""
@@ -98,6 +85,8 @@ class AuthService:
         
         if not user.is_verified:
             raise ValueError("Please verify your email address before logging in")
+        from src.services.session_service import SessionService
+        user = SessionService.principal({'user_id': user.id, 'token_version': user.token_version or 0})
         
         # Update last login
         user.last_login_at = datetime.utcnow()

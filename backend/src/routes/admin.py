@@ -284,7 +284,15 @@ def get_user(current_user, user_id):
 def create_user(current_user):
     """Create a new user with comprehensive error handling"""
     try:
-        data = request.get_json()
+        from src.utils.hierarchy_scoping import tenant_hierarchy_scope
+        from flask import current_app
+        if not tenant_hierarchy_scope(current_user):
+            return jsonify({'error': 'A complete hierarchy and tenant scope is required', 'code': 'HIERARCHY_SCOPE_REQUIRED'}), 403
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'A JSON object is required'}), 400
+        if 'tenant_id' in data and data['tenant_id'] != current_user.tenant_id:
+            return jsonify({'error': 'tenant_id must match the authenticated tenant'}), 403
         
         # Validate required fields
         required_fields = ['email', 'password', 'first_name', 'last_name', 'role']
@@ -296,6 +304,13 @@ def create_user(current_user):
                 fields=', '.join(missing_fields)
             )), 400
         
+        if any(not isinstance(data[field], str) for field in required_fields):
+            return jsonify({'error': 'Required fields must be strings'}), 400
+        from src.utils.validators import validate_password_strength
+        valid_password, password_error = validate_password_strength(data['password'])
+        if not valid_password:
+            return jsonify({'error': password_error}), 400
+
         # Validate email format
         valid, result = validate_email_format(data['email'])
         if not valid:
@@ -313,6 +328,8 @@ def create_user(current_user):
         
         # Validate role
         allowed_roles = ['supermaster', 'super_admin', 'master', 'admin', 'agent', 'trader']
+        if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False):
+            allowed_roles = ['affiliate', 'agent', 'trader']
         if data['role'] not in allowed_roles:
             return jsonify(format_error_response(
                 'INVALID_ROLE',
@@ -325,9 +342,11 @@ def create_user(current_user):
         # Normalize roles (agent -> affiliate, etc.)
         target_role = Roles.normalize_role(data['role'])
         current_role = Roles.normalize_role(g.current_user.role)
+        if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False) and target_role == Roles.AFFILIATE:
+            return jsonify({'error': 'Affiliate program activation requires configured bonus terms', 'code': 'AFFILIATE_PROGRAM_NOT_CONFIGURED'}), 409
         
         # Check if current user can create target role
-        if not can_user_create_role(current_role, target_role, g.current_user.can_create_same_role):
+        if not current_user.can_create_user(data['role']):
             role_names = {
                 'supermaster': 'SuperMaster',
                 'master': 'Master',
@@ -375,35 +394,28 @@ def create_user(current_user):
                 country_code=data.get('country_code'),
                 is_verified=is_verified,
                 parent_id=g.current_user.id,  # Set parent to current user
-                level=g.current_user.level + 1 if hasattr(g.current_user, 'level') else 1
+                level=g.current_user.level + 1 if hasattr(g.current_user, 'level') else 1,
+                tenant_id=current_user.tenant_id
             )
             user.set_password(data['password'])
             
             db.session.add(user)
-            db.session.commit()
+            db.session.flush()
             
-            # Build tree_path after commit
-            if g.current_user.tree_path:
-                user.tree_path = f"{g.current_user.tree_path}.{user.id}"
-            else:
-                user.tree_path = str(user.id)
-            db.session.commit()
-        
-        # Generate referral code AFTER commit (to avoid NOT NULL issues)
-        if user.role in ['supermaster', 'super_admin', 'admin', 'agent']:
-            user.generate_referral_code()
-            db.session.commit()
-        
-        # Create Agent profile for agents
-        if user.role == 'agent':
-            from src.models.agent import Agent
-            agent = Agent(
-                user_id=user.id,
-                agent_code=user.referral_code,  # Use the same code as referral_code
-                commission_rate=10.0,  # Default 10% commission
-                is_active=True
-            )
-            db.session.add(agent)
+            # Validate the canonical path before any commit; failures leave no account.
+            user.update_tree_path()
+            if user.role in ['supermaster', 'super_admin', 'admin', 'agent']:
+                user.generate_referral_code()
+            if user.role == 'agent':
+                from src.models.agent import Agent
+                agent = Agent(
+                    user_id=user.id,
+                    agent_code=user.referral_code,
+                    commission_rate=10.0,
+                    is_active=True
+                )
+                db.session.add(agent)
+            # Account, canonical path, referral and optional profile are atomic.
             db.session.commit()
         
         return jsonify({
@@ -419,6 +431,9 @@ def create_user(current_user):
             }
         }), 201
         
+    except ValueError:
+        db.session.rollback()
+        return jsonify({'error': 'Invalid hierarchy parent', 'code': 'HIERARCHY_PARENT_INVALID'}), 400
     except Exception as e:
         db.session.rollback()
         # Log the actual error for debugging

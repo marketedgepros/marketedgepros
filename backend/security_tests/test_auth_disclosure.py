@@ -53,6 +53,7 @@ def app():
     """Use the real auth blueprint, with no DB, real provider, or active rate limits."""
     app = Flask(__name__)
     app.config.update(
+        EXPANDED_HIERARCHY_ENABLED=True,
         TESTING=True,
         SECRET_KEY="security-suite-only-key",
         RATELIMIT_ENABLED=False,

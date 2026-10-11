@@ -22,6 +22,9 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     DEBUG = False
     TESTING = False
+    # Single-brand ownership is pinned by a reviewed stable DB ID, not email.
+    PLATFORM_ROOT_USER_ID = os.getenv('PLATFORM_ROOT_USER_ID')
+    EXPANDED_HIERARCHY_ENABLED = False
     
     # Database
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -86,6 +89,8 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     """Isolated defaults; PostgreSQL requires an explicit per-run test URL."""
     TESTING = True
+    # Existing legacy-feature suites remain explicit future-mode regressions.
+    EXPANDED_HIERARCHY_ENABLED = True
     SECRET_KEY = 'isolated-test-secret-not-for-production'
     JWT_SECRET_KEY = 'isolated-test-jwt-secret-not-for-production'
     SQLALCHEMY_DATABASE_URI = os.getenv('TEST_DATABASE_URL', 'sqlite:///:memory:')

@@ -41,6 +41,7 @@ def crm_app(monkeypatch):
     """A minimal real Flask app, real decorator, and real SQLAlchemy tables."""
     app = Flask('crm-scope-security')
     app.config.update(
+        EXPANDED_HIERARCHY_ENABLED=True,
         TESTING=True,
         SQLALCHEMY_DATABASE_URI='sqlite:///:memory:',
         SQLALCHEMY_TRACK_MODIFICATIONS=False,

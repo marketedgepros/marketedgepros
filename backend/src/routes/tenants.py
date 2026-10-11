@@ -1,7 +1,7 @@
 """
 Tenant management routes
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from src.database import db
 from src.models.tenant import Tenant
 from src.utils.decorators import token_required, role_required
@@ -13,10 +13,26 @@ logger = logging.getLogger(__name__)
 tenants_bp = Blueprint('tenants', __name__)
 
 
+@tenants_bp.before_request
+def launch_brand_management_gate():
+    if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False) and request.endpoint != 'tenants.get_current_tenant_info':
+        return jsonify({'error': 'White label management is disabled in single-brand launch mode', 'code': 'WHITE_LABEL_DISABLED'}), 409
+
+
 @tenants_bp.route('/current', methods=['GET'])
 def get_current_tenant_info():
     """Get current tenant information (public endpoint)"""
-    tenant = get_current_tenant()
+    if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False):
+        from src.models.user import User
+        from src.utils.hierarchy_scoping import configured_platform_root_id, platform_root_scope, tenant_hierarchy_scope, without_hierarchy_scope
+        owner_id = configured_platform_root_id()
+        with without_hierarchy_scope(db.session):
+            owner = User.query.filter(User.id == owner_id).populate_existing().first() if owner_id else None
+        if owner is None or not platform_root_scope(owner) or not tenant_hierarchy_scope(owner):
+            return jsonify({'error': 'Single-brand ownership is not configured', 'code': 'BRAND_NOT_CONFIGURED'}), 503
+        tenant = Tenant.query.filter(Tenant.id == owner.tenant_id).first()
+    else:
+        tenant = get_current_tenant()
     
     if not tenant:
         return jsonify({'error': 'Tenant not found'}), 404
@@ -258,4 +274,3 @@ def get_tenant_stats(tenant_id):
             'active_challenges': active_challenges
         }
     }), 200
-

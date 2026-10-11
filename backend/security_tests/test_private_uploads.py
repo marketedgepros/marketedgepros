@@ -69,6 +69,7 @@ def app(tmp_path, monkeypatch):
     """A test-only Flask host for the actual generic GET route."""
     app = Flask(__name__)
     app.config.update(
+        EXPANDED_HIERARCHY_ENABLED=True,
         TESTING=True,
         SECRET_KEY="upload-route-security-test-only",
         UPLOAD_FOLDER=str(tmp_path / "uploads"),

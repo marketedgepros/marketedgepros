@@ -88,6 +88,7 @@ def app(staging_resources):
     flask_app = Flask("marketedgepros-staging-integration")
     flask_app.config.update(
         TESTING=True,
+        EXPANDED_HIERARCHY_ENABLED=True,
         SECRET_KEY="staging-runner-public-synthetic-secret",
         JWT_SECRET_KEY="staging-runner-public-synthetic-jwt",
         JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=10),

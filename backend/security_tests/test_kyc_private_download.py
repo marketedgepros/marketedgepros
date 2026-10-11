@@ -259,8 +259,12 @@ def test_cookie_only_owner_download(kyc_app):
 
 def test_root_supermaster_download_remains_tenant_bound(kyc_app):
     assert upload(kyc_app).status_code==200
+    kyc_app.config['PLATFORM_ROOT_USER_ID']=6
     with kyc_app.app_context():
-        db.session.get(User,6).role='supermaster'
+        root=db.session.get(User,6)
+        root.role='supermaster'
+        root.can_create_same_role=True
+        root.is_verified=True
         db.session.commit()
     response=kyc_app.test_client().get(download_url(),headers=headers(kyc_app,6))
     assert response.status_code==200

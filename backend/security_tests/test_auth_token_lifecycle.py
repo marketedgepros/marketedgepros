@@ -27,6 +27,7 @@ def lifecycle_app():
     """A real Flask app and real models with no networked or credentialed resources."""
     app = Flask("auth-token-lifecycle")
     app.config.update(
+        EXPANDED_HIERARCHY_ENABLED=True,
         TESTING=True,
         SECRET_KEY="focused-test-key-only",
         JWT_SECRET_KEY="focused-test-jwt-key-only",

@@ -16,6 +16,7 @@ def analytics_app(tmp_path):
 
     app = Flask(__name__)
     app.config.update(
+        EXPANDED_HIERARCHY_ENABLED=True,
         TESTING=True,
         SECRET_KEY="analytics-scope-test",
         JWT_SECRET_KEY="analytics-scope-test",
