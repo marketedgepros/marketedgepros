@@ -8,7 +8,11 @@ from src.middleware.login_monitor import (
 )
 from src.extensions import limiter
 from src import limiter
+from src.database import db
 from src.services.auth_service import AuthService
+from src.services.session_service import SessionService
+from src.services.two_factor_service import TwoFactorService
+from src.middleware.csrf_middleware import validate_session_csrf
 from src.services.email_service import EmailService
 from src.utils.decorators import token_required
 from src.utils.validators import (
@@ -52,8 +56,10 @@ def register():
         }), 201
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': 'Registration failed'}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Registration failed'}), 500
 
 
@@ -62,7 +68,7 @@ def register():
 @validate_schema(LoginSchema)
 def login():
     """Login user"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
     # Validate required fields
     valid, message = validate_required_fields(data, ['email', 'password'])
@@ -83,22 +89,25 @@ def login():
         # Check if 2FA is enabled
         if user.two_factor_enabled:
             # Don't generate tokens yet, wait for 2FA
+            challenge_token = TwoFactorService.issue(user)
+            db.session.commit()
             return jsonify({
                 'message': '2FA required',
                 'requires_2fa': True,
-                'user_id': user.id
+                'user_id': user.id,
+                'challenge_token': challenge_token
             }), 200
         
         # Generate tokens
-        access_token = user.generate_access_token()
-        refresh_token = user.generate_refresh_token()
+        access_token, refresh_token = SessionService.issue(user)
+        db.session.commit()
         
         # Record successful login
         ip_address = get_client_ip()
         record_successful_login(ip_address)
         
         # Generate CSRF token
-        csrf_token = generate_csrf_token()
+        csrf_token = generate_csrf_token(access_token, refresh_token)
         
         # Create response with httpOnly cookies
         response = make_response(jsonify({
@@ -128,46 +137,34 @@ def login():
             max_age=2592000  # 30 days
         )
         
-        return response
+        return set_csrf_cookie(response, csrf_token)
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 401
     except Exception as e:
+        db.session.rollback()
         import traceback
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f'Login error: {str(e)}')
         logger.error(traceback.format_exc())
-        return jsonify({'error': f'Login failed: {str(e)}'}), 500
+        return jsonify({'error': 'Login unavailable'}), 503
 
 
 @auth_bp.route("/login/2fa", methods=["POST"])
 @limiter.limit("10 per minute")
 def login_2fa():
     """Complete login with 2FA"""
-    data = request.get_json()
-    
-    # Validate required fields
-    valid, message = validate_required_fields(data, ['user_id', 'token'])
-    if not valid:
-        return jsonify({'error': message}), 400
-    
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not data.get('challenge_token') or not data.get('token'):
+        return jsonify({'error': 'Password-bound challenge and token are required'}), 400
     try:
-        from src.models import User
-        
-        user = User.query.get(data['user_id'])
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-        
-        # Verify 2FA token
-        AuthService.verify_2fa(user, data['token'])
-        
-        # Generate tokens
-        access_token = user.generate_access_token()
-        refresh_token = user.generate_refresh_token()
-        
+        user, access_token, refresh_token = TwoFactorService.complete(
+            data['challenge_token'], data['token'], data.get('user_id'))
+
         # Generate CSRF token
-        csrf_token = generate_csrf_token()
+        csrf_token = generate_csrf_token(access_token, refresh_token)
         
         # Create response with httpOnly cookies
         response = make_response(jsonify({
@@ -197,21 +194,23 @@ def login_2fa():
             max_age=2592000  # 30 days
         )
         
-        return response
+        return set_csrf_cookie(response, csrf_token)
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 401
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': '2FA verification failed'}), 500
 
 
 @auth_bp.route('/logout', methods=['POST'])
 @token_required
-def logout():
+def logout(current_user):
     """Logout user (revoke token)"""
     try:
         # Revoke current token
-        AuthService.revoke_token(g.token)
+        SessionService.logout(current_user, g.token)
         
         # Create response and clear cookies
         response = make_response(jsonify({'message': 'Logout successful'}), 200)
@@ -243,6 +242,7 @@ def logout():
         return response
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Logout failed'}), 500
 
 
@@ -250,34 +250,31 @@ def logout():
 @limiter.limit("30 per minute")
 def refresh_token():
     """Refresh access token"""
-    data = request.get_json()
-    
-    if 'refresh_token' not in data:
+    data = request.get_json(silent=True)
+    if data is not None and not isinstance(data, dict):
+        return jsonify({'error': 'JSON object required'}), 400
+    cookie_refresh = request.cookies.get('refresh_token')
+    refresh = cookie_refresh or (data or {}).get('refresh_token')
+    if not refresh:
         return jsonify({'error': 'Refresh token is required'}), 400
-    
+    if cookie_refresh and not validate_session_csrf(cookie_refresh):
+        return jsonify({'error': 'CSRF validation failed', 'code': 'CSRF_INVALID'}), 403
     try:
-        access_token = AuthService.refresh_access_token(data['refresh_token'])
-        
-        # Create response with new access token cookie
+        access_token, refresh_token = SessionService.rotate(refresh)
+        csrf_token = generate_csrf_token(access_token, refresh_token)
         response = make_response(jsonify({
             'message': 'Token refreshed successfully',
-            'access_token': access_token  # Also send in response for backward compatibility
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'csrf_token': csrf_token,
         }), 200)
-        response.set_cookie(
-            'access_token',
-            value=access_token,
-            httponly=True,
-            secure=True,
-            samesite='Lax',
-            max_age=3600
-        )
-        
-        return response
-        
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 401
-    except Exception as e:
-        return jsonify({'error': 'Token refresh failed'}), 500
+        response.set_cookie('access_token',access_token,httponly=True,secure=True,samesite='Lax',max_age=3600)
+        response.set_cookie('refresh_token',refresh_token,httponly=True,secure=True,samesite='Lax',max_age=2592000)
+        return set_csrf_cookie(response,csrf_token)
+    except ValueError:
+        return jsonify({'error': 'Invalid or revoked refresh session'}), 401
+    except Exception:
+        return jsonify({'error': 'Token refresh unavailable'}), 503
 
 
 @auth_bp.route('/verify-email/<token>', methods=['GET'])
@@ -295,8 +292,10 @@ def verify_email(token):
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Email verification failed'}), 500
 
 
@@ -306,7 +305,7 @@ def verify_email_with_code():
     from src.models.verification_attempt import VerificationAttempt
     import logging
     
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     logger = logging.getLogger(__name__)
     
     # Get IP and User Agent
@@ -319,7 +318,7 @@ def verify_email_with_code():
         return jsonify({'error': message}), 400
     
     # Validate code format (6 digits)
-    if not data['code'].isdigit() or len(data['code']) != 6:
+    if not isinstance(data['code'],str) or not data['code'].isascii() or not data['code'].isdigit() or len(data['code']) != 6:
         return jsonify({'error': 'Code must be 6 digits'}), 400
     
     email = data['email']
@@ -330,7 +329,7 @@ def verify_email_with_code():
         logger.warning(f'Rate limit exceeded for email verification: {email} from IP {ip_address}')
         VerificationAttempt.log_attempt(
             email=data["email"],
-            code_entered=code,
+            code_entered='******',
             success=False,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -346,7 +345,7 @@ def verify_email_with_code():
         # Log successful attempt
         VerificationAttempt.log_attempt(
             email=data["email"],
-            code_entered=code,
+            code_entered='******',
             success=True,
             ip_address=ip_address,
             user_agent=user_agent
@@ -363,11 +362,12 @@ def verify_email_with_code():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         # Log failed attempt
         failure_reason = str(e).lower().replace(' ', '_')
         VerificationAttempt.log_attempt(
             email=data["email"],
-            code_entered=code,
+            code_entered='******',
             success=False,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -378,10 +378,11 @@ def verify_email_with_code():
         
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         # Log failed attempt
         VerificationAttempt.log_attempt(
             email=data["email"],
-            code_entered=code,
+            code_entered='******',
             success=False,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -413,11 +414,13 @@ def resend_verification():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         # Keep the response uniform for nonexistent and already-verified accounts.
         return jsonify({
             'message': 'If the email exists and is not verified, a new verification code has been sent'
         }), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Failed to resend verification code'}), 500
 
 
@@ -441,6 +444,7 @@ def request_password_reset():
         }), 200
         
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Password reset request failed'}), 500
 
 
@@ -448,7 +452,7 @@ def request_password_reset():
 @limiter.limit("5 per hour")
 def reset_password():
     """Reset password with token (URL-based)"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
     # Validate required fields
     valid, message = validate_required_fields(data, ['token', 'new_password'])
@@ -469,8 +473,10 @@ def reset_password():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Password reset failed'}), 500
 
 
@@ -478,7 +484,7 @@ def reset_password():
 @limiter.limit("10 per minute")
 def verify_reset_code():
     """Verify password reset code"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
     # Validate required fields
     valid, message = validate_required_fields(data, ['email', 'code'])
@@ -486,7 +492,7 @@ def verify_reset_code():
         return jsonify({'error': message}), 400
     
     # Validate code format (6 digits)
-    if not data['code'].isdigit() or len(data['code']) != 6:
+    if not isinstance(data['code'],str) or not data['code'].isascii() or not data['code'].isdigit() or len(data['code']) != 6:
         return jsonify({'error': 'Code must be 6 digits'}), 400
     
     try:
@@ -498,8 +504,10 @@ def verify_reset_code():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Code verification failed'}), 500
 
 
@@ -507,7 +515,7 @@ def verify_reset_code():
 @limiter.limit("5 per hour")
 def reset_password_with_code():
     """Reset password with 6-digit code"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
     # Validate required fields
     valid, message = validate_required_fields(data, ['email', 'code', 'new_password'])
@@ -515,7 +523,7 @@ def reset_password_with_code():
         return jsonify({'error': message}), 400
     
     # Validate code format (6 digits)
-    if not data['code'].isdigit() or len(data['code']) != 6:
+    if not isinstance(data['code'],str) or not data['code'].isascii() or not data['code'].isdigit() or len(data['code']) != 6:
         return jsonify({'error': 'Code must be 6 digits'}), 400
     
     # Validate password
@@ -536,14 +544,16 @@ def reset_password_with_code():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Password reset failed'}), 500
 
 
 @auth_bp.route('/2fa/enable', methods=['POST'])
 @token_required
-def enable_2fa():
+def enable_2fa(current_user):
     """Enable 2FA for current user"""
     try:
         uri = AuthService.enable_2fa(g.current_user)
@@ -555,18 +565,20 @@ def enable_2fa():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': '2FA enable failed'}), 500
 
 
 @auth_bp.route('/2fa/confirm', methods=['POST'])
 @token_required
-def confirm_2fa():
+def confirm_2fa(current_user):
     """Confirm and activate 2FA"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
-    if 'token' not in data:
+    if not isinstance(data,dict) or 'token' not in data:
         return jsonify({'error': 'Token is required'}), 400
     
     try:
@@ -578,18 +590,20 @@ def confirm_2fa():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': '2FA confirmation failed'}), 500
 
 
 @auth_bp.route('/2fa/disable', methods=['POST'])
 @token_required
-def disable_2fa():
+def disable_2fa(current_user):
     """Disable 2FA for current user"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
-    if 'password' not in data:
+    if not isinstance(data,dict) or 'password' not in data:
         return jsonify({'error': 'Password is required'}), 400
     
     try:
@@ -601,14 +615,16 @@ def disable_2fa():
         }), 200
         
     except ValueError as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': '2FA disable failed'}), 500
 
 
 @auth_bp.route('/me', methods=['GET'])
 @token_required
-def get_current_user():
+def get_current_user(current_user):
     """Get current user info (exempt from rate limiting)"""
     return jsonify({
         'user': g.current_user.to_dict(include_sensitive=True)

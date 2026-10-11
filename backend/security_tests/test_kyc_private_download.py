@@ -31,6 +31,8 @@ def kyc_app(tmp_path, monkeypatch):
     monkeypatch.setattr(storage_service, 'client', None)
     with app.app_context():
         User.__table__.create(db.engine)
+        from src.models.token_blacklist import TokenBlacklist
+        TokenBlacklist.__table__.create(db.engine)
         for identity, tenant, role, tree in [
             (1, 10, 'trader', '2/1'), (2, 10, 'master', '2'),
             (3, 10, 'trader', '3'), (4, 20, 'master', '4'),

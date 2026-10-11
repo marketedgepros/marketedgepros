@@ -41,7 +41,7 @@ class TokenBlacklist(db.Model):
     @classmethod
     def revoke_all_user_tokens(cls, user_id):
         """Revoke all tokens for a user (useful for security incidents)"""
-        from models.user import User
+        from src.models.user import User
         user = User.query.get(user_id)
         if user:
             user.token_version = (user.token_version or 0) + 1

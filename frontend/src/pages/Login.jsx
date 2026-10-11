@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import useAuthStore from '../store/authStore';
@@ -6,7 +6,14 @@ import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, login2FA, error, clearError } = useAuthStore();
+  const {
+    login,
+    login2FA,
+    pending2FA,
+    cancel2FA,
+    error,
+    clearError,
+  } = useAuthStore();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -17,6 +24,11 @@ export default function Login() {
   const [userId, setUserId] = useState(null);
   const [twoFactorToken, setTwoFactorToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => () => {
+    // A password-proof challenge must not survive leaving this route.
+    cancel2FA();
+  }, [cancel2FA]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -70,12 +82,16 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (err) {
+      // Verification failures deliberately invalidate the single-use pending challenge.
+      setRequires2FA(false);
+      setUserId(null);
+      setTwoFactorToken('');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (requires2FA) {
+  if (requires2FA && pending2FA) {
     return (
       <Layout>
         <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -102,11 +118,14 @@ export default function Login() {
                     type="text"
                     value={twoFactorToken}
                     onChange={(e) => {
-                      setTwoFactorToken(e.target.value);
+                      setTwoFactorToken(e.target.value.replace(/\D/g, ''));
                       clearError();
                     }}
                     placeholder="000000"
                     maxLength="6"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
                     className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-center text-2xl tracking-widest text-white placeholder-gray-500"
                     required
                     autoFocus
@@ -124,7 +143,9 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => {
+                    cancel2FA();
                     setRequires2FA(false);
+                    setUserId(null);
                     setTwoFactorToken('');
                     clearError();
                   }}
@@ -236,4 +257,3 @@ export default function Login() {
     </Layout>
   );
 }
-

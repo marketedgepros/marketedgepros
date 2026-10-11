@@ -1,101 +1,57 @@
-"""
-CSRF Protection Middleware
-Implements Double Submit Cookie pattern for CSRF protection
-"""
-import secrets
-from flask import request, jsonify, g
+"""Session-bound double-submit CSRF for cookie-authenticated mutations."""
 from functools import wraps
+import hashlib
+import hmac
+import secrets
+from flask import current_app, request, jsonify, g
 
 
-def generate_csrf_token():
-    """
-    Generate a cryptographically secure CSRF token
-    
-    Returns:
-        str: A URL-safe random token (32 bytes)
-    """
-    return secrets.token_urlsafe(32)
+def generate_csrf_token(access_token=None, refresh_token=None):
+    nonce = secrets.token_urlsafe(32)
+    if not access_token:
+        # Callers issuing a session must supply its access token. This form is
+        # retained only for unauthenticated/non-session uses and is never valid
+        # for cookie-authenticated mutations.
+        return nonce
+    signature = hmac.new(str(current_app.config['JWT_SECRET_KEY']).encode(),
+                         (nonce + '|' + access_token).encode(), hashlib.sha256).hexdigest()
+    if refresh_token:
+        refresh_signature = hmac.new(str(current_app.config['JWT_SECRET_KEY']).encode(),
+                                     (nonce + '|' + refresh_token).encode(), hashlib.sha256).hexdigest()
+        return nonce + '.' + signature + '.' + refresh_signature
+    return nonce + '.' + signature
+
+
+def validate_session_csrf(access_token):
+    cookie = request.cookies.get('csrf_token')
+    header = request.headers.get('X-CSRF-Token')
+    if not cookie or not header or len(cookie) > 256 or len(header) > 256:
+        return False
+    if not cookie.isascii() or not header.isascii():
+        return False
+    if not secrets.compare_digest(cookie, header):
+        return False
+    parts = header.split('.')
+    if len(parts) not in (2, 3):
+        return False
+    nonce, signatures = parts[0], parts[1:]
+    expected = hmac.new(str(current_app.config['JWT_SECRET_KEY']).encode(),
+                        (nonce + '|' + access_token).encode(), hashlib.sha256).hexdigest()
+    return any(secrets.compare_digest(signature, expected) for signature in signatures)
 
 
 def csrf_protect(f):
-    """
-    Decorator to protect routes from CSRF attacks
-    
-    Uses Double Submit Cookie pattern:
-    - Token is sent in both cookie (httpOnly) and custom header
-    - Both must match for the request to be valid
-    
-    Usage:
-        @app.route('/api/profile', methods=['PUT'])
-        @token_required
-        @csrf_protect
-        def update_profile():
-            ...
-    
-    Args:
-        f: The route function to protect
-        
-    Returns:
-        The decorated function with CSRF protection
-    """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Skip CSRF check for safe methods (GET, HEAD, OPTIONS)
-        # These methods should not modify state
-        if request.method in ['GET', 'HEAD', 'OPTIONS']:
-            return f(*args, **kwargs)
-        
-        # Get CSRF token from cookie
-        cookie_token = request.cookies.get('csrf_token')
-        
-        # Get CSRF token from header
-        header_token = request.headers.get('X-CSRF-Token')
-        
-        # Validate both tokens exist
-        if not cookie_token:
-            return jsonify({
-                'error': 'CSRF token missing in cookie',
-                'code': 'CSRF_COOKIE_MISSING'
-            }), 403
-        
-        if not header_token:
-            return jsonify({
-                'error': 'CSRF token missing in header',
-                'code': 'CSRF_HEADER_MISSING'
-            }), 403
-        
-        # Validate tokens match (constant-time comparison)
-        if not secrets.compare_digest(cookie_token, header_token):
-            return jsonify({
-                'error': 'CSRF token mismatch',
-                'code': 'CSRF_TOKEN_MISMATCH'
-            }), 403
-        
-        # Store token in g for potential use in the route
-        g.csrf_token = cookie_token
-        
+        if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+            token = request.cookies.get('access_token')
+            if token and not validate_session_csrf(token):
+                return jsonify({'error': 'CSRF validation failed', 'code': 'CSRF_INVALID'}), 403
         return f(*args, **kwargs)
-    
     return decorated
 
 
 def set_csrf_cookie(response, csrf_token):
-    """
-    Helper function to set CSRF token cookie on response
-    
-    Args:
-        response: Flask response object
-        csrf_token: The CSRF token to set
-        
-    Returns:
-        The response object with CSRF cookie set
-    """
-    response.set_cookie(
-        'csrf_token',
-        value=csrf_token,
-        httponly=True,  # Not accessible to JavaScript
-        secure=True,    # HTTPS only
-        samesite='Lax', # CSRF protection
-        max_age=3600    # 1 hour (same as access token)
-    )
+    response.set_cookie('csrf_token', csrf_token, httponly=True, secure=True,
+                        samesite='Lax', max_age=2592000)
     return response

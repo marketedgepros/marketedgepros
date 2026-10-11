@@ -193,7 +193,7 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             # Log the exception if necessary
             raise RuntimeError("Failed to generate password reset token") from e
     
-    def generate_access_token(self):
+    def generate_access_token(self, session_id=None):
         """Generate JWT access token with jti and token_version"""
         import uuid
         now = datetime.utcnow()
@@ -210,13 +210,16 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             'token_version': self.token_version or 0  # For mass revocation
         }
         
+        if session_id is not None:
+            payload['sid'] = session_id
+
         return jwt.encode(
             payload,
             current_app.config['JWT_SECRET_KEY'],
             algorithm='HS256'
         )
     
-    def generate_refresh_token(self):
+    def generate_refresh_token(self, session_id=None):
         """Generate JWT refresh token"""
         now = datetime.utcnow()
         expires_delta = current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
@@ -224,9 +227,14 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             'user_id': self.id,
             'exp': now + expires_delta,
             'iat': now,
-            'type': 'refresh'
+            'type': 'refresh',
+            'jti': __import__('uuid').uuid4().hex,
+            'token_version': self.token_version or 0
         }
-        
+
+        if session_id is not None:
+            payload['sid'] = session_id
+
         return jwt.encode(
             payload,
             current_app.config['JWT_SECRET_KEY'],
@@ -240,7 +248,8 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             payload = jwt.decode(
                 token,
                 current_app.config['JWT_SECRET_KEY'],
-                algorithms=['HS256']
+                algorithms=['HS256'],
+                options={'require': ['user_id', 'type', 'exp', 'iat']}
             )
             
             if payload.get('type') != token_type:
@@ -474,4 +483,3 @@ class PasswordResetToken(db.Model, TimestampMixin):
         """Mark token as used"""
         self.used = True
         db.session.commit()
-

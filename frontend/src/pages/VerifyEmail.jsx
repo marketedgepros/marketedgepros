@@ -3,7 +3,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Mail, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
-import api from "../services/api"';
+import api from '../services/api';
 
 
 
@@ -192,4 +192,3 @@ export default function VerifyEmail() {
     </Layout>
   );
 }
-

@@ -36,7 +36,8 @@ def update_profile(current_user):
     data = request.get_json()
     
     try:
-        user = g.current_user
+        from src.services.session_service import SessionService
+        user = SessionService.principal(SessionService.payload(g.token), lock=True)
         
         # Update allowed fields
         if "first_name" in data:
@@ -100,6 +101,11 @@ def update_profile(current_user):
             user.email = result
             user.is_verified = False
             user.email_verified_at = None
+            user.token_version = (user.token_version or 0) + 1
+            from src.models.user import EmailVerificationToken, PasswordResetToken
+            for model in (EmailVerificationToken, PasswordResetToken):
+                db.session.query(model).filter(model.user_id == user.id, model.used.is_(False)).update(
+                    {'used': True}, synchronize_session=False)
             
             # TODO (Phase 4 - Email Notifications): Send verification email to new address
         
@@ -112,7 +118,7 @@ def update_profile(current_user):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500
+        return jsonify({"error": "Failed to update profile"}), 500
 
 
 @profile_bp.route("/password", methods=["PUT"])
@@ -127,7 +133,8 @@ def change_password(current_user):
         return jsonify({"error": message}), 400
     
     try:
-        user = g.current_user
+        from src.services.session_service import SessionService
+        user = SessionService.principal(SessionService.payload(g.token), lock=True)
         
         # Verify current password
         if not user.check_password(data["current_password"]):
@@ -144,10 +151,15 @@ def change_password(current_user):
         
         # Update password
         user.set_password(data["new_password"])
+        user.token_version = (user.token_version or 0) + 1
+        from src.models.user import PasswordResetToken
+        db.session.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id, PasswordResetToken.used.is_(False)
+        ).update({'used': True}, synchronize_session=False)
         db.session.commit()
         
         # TODO (Phase 4 - Email Notifications): Send password change notification email
-        # TODO (Phase 3 - Security): Revoke all existing tokens for security
+        # Access and refresh tokens with earlier versions now fail validation.
         
         return jsonify({
             "message": "Password changed successfully"
@@ -155,7 +167,7 @@ def change_password(current_user):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"Failed to change password: {str(e)}"}), 500
+        return jsonify({"error": "Failed to change password"}), 500
 
 
 @profile_bp.route("/avatar", methods=["POST"])
@@ -276,4 +288,3 @@ def get_profile_stats(current_user):
         
     except Exception as e:
         return jsonify({"error": f"Failed to get stats: {str(e)}"}), 500
-

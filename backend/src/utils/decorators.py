@@ -18,29 +18,27 @@ def token_required(f):
         
         # Fallback to Authorization header (backward compatibility)
         if not token and 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            try:
-                token = auth_header.split(' ')[1]  # Bearer <token>
-            except IndexError:
+            parts = request.headers['Authorization'].split()
+            if len(parts) != 2 or parts[0].lower() != 'bearer':
                 return jsonify({'error': 'Invalid token format'}), 401
-        
+            token = parts[1]
+
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
         
-        # Check if token is blacklisted
-        if AuthService.is_token_blacklisted(token):
-            return jsonify({'error': 'Token has been revoked'}), 401
-        
-        # Verify token
-        payload = User.verify_token(token, token_type='access')
-        if not payload:
-            return jsonify({'error': 'Invalid or expired token'}), 401
-        
-        # Get user
-        current_user = User.query.get(payload['user_id'])
-        if not current_user or not current_user.is_active:
-            return jsonify({'error': 'User not found or inactive'}), 401
-        
+        try:
+            from src.services.session_service import SessionService
+            current_user, payload = SessionService.authenticate(token, 'access')
+        except ValueError:
+            return jsonify({'error': 'Invalid or revoked session'}), 401
+        except Exception:
+            return jsonify({'error': 'Authentication unavailable'}), 503
+
+        if request.cookies.get('access_token') and request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+            from src.middleware.csrf_middleware import validate_session_csrf
+            if not validate_session_csrf(token):
+                return jsonify({'error': 'CSRF validation failed', 'code': 'CSRF_INVALID'}), 403
+
         # Store user in g
         g.current_user = current_user
         g.token = token

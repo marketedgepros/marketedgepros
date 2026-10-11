@@ -504,13 +504,25 @@ def delete_user(current_user, user_id):
 def admin_reset_password(current_user, user_id):
     """Admin reset user password"""
     try:
-        user = User.query.get_or_404(user_id)
-        data = request.get_json()
-        
-        if 'new_password' not in data:
+        if not current_user.tenant_id:
+            return jsonify({'error': 'Tenant membership required'}), 403
+        user = _kyc_users_for_actor(current_user).filter(User.id == user_id).with_for_update().populate_existing().first()
+        if user is None:
+            return jsonify({'error': 'User not found'}), 404
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or 'new_password' not in data:
             return jsonify({'error': 'New password is required'}), 400
-        
+        from src.services.auth_token_service import AuthTokenService
+        try:
+            AuthTokenService._password(data['new_password'])
+        except ValueError:
+            return jsonify({'error': 'Invalid password'}), 400
         user.set_password(data['new_password'])
+        user.token_version = (user.token_version or 0) + 1
+        from src.models.user import PasswordResetToken
+        db.session.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id, PasswordResetToken.used.is_(False)
+        ).update({'used': True}, synchronize_session=False)
         user.updated_at = datetime.utcnow()
         db.session.commit()
         
@@ -518,7 +530,7 @@ def admin_reset_password(current_user, user_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Password reset failed'}), 500
 
 
 @admin_bp.route('/programs', methods=['GET'])
