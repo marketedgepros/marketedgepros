@@ -114,77 +114,17 @@ class PaymentService:
     
     @staticmethod
     def confirm_payment(payment_intent_id):
-        """Confirm payment and activate challenge"""
-        if not PaymentService._get_stripe_key():
-            logger.error('Stripe API key not configured')
-            return {'status': 'error', 'message': 'Payment system not configured'}
-        
-        try:
-            # Retrieve payment intent
-            intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-            
-            # Handle different statuses
-            if intent.status == 'succeeded':
-                # Find challenge
-                challenge = Challenge.query.filter_by(payment_id=payment_intent_id).first()
-                if not challenge:
-                    logger.error(f'Challenge not found for payment intent {payment_intent_id}')
-                    return {'status': 'error', 'message': 'Challenge not found'}
-                
-                # Update challenge status
-                challenge.payment_status = 'paid'
-                challenge.status = 'active'
+        """Legacy activation unavailable until canonical settlement/provisioning."""
+        # Do not activate from a mutable payment_id/status or continue after
+        # failed MT5 provisioning. This service is not a verified entitlement
+        # adapter, even when a Stripe key exists. Refuse before credentials,
+        # provider retrieval, DB lookup, status mutation or commit.
+        return {
+            'status': 'error', 'confirmed': False,
+            'code': 'ORDER_SETTLEMENT_NOT_CONFIGURED',
+            'message': 'Verified settlement and MT5 provisioning are not configured',
+        }
 
-                # ===== MT5 Account Creation =====
-                try:
-                    logger.info(f'Creating MT5 account for challenge {challenge.id}')
-                    
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    mt5_account_data = loop.run_until_complete(
-                        mt5_challenge_service.create_mt5_account_for_challenge(challenge.id)
-                    )
-                    loop.close()
-                    
-                    if mt5_account_data:
-                        logger.info(f'MT5 account created: {mt5_account_data.get("mt5_login")}')
-                        challenge.account_number = str(mt5_account_data.get('mt5_login'))
-                except Exception as mt5_error:
-                    logger.error(f'MT5 account creation error: {mt5_error}')
-                    # Continue even if MT5 creation fails
-                # ===== End MT5 Integration =====
-                
-                # Commit all changes
-                db.session.commit()
-                
-                logger.info(f'Payment confirmed for challenge {challenge.id}')
-                return {'status': 'succeeded', 'confirmed': True}
-                
-            elif intent.status == 'requires_action':
-                logger.info(f'Payment intent {payment_intent_id} requires action')
-                return {
-                    'status': 'requires_action',
-                    'confirmed': False,
-                    'client_secret': intent.client_secret,
-                    'next_action': intent.next_action
-                }
-                
-            elif intent.status == 'processing':
-                logger.info(f'Payment intent {payment_intent_id} is processing')
-                return {'status': 'processing', 'confirmed': False}
-                
-            else:
-                logger.warning(f'Payment intent {payment_intent_id} status: {intent.status}')
-                return {'status': intent.status, 'confirmed': False}
-            
-            
-        except stripe.error.StripeError as e:
-            logger.error(f'Stripe error: {str(e)}')
-            return {'status': 'error', 'message': str(e)}
-        except Exception as e:
-            logger.error(f'Payment confirmation failed: {str(e)}')
-            return {'status': 'error', 'message': 'Payment confirmation failed'}
-    
     @staticmethod
     def refund_payment(challenge, reason=None):
         """Refund payment for a challenge"""
@@ -294,4 +234,3 @@ class PaymentService:
         except Exception as e:
             logger.error(f'Failed to get payment status: {str(e)}')
             return None
-

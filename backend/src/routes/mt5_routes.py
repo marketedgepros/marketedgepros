@@ -1,365 +1,536 @@
+"""Bounded legacy MT5 read routes.
+
+The deployed MT5 tables are retained as unverified historical data only.  This
+module deliberately does not provision, mutate, or synchronize a provider until
+a reviewed provider protocol is available.
 """
-MT5 API Routes for MarketEdgePros
-Handles all MT5-related API endpoints
-"""
-from flask import Blueprint, request, jsonify
-from src.database import db
-from src.utils.decorators import token_required
-from src.models.mt5_models import MT5Account, MT5Trade, MT5Position
-from src.services.mt5_service import mt5_service
-from src.utils.decorators import admin_required
 import logging
-from datetime import datetime, timedelta
+
+from flask import Blueprint, current_app, jsonify, request
+from sqlalchemy import and_, case, false, func, or_
+
+from src.database import db
+from src.middleware.tenant_middleware import get_current_tenant
+from src.models.mt5_models import MT5Account, MT5Position, MT5Trade
+from src.models.tenant import Tenant
+from src.models.trading_program import Challenge, TradingProgram
+from src.models.user import User
+from src.utils.crm_scope import scoped_users
+from src.utils.decorators import admin_required, token_required
+from src.utils.hierarchy_scoping import platform_root_scope
 
 logger = logging.getLogger(__name__)
 
-mt5_bp = Blueprint('mt5', __name__, url_prefix='/api/mt5')
+mt5_bp = Blueprint("mt5", __name__, url_prefix="/api/mt5")
+
+_PAGE_MIN = 1
+_PAGE_MAX = 1000
+_PER_PAGE_MIN = 1
+_PER_PAGE_MAX = 100
+_MT5_NOT_CONFIGURED_CODE = "MT5_PROVIDER_NOT_CONFIGURED"
+_MT5_NOT_CONFIGURED_MESSAGE = "MT5 provider is not configured"
 
 
-@mt5_bp.route('/accounts', methods=['GET'])
+def _not_configured_response():
+    """Refuse every legacy mutator before parsing a body or querying a row."""
+    return jsonify({
+        "success": False,
+        "message": _MT5_NOT_CONFIGURED_MESSAGE,
+        "code": _MT5_NOT_CONFIGURED_CODE,
+    }), 503
+
+
+def _invalid_query_response():
+    """Keep malformed list input separate from provider/read failure details."""
+    return jsonify({
+        "success": False,
+        "message": "Invalid MT5 query parameters",
+        "code": "INVALID_MT5_QUERY",
+    }), 400
+
+
+def _parse_bounded_positive_int(name, default, minimum, maximum):
+    """Parse exactly one canonical decimal query value, or return ``None``."""
+    values = request.args.getlist(name)
+    if not values:
+        return default
+    if len(values) != 1:
+        return None
+    value = values[0]
+    if not value or len(value) > len(str(maximum)) or not value.isascii() or not value.isdecimal():
+        return None
+    parsed = int(value)
+    if str(parsed) != value or not minimum <= parsed <= maximum:
+        return None
+    return parsed
+
+
+def _pagination_parameters():
+    page = _parse_bounded_positive_int("page", 1, _PAGE_MIN, _PAGE_MAX)
+    per_page = _parse_bounded_positive_int(
+        "per_page", 50, _PER_PAGE_MIN, _PER_PAGE_MAX,
+    )
+    if page is None or per_page is None:
+        return None
+    return page, per_page
+
+
+def _trade_status_parameter():
+    values = request.args.getlist("status")
+    if not values:
+        return "all"
+    if len(values) != 1 or values[0] not in {"all", "open", "closed"}:
+        return None
+    return values[0]
+
+
+def _pagination_payload(page_result, page, per_page):
+    return {
+        "total": page_result.total,
+        "page": page,
+        "pages": page_result.pages,
+        "per_page": per_page,
+        "returned_count": len(page_result.items),
+    }
+
+
+def _legacy_metadata(account=None, *, profit_data_status=None):
+    """Describe persisted rows without suggesting a live MT5 verification."""
+    metadata = {
+        "source": "persisted_legacy",
+        "mt5_freshness": "not_verified",
+    }
+    if account is not None:
+        # An account without a challenge is historical data, not a reconstructed
+        # entitlement.  It is readable only because the real owner/tenant joins
+        # below remain valid.
+        metadata["challenge_link"] = (
+            "legacy_unlinked" if account.challenge_id is None else "stored"
+        )
+        metadata["entitlement"] = "not_verified"
+    if profit_data_status is not None:
+        metadata["profit_data_status"] = profit_data_status
+    return metadata
+
+
+def _replace_unknown_numbers(data, model, fields):
+    """The legacy model serializes ``None`` like zero; restore unknown to null."""
+    for field in fields:
+        if getattr(model, field) is None:
+            data[field] = None
+    return data
+
+
+def _serialize_account(account):
+    data = account.to_dict(include_password=False)
+    # Defensive deletion protects callers if the model's serializer later grows
+    # a compatibility password option again.
+    data.pop("mt5_password", None)
+    _replace_unknown_numbers(
+        data,
+        account,
+        ("balance", "equity", "margin", "free_margin", "margin_level"),
+    )
+    data["data_status"] = "unverified_legacy"
+    data["metadata"] = _legacy_metadata(account)
+    return data
+
+
+def _serialize_trade(trade):
+    data = trade.to_dict()
+    _replace_unknown_numbers(
+        data,
+        trade,
+        (
+            "volume", "open_price", "close_price", "stop_loss", "take_profit",
+            "profit", "commission", "swap",
+        ),
+    )
+    data["data_status"] = "unverified_legacy"
+    data["metadata"] = _legacy_metadata()
+    return data
+
+
+def _serialize_position(position):
+    data = position.to_dict()
+    _replace_unknown_numbers(
+        data,
+        position,
+        (
+            "volume", "price_open", "price_current", "stop_loss", "take_profit",
+            "profit", "swap", "commission",
+        ),
+    )
+    data["data_status"] = "unverified_legacy"
+    data["metadata"] = _legacy_metadata()
+    return data
+
+
+def _valid_current_tenant_id(current_user):
+    tenant_id = getattr(current_user, "tenant_id", None)
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
+        return None
+    return tenant_id
+
+
+def _valid_current_user_id(current_user):
+    user_id = getattr(current_user, "id", None)
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id < 1:
+        return None
+    return user_id
+
+
+def _base_account_query(current_user, *, all_active_tenants=False):
+    """Return only accounts whose user/challenge/program tenant chain is valid.
+
+    ``MT5Account`` has no tenant column and does not participate in the generic
+    hierarchy model hook.  Every read therefore joins the actual owner and, for
+    challenge-linked rows, the actual challenge and program.  Null challenge IDs
+    are an explicit legacy case rather than an implicit cross-tenant fallback.
+    """
+    tenant_id = _valid_current_tenant_id(current_user)
+    if tenant_id is None:
+        return MT5Account.query.filter(false())
+
+    challenge_chain_is_valid = or_(
+        MT5Account.challenge_id.is_(None),
+        and_(
+            Challenge.id.is_not(None),
+            Challenge.user_id == MT5Account.user_id,
+            TradingProgram.id.is_not(None),
+            TradingProgram.tenant_id == User.tenant_id,
+        ),
+    )
+    filters = [
+        User.is_active.is_(True),
+        User.is_verified.is_(True),
+        Tenant.status == "active",
+        challenge_chain_is_valid,
+    ]
+    if not all_active_tenants:
+        filters.insert(0, User.tenant_id == tenant_id)
+
+    return (
+        MT5Account.query
+        .join(User, User.id == MT5Account.user_id)
+        .join(Tenant, Tenant.id == User.tenant_id)
+        .outerjoin(Challenge, Challenge.id == MT5Account.challenge_id)
+        .outerjoin(TradingProgram, TradingProgram.id == Challenge.program_id)
+        .filter(*filters)
+    )
+
+
+def _owner_account_query(current_user):
+    user_id = _valid_current_user_id(current_user)
+    query = _base_account_query(current_user)
+    if user_id is None:
+        return query.filter(false())
+    return query.filter(User.id == user_id)
+
+
+def _configured_root_can_read_wide(current_user):
+    """Allow the one configured platform root the documented broad admin view."""
+    if not platform_root_scope(current_user):
+        return False
+    if current_app.config.get("EXPANDED_HIERARCHY_ENABLED", False):
+        return True
+
+    # The launch-mode root exception remains tied to the same active configured
+    # brand used by session authentication; it is never a generic all-row bypass.
+    tenant = get_current_tenant()
+    return (
+        tenant is not None
+        and tenant.status == "active"
+        and tenant.id == _valid_current_tenant_id(current_user)
+    )
+
+
+def _admin_account_query(current_user):
+    if _configured_root_can_read_wide(current_user):
+        return _base_account_query(current_user, all_active_tenants=True)
+    # Future-mode administrators receive the existing CRM tenant/downline scope,
+    # rather than relying on the generic User loader criterion or reading all MT5
+    # rows simply because this model predates tenant_id.
+    return scoped_users(current_user, _base_account_query(current_user))
+
+
+def _scoped_owner_account(current_user, account_id):
+    with db.session.no_autoflush:
+        return _owner_account_query(current_user).filter(
+            MT5Account.id == account_id,
+        ).first()
+
+
+@mt5_bp.route("/accounts", methods=["GET"])
 @token_required
 def get_user_mt5_accounts(current_user):
-    """Get all MT5 accounts for current user"""
+    """Return a bounded page of the caller's verified-owner legacy accounts."""
+    pagination = _pagination_parameters()
+    if pagination is None:
+        return _invalid_query_response()
+    page, per_page = pagination
     try:
-        user_id = current_user.id
-        accounts = MT5Account.query.filter_by(user_id=user_id).all()
-        
+        with db.session.no_autoflush:
+            accounts = _owner_account_query(current_user).order_by(
+                MT5Account.id.asc(),
+            ).paginate(page=page, per_page=per_page, error_out=False)
+        payload = {
+            "success": True,
+            "accounts": [_serialize_account(account) for account in accounts.items],
+            "data_status": "unverified_legacy",
+            "metadata": _legacy_metadata(),
+        }
+        payload.update(_pagination_payload(accounts, page, per_page))
+        return jsonify(payload), 200
+    except Exception:
+        logger.error("MT5 account list read failed")
         return jsonify({
-            'success': True,
-            'accounts': [acc.to_dict() for acc in accounts]
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to get MT5 accounts: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+            "success": False,
+            "message": "Unable to retrieve MT5 data",
+            "code": "MT5_READ_UNAVAILABLE",
+        }), 500
 
 
-@mt5_bp.route('/accounts/<int:account_id>', methods=['GET'])
+@mt5_bp.route("/accounts/<int:account_id>", methods=["GET"])
 @token_required
 def get_mt5_account(current_user, account_id):
-    """Get specific MT5 account details"""
+    """Return a caller-owned persisted row; no provider call is made."""
     try:
-        user_id = current_user.id
-        account = MT5Account.query.filter_by(id=account_id, user_id=user_id).first()
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        # Get fresh data from MT5 API
-        try:
-            # Note: Sync version - async not supported in Flask routes
-            # mt5_data = await mt5_service.get_account_info(account.mt5_login)
-            # For now, return cached data from database
-            pass
-        except Exception as e:
-            logger.warning(f"Failed to fetch fresh MT5 data: {e}")
-        
+        account = _scoped_owner_account(current_user, account_id)
+        if account is None:
+            return jsonify({"success": False, "message": "Account not found"}), 404
         return jsonify({
-            'success': True,
-            'account': account.to_dict(include_password=True)
+            "success": True,
+            "account": _serialize_account(account),
+            "data_status": "unverified_legacy",
+            "metadata": _legacy_metadata(),
         }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to get MT5 account: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+    except Exception:
+        logger.error("MT5 account detail read failed")
+        return jsonify({
+            "success": False,
+            "message": "Unable to retrieve MT5 data",
+            "code": "MT5_READ_UNAVAILABLE",
+        }), 500
 
 
-@mt5_bp.route('/accounts/create', methods=['POST'])
+@mt5_bp.route("/accounts/create", methods=["POST"])
 @token_required
 def create_mt5_account(current_user):
-    """Create new MT5 account for user"""
-    try:
-        user_id = current_user.id
-        data = request.get_json()
-        
-        challenge_id = data.get('challenge_id')
-        account_type = data.get('account_type', 'demo')
-        balance = data.get('balance', 10000)
-        leverage = data.get('leverage', 100)
-        
-        # Create account via MT5 API (async disabled for Flask compatibility)
-        # In production, this would call mt5_service.create_account()
-        # For now, create demo account data
-        import random
-        mt5_data = {
-            'login': f'{10000 + random.randint(1000, 9999)}',
-            'password': 'TempPass123!',
-            'group': f"{account_type}\\demoforex"
-        }
-        
-        # Save to database
-        account = MT5Account(
-            user_id=user_id,
-            challenge_id=challenge_id,
-            mt5_login=mt5_data.get('login'),
-            mt5_password_encrypted=mt5_data.get('password'),  # Will be encrypted by model
-            mt5_group=mt5_data.get('group'),
-            balance=balance,
-            equity=balance,
-            status='active'
-        )
-        
-        db.session.add(account)
-        db.session.commit()
-        
-        logger.info(f"MT5 account created for user {user_id}: {account.mt5_login}")
-        
-        return jsonify({
-            'success': True,
-            'account': account.to_dict(include_password=True),
-            'message': 'MT5 account created successfully'
-        }), 201
-        
-    except Exception as e:
-        logger.error(f"Failed to create MT5 account: {e}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+    """Refuse provisioning until a reviewed MT5 provider protocol exists."""
+    return _not_configured_response()
 
 
-@mt5_bp.route('/accounts/<int:account_id>/trades', methods=['GET'])
+@mt5_bp.route("/accounts/<int:account_id>/trades", methods=["GET"])
 @token_required
 def get_account_trades(current_user, account_id):
-    """Get trade history for MT5 account"""
+    """Return a bounded, exact-status page of persisted legacy trades."""
+    pagination = _pagination_parameters()
+    status = _trade_status_parameter()
+    if pagination is None or status is None:
+        return _invalid_query_response()
+    page, per_page = pagination
     try:
-        user_id = current_user.id
-        account = MT5Account.query.filter_by(id=account_id, user_id=user_id).first()
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        # Get pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 50, type=int)
-        status = request.args.get('status', 'all')  # all, open, closed
-        
-        # Build query
-        query = MT5Trade.query.filter_by(mt5_account_id=account_id)
-        
-        if status != 'all':
-            query = query.filter_by(status=status)
-        
-        # Order by most recent first
-        query = query.order_by(MT5Trade.open_time.desc())
-        
-        # Paginate
-        trades = query.paginate(page=page, per_page=per_page, error_out=False)
-        
+        account = _scoped_owner_account(current_user, account_id)
+        if account is None:
+            return jsonify({"success": False, "message": "Account not found"}), 404
+        with db.session.no_autoflush:
+            query = MT5Trade.query.filter(MT5Trade.mt5_account_id == account.id)
+            if status != "all":
+                query = query.filter(MT5Trade.status == status)
+            trades = query.order_by(
+                MT5Trade.open_time.desc(), MT5Trade.id.desc(),
+            ).paginate(page=page, per_page=per_page, error_out=False)
+        payload = {
+            "success": True,
+            "trades": [_serialize_trade(trade) for trade in trades.items],
+            "status": status,
+            "data_status": "unverified_legacy",
+            "metadata": _legacy_metadata(),
+        }
+        payload.update(_pagination_payload(trades, page, per_page))
+        return jsonify(payload), 200
+    except Exception:
+        logger.error("MT5 trade list read failed")
         return jsonify({
-            'success': True,
-            'trades': [trade.to_dict() for trade in trades.items],
-            'total': trades.total,
-            'page': page,
-            'pages': trades.pages
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to get trades: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+            "success": False,
+            "message": "Unable to retrieve MT5 data",
+            "code": "MT5_READ_UNAVAILABLE",
+        }), 500
 
 
-@mt5_bp.route('/accounts/<int:account_id>/positions', methods=['GET'])
+@mt5_bp.route("/accounts/<int:account_id>/positions", methods=["GET"])
 @token_required
 def get_account_positions(current_user, account_id):
-    """Get open positions for MT5 account"""
+    """Return a bounded page of persisted open-position rows."""
+    pagination = _pagination_parameters()
+    if pagination is None:
+        return _invalid_query_response()
+    page, per_page = pagination
     try:
-        user_id = current_user.id
-        account = MT5Account.query.filter_by(id=account_id, user_id=user_id).first()
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        positions = MT5Position.query.filter_by(mt5_account_id=account_id).all()
-        
+        account = _scoped_owner_account(current_user, account_id)
+        if account is None:
+            return jsonify({"success": False, "message": "Account not found"}), 404
+        with db.session.no_autoflush:
+            positions = MT5Position.query.filter(
+                MT5Position.mt5_account_id == account.id,
+            ).order_by(
+                MT5Position.open_time.desc(), MT5Position.id.desc(),
+            ).paginate(page=page, per_page=per_page, error_out=False)
+        payload = {
+            "success": True,
+            "positions": [_serialize_position(position) for position in positions.items],
+            "data_status": "unverified_legacy",
+            "metadata": _legacy_metadata(),
+        }
+        payload.update(_pagination_payload(positions, page, per_page))
+        return jsonify(payload), 200
+    except Exception:
+        logger.error("MT5 position list read failed")
         return jsonify({
-            'success': True,
-            'positions': [pos.to_dict() for pos in positions]
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to get positions: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+            "success": False,
+            "message": "Unable to retrieve MT5 data",
+            "code": "MT5_READ_UNAVAILABLE",
+        }), 500
 
 
-@mt5_bp.route('/accounts/<int:account_id>/stats', methods=['GET'])
+@mt5_bp.route("/accounts/<int:account_id>/stats", methods=["GET"])
 @token_required
 def get_account_stats(current_user, account_id):
-    """Get trading statistics for MT5 account"""
+    """Aggregate closed-trade statistics in SQL without treating null profit as 0."""
     try:
-        user_id = current_user.id
-        account = MT5Account.query.filter_by(id=account_id, user_id=user_id).first()
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        # Calculate statistics
-        all_trades = MT5Trade.query.filter_by(mt5_account_id=account_id, status='closed').all()
-        
-        total_trades = len(all_trades)
-        winning_trades = len([t for t in all_trades if t.profit > 0])
-        losing_trades = len([t for t in all_trades if t.profit < 0])
-        
-        total_profit = sum(t.profit for t in all_trades if t.profit)
-        total_loss = sum(t.profit for t in all_trades if t.profit and t.profit < 0)
-        
-        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-        profit_factor = abs(total_profit / total_loss) if total_loss != 0 else 0
-        
-        # Get open positions count
-        open_positions = MT5Position.query.filter_by(mt5_account_id=account_id).count()
-        
+        account = _scoped_owner_account(current_user, account_id)
+        if account is None:
+            return jsonify({"success": False, "message": "Account not found"}), 404
+
+        with db.session.no_autoflush:
+            aggregate = (
+                MT5Trade.query
+                .filter(
+                    MT5Trade.mt5_account_id == account.id,
+                    MT5Trade.status == "closed",
+                )
+                .with_entities(
+                    func.count(MT5Trade.id).label("total_trades"),
+                    func.coalesce(func.sum(case((MT5Trade.profit > 0, 1), else_=0)), 0).label("winning_trades"),
+                    func.coalesce(func.sum(case((MT5Trade.profit < 0, 1), else_=0)), 0).label("losing_trades"),
+                    func.coalesce(func.sum(case((MT5Trade.profit.is_not(None), MT5Trade.profit), else_=0)), 0).label("net_profit"),
+                    func.coalesce(func.sum(case((MT5Trade.profit > 0, MT5Trade.profit), else_=0)), 0).label("gross_profit"),
+                    func.coalesce(func.sum(case((MT5Trade.profit < 0, MT5Trade.profit), else_=0)), 0).label("gross_loss"),
+                    func.coalesce(func.sum(case((MT5Trade.profit.is_(None), 1), else_=0)), 0).label("missing_profit_rows"),
+                )
+                .one()
+            )
+            open_positions = MT5Position.query.filter(
+                MT5Position.mt5_account_id == account.id,
+            ).count()
+
+        total_trades = int(aggregate.total_trades or 0)
+        winning_trades = int(aggregate.winning_trades or 0)
+        losing_trades = int(aggregate.losing_trades or 0)
+        missing_profit_rows = int(aggregate.missing_profit_rows or 0)
+        profit_data_status = "unknown" if missing_profit_rows else "unverified_legacy"
+
+        if missing_profit_rows:
+            net_profit = None
+            gross_profit = None
+            gross_loss = None
+            win_rate = None
+            profit_factor = None
+        else:
+            net_profit = float(aggregate.net_profit)
+            gross_profit = float(aggregate.gross_profit)
+            gross_loss = float(aggregate.gross_loss)
+            win_rate = round((winning_trades / total_trades) * 100, 2) if total_trades else 0
+            profit_factor = (
+                round(gross_profit / abs(gross_loss), 2)
+                if gross_loss < 0
+                else None
+            )
+
+        stats = {
+            "total_trades": total_trades,
+            "winning_trades": winning_trades,
+            "losing_trades": losing_trades,
+            "missing_profit_rows": missing_profit_rows,
+            "win_rate": win_rate,
+            "total_profit": net_profit,
+            "gross_profit": gross_profit,
+            "total_loss": gross_loss,
+            "gross_loss": gross_loss,
+            "profit_factor": profit_factor,
+            "open_positions": open_positions,
+            "current_balance": float(account.balance) if account.balance is not None else None,
+            "current_equity": float(account.equity) if account.equity is not None else None,
+            "profit_data_status": profit_data_status,
+        }
         return jsonify({
-            'success': True,
-            'stats': {
-                'total_trades': total_trades,
-                'winning_trades': winning_trades,
-                'losing_trades': losing_trades,
-                'win_rate': round(win_rate, 2),
-                'total_profit': float(total_profit) if total_profit else 0,
-                'total_loss': float(total_loss) if total_loss else 0,
-                'profit_factor': round(profit_factor, 2),
-                'open_positions': open_positions,
-                'current_balance': float(account.balance) if account.balance else 0,
-                'current_equity': float(account.equity) if account.equity else 0
-            }
+            "success": True,
+            "stats": stats,
+            "data_status": "unverified_legacy",
+            "metadata": _legacy_metadata(
+                account,
+                profit_data_status=profit_data_status,
+            ),
         }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to get account stats: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+    except Exception:
+        logger.error("MT5 statistics read failed")
+        return jsonify({
+            "success": False,
+            "message": "Unable to retrieve MT5 data",
+            "code": "MT5_READ_UNAVAILABLE",
+        }), 500
 
 
-# Admin routes
-@mt5_bp.route('/admin/accounts', methods=['GET'])
+@mt5_bp.route("/admin/accounts", methods=["GET"])
 @token_required
 @admin_required
 def admin_get_all_accounts(current_user):
-    """Admin: Get all MT5 accounts"""
+    """List bounded valid account rows within explicit root/CRM scope."""
+    pagination = _pagination_parameters()
+    if pagination is None:
+        return _invalid_query_response()
+    page, per_page = pagination
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 50, type=int)
-        
-        accounts = MT5Account.query.paginate(page=page, per_page=per_page, error_out=False)
-        
+        with db.session.no_autoflush:
+            accounts = _admin_account_query(current_user).order_by(
+                MT5Account.id.asc(),
+            ).paginate(page=page, per_page=per_page, error_out=False)
+        payload = {
+            "success": True,
+            "accounts": [_serialize_account(account) for account in accounts.items],
+            "data_status": "unverified_legacy",
+            "metadata": _legacy_metadata(),
+        }
+        payload.update(_pagination_payload(accounts, page, per_page))
+        return jsonify(payload), 200
+    except Exception:
+        logger.error("MT5 administrator account list read failed")
         return jsonify({
-            'success': True,
-            'accounts': [acc.to_dict() for acc in accounts.items],
-            'total': accounts.total,
-            'page': page,
-            'pages': accounts.pages
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to get all accounts: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+            "success": False,
+            "message": "Unable to retrieve MT5 data",
+            "code": "MT5_READ_UNAVAILABLE",
+        }), 500
 
 
-@mt5_bp.route('/admin/accounts/<int:account_id>/disable', methods=['POST'])
+@mt5_bp.route("/admin/accounts/<int:account_id>/disable", methods=["POST"])
 @token_required
 @admin_required
 def admin_disable_account(current_user, account_id):
-    """Admin: Disable MT5 account"""
-    try:
-        account = MT5Account.query.get(account_id)
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        # Disable via MT5 API (async disabled for Flask compatibility)
-        # await mt5_service.disable_account(account.mt5_login)
-        # For now, just update database
-        
-        # Update database
-        account.status = 'disabled'
-        account.updated_at = datetime.utcnow()
-        db.session.commit()
-        
-        logger.info(f"MT5 account disabled: {account.mt5_login}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Account disabled successfully'
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to disable account: {e}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+    """Refuse local status changes without an approved provider workflow."""
+    return _not_configured_response()
 
 
-@mt5_bp.route('/admin/accounts/<int:account_id>/balance', methods=['POST'])
+@mt5_bp.route("/admin/accounts/<int:account_id>/balance", methods=["POST"])
 @token_required
 @admin_required
 def admin_update_balance(current_user, account_id):
-    """Admin: Update MT5 account balance"""
-    try:
-        account = MT5Account.query.get(account_id)
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        data = request.get_json()
-        amount = data.get('amount')
-        operation = data.get('operation', 'deposit')  # deposit or withdraw
-        
-        if not amount:
-            return jsonify({'success': False, 'message': 'Amount is required'}), 400
-        
-        # Update via MT5 API (async disabled for Flask compatibility)
-        # result = await mt5_service.update_balance(account.mt5_login, amount, operation)
-        # For now, update balance directly
-        if operation == 'deposit':
-            account.balance += amount
-            account.equity += amount
-        else:  # withdraw
-            account.balance -= amount
-            account.equity -= amount
-        account.updated_at = datetime.utcnow()
-        db.session.commit()
-        
-        logger.info(f"Balance updated for {account.mt5_login}: {operation} {amount}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Balance updated successfully',
-            'account': account.to_dict()
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to update balance: {e}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+    """Refuse local balance writes without an approved provider workflow."""
+    return _not_configured_response()
 
 
-@mt5_bp.route('/sync/<int:account_id>', methods=['POST'])
+@mt5_bp.route("/sync/<int:account_id>", methods=["POST"])
 @token_required
 def sync_account_data(current_user, account_id):
-    """Manually sync account data from MT5"""
-    try:
-        user_id = current_user.id
-        account = MT5Account.query.filter_by(id=account_id, user_id=user_id).first()
-        
-        if not account:
-            return jsonify({'success': False, 'message': 'Account not found'}), 404
-        
-        # Sync account info (async disabled for Flask compatibility)
-        # mt5_data = await mt5_service.get_account_info(account.mt5_login)
-        # For now, just update timestamp
-        account.updated_at = datetime.utcnow()
-        
-        # In production, this would:
-        # 1. Sync account info from MT5
-        # 2. Sync positions
-        # 3. Sync recent trades
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Account data synced successfully',
-            'account': account.to_dict()
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Failed to sync account data: {e}")
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+    """Refuse fake timestamp sync success until a provider protocol exists."""
+    return _not_configured_response()
