@@ -237,6 +237,8 @@ def test_nginx_template_has_canonical_api_and_spa_guards():
     template = (BACKEND / "deploy/nginx-site.conf.template").read_text(encoding="utf-8")
     assert "root @RELEASE_PATH@/frontend/dist;" in template
     assert "server 127.0.0.1:5001;" in template
+    assert 'location ~ "^/assets/' in template
+    assert 'location ~* "\\.[A-Za-z0-9]{1,16}$" {' in template
     assert "location ^~ /api/" in template
     assert "location = /health" in template
     assert "location ^~ /health/" in template
