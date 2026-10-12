@@ -116,6 +116,7 @@ const ProtectedRoute = (await compile('protected-route', 'App.jsx', (text) => te
   .replace("import { useState, useEffect, lazy, Suspense } from 'react';", "import { useState, useEffect } from 'react'; const lazy = () => () => null; const Suspense = ({ children }) => children;")
   .replace("import useAuthStore from './store/authStore';", authStub)
   .replace("import Notification from './components/Notification';", 'const Notification = () => null;')
+  .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(new URL('../src/components/RouteScrollManager.js', import.meta.url).href)};`)
   .replace("import ChatWidget from './components/ChatWidget';", 'const ChatWidget = () => null;')
   .replace("import { ADMIN_ROLES } from './constants/roles';", "const ADMIN_ROLES = ['supermaster', 'master'];")
   .replace("import { postLoginDestination } from './services/navigationService.js';", "const postLoginDestination = () => '/dashboard';")

@@ -110,6 +110,7 @@ const ProtectedModule = await compileJsx('protected-route', 'App.jsx', (text) =>
   .replace("import { useState, useEffect, lazy, Suspense } from 'react';", "import { useState, useEffect } from 'react'; const lazy = () => ({ children }) => children || <output data-ui6-account-route={useLocation().pathname}>{useLocation().pathname}</output>; const Suspense = ({ children }) => children;")
   .replace("import useAuthStore from './store/authStore';", accountAuthStub)
   .replace("import Notification from './components/Notification';", 'const Notification = () => null;')
+  .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(sourceUrl('components/RouteScrollManager.js'))};`)
   .replace("import ChatWidget from './components/ChatWidget';", 'const ChatWidget = () => null;')
   .replace("import { ADMIN_ROLES } from './constants/roles';", `import { ADMIN_ROLES } from ${JSON.stringify(sourceUrl('constants/roles.js'))};`)
   .replace("import { postLoginDestination } from './services/navigationService.js';", "const postLoginDestination = () => '/user/dashboard';")

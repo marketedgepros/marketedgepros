@@ -38,6 +38,7 @@ async function compileRouter() {
   let source = fs.readFileSync(appFile, "utf8")
     .replace("import useAuthStore from './store/authStore';", `import useAuthStore from ${JSON.stringify(absolute("../src/store/authStore.js"))};`)
     .replace("import Notification from './components/Notification';", "const Notification = () => null;")
+    .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(new URL('../src/components/RouteScrollManager.js', import.meta.url).href)};`)
     .replace("import ChatWidget from './components/ChatWidget';", "const ChatWidget = () => null;")
     .replace("import { ADMIN_ROLES } from './constants/roles';", `import { ADMIN_ROLES } from ${JSON.stringify(absolute("../src/constants/roles.js"))};`)
     .replace("import { postLoginDestination } from './services/navigationService.js';", `import { postLoginDestination } from ${JSON.stringify(absolute("../src/services/navigationService.js"))};`)

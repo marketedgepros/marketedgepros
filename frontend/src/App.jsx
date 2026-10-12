@@ -8,6 +8,7 @@ import { postLoginDestination } from './services/navigationService.js';
 import { useLocation } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import useNotificationStore from './stores/notificationStore.js';
+import RouteScrollManager from './components/RouteScrollManager.js';
 
 // Auth Pages (Lazy Loaded)
 const Login = lazy(() => import('./pages/Login'));
@@ -192,6 +193,7 @@ function App() {
           </div>
         </div>
       }>
+        <RouteScrollManager />
         <Routes>
         {/* Public Routes */}
         <Route path="/" element={<HomePage />} />

@@ -82,6 +82,7 @@ let appCode = fs.readFileSync(src('App.jsx'), 'utf8');
 for (const [from, to] of [
   ['./store/authStore', authStub],
   ['./components/Notification', notificationStub],
+  ['./components/RouteScrollManager.js', new URL('../src/components/RouteScrollManager.js', import.meta.url).href],
   ['./components/ChatWidget', chatStub],
   ['./constants/roles', rolesStub],
   ['./services/navigationService.js', navigationStub],

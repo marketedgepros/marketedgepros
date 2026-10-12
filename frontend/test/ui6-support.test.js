@@ -123,6 +123,7 @@ function appSourceWithSupportPages(source) {
     .replace("import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';", "import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';")
     .replace("import useAuthStore from './store/authStore';", `import useAuthStore from ${JSON.stringify(authStub)};`)
     .replace("import Notification from './components/Notification';", `import Notification from ${JSON.stringify(notificationStub)};`)
+    .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(new URL('../src/components/RouteScrollManager.js', import.meta.url).href)};`)
     .replace("import ChatWidget from './components/ChatWidget';", `import ChatWidget from ${JSON.stringify(chatStub)};`)
     .replace("import { ADMIN_ROLES } from './constants/roles';", `import { ADMIN_ROLES } from ${JSON.stringify(rolesStub)};`)
     .replace("import { postLoginDestination } from './services/navigationService.js';", `import { postLoginDestination } from ${JSON.stringify(navigationStub)};`)

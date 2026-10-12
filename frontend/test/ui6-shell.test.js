@@ -154,6 +154,7 @@ function compiledAppSource() {
     .replace("import { useState, useEffect, lazy, Suspense } from 'react';", "import React, { useState, useEffect, lazy, Suspense } from 'react';")
     .replace("import useAuthStore from './store/authStore';", `const useAuthStore = () => globalThis.__ui6Auth; useAuthStore.subscribe = () => () => {};`)
     .replace("import Notification from './components/Notification';", 'const Notification = () => null;')
+    .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(pathToFileURL(path.join(frontend, 'src/components/RouteScrollManager.js')).href)};`)
     .replace("import ChatWidget from './components/ChatWidget';", 'const ChatWidget = () => React.createElement("div", { "data-chat": "true" });')
     .replace("import { ADMIN_ROLES } from './constants/roles';", "const ADMIN_ROLES = ['admin'];")
     .replace("import { postLoginDestination } from './services/navigationService.js';", `import { postLoginDestination } from ${JSON.stringify(navigationUrl)};`)

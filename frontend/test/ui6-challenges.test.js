@@ -99,6 +99,7 @@ appSource = `import ChallengePage from ${JSON.stringify(temporaryUrl('Challenges
   .replace("import { useLocation } from 'react-router-dom';", "import { useLocation, useNavigate } from 'react-router-dom';")
   .replace("import useAuthStore from './store/authStore';", `import useAuthStore from ${JSON.stringify(authStub)};`)
   .replace("import Notification from './components/Notification';", 'const Notification = () => null;')
+  .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(new URL('../src/components/RouteScrollManager.js', import.meta.url).href)};`)
   .replace("import ChatWidget from './components/ChatWidget';", 'const ChatWidget = () => null;')
   .replace("import { ADMIN_ROLES } from './constants/roles';", "const ADMIN_ROLES = ['master', 'supermaster'];")
   .replace("import { postLoginDestination } from './services/navigationService.js';", "const postLoginDestination = () => '/dashboard';")

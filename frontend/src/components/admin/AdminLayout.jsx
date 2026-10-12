@@ -197,7 +197,7 @@ export default function AdminLayout({ children }) {
         ></div>
       )}
       {/* Main Content */}
-      <main className="min-w-0 flex-1 overflow-y-auto relative">
+      <main data-route-scroll-container className="min-w-0 flex-1 overflow-y-auto relative">
         {/* Top Bar */}
         <div className="sticky top-0 z-20 bg-slate-800/50 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-4">
           <div className="flex items-center justify-between">

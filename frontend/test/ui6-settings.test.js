@@ -113,6 +113,7 @@ appSource = appSource
   .replace("import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';", "import { MemoryRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';")
   .replaceAll('./store/authStore', authStub)
   .replaceAll('./components/Notification', noopModule)
+  .replaceAll('./components/RouteScrollManager.js', new URL('../src/components/RouteScrollManager.js', import.meta.url).href)
   .replaceAll('./components/ChatWidget', noopModule)
   .replaceAll('./constants/roles', rolesModule)
   .replaceAll('./services/navigationService.js', navigationModule)

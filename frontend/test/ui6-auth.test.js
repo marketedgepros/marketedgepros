@@ -124,6 +124,7 @@ const AuthRouter = (await compile('router', 'App.jsx', (text) => {
     .replace("import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';", "import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';")
     .replace("import useAuthStore from './store/authStore';", authStub)
     .replace("import Notification from './components/Notification';", 'const Notification = () => null;')
+    .replace("import RouteScrollManager from './components/RouteScrollManager.js';", `import RouteScrollManager from ${JSON.stringify(new URL('../src/components/RouteScrollManager.js', import.meta.url).href)};`)
     .replace("import ChatWidget from './components/ChatWidget';", 'const ChatWidget = () => null;')
     .replace("import { ADMIN_ROLES } from './constants/roles';", "const ADMIN_ROLES = ['admin'];")
     .replace("import { postLoginDestination } from './services/navigationService.js';", `import { postLoginDestination } from ${JSON.stringify(sourceUrl('services', 'navigationService.js'))};`)
