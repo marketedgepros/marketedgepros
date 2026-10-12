@@ -37,7 +37,11 @@ test('canonical checkout IDs reject ambiguous input and resolve to existing temp
     assert.throws(() => programCheckoutPath(id), /Invalid program/);
   }
   const lightning = fs.readFileSync(new URL('../src/pages/LightningChallenge.jsx', import.meta.url), 'utf8');
-  assert.match(lightning, /navigate\(programCheckoutPath\(programId\)\)/);
+  assert.match(lightning, /<CatalogPreview[^>]+type="lightning"/);
+  const preview = fs.readFileSync(new URL('../src/components/programs/CatalogPreview.jsx', import.meta.url), 'utf8');
+  assert.match(preview, /CatalogCard/);
+  const card = fs.readFileSync(new URL('../src/components/programs/CatalogUI.jsx', import.meta.url), 'utf8');
+  assert.match(card, /to=\{`\/programs\/\$\{program.id\}`\}/);
   assert.doesNotMatch(lightning, /navigate\(`\/checkout/);
 });
 
@@ -79,5 +83,5 @@ test('affiliate link registration does not invent an affiliate role or navigate 
   assert.match(landing, /if \(user.role === 'affiliate'\) \{\s*navigate\('\/affiliate\/dashboard'\)/);
   const registrationBlock = landing.match(/const registration = await registerAffiliate\(\);[\s\S]*?catch \(requestError\)/)[0];
   assert.doesNotMatch(registrationBlock, /navigate\(|updateUser\(|role:\s*['"]affiliate/);
-  assert.match(registrationBlock, /does not change your account role/);
+  assert.match(registrationBlock, /does not create a commission or confirm eligibility for a payout/);
 });

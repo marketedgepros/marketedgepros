@@ -1,175 +1,66 @@
 import { Helmet } from 'react-helmet-async';
+import { SITE_DESCRIPTION, isPrivatePage, publicSiteOrigin, publicPageUrl, serializePublicSchema } from '../services/publicMetadataService';
 
 export default function SEO({
   title = 'MarketEdgePros',
-  description = 'Professional prop trading firm offering instant funding, one-phase, and two-phase challenges. Get funded and trade with up to $200K capital.',
-  keywords = 'prop trading, funded trading, trading challenge, forex funding, day trading, instant funding',
-  ogImage = '/og-image.jpg',
+  description = SITE_DESCRIPTION,
+  keywords = 'trading programs, program comparison, account portal, trading education',
+  ogImage = null,
   ogType = 'website',
-  twitterCard = 'summary_large_image',
+  twitterCard = 'summary',
   canonical,
   noindex = false,
   nofollow = false,
   structuredData
 }) {
-  const siteUrl = 'https://marketedgepros.com';
+  const siteOrigin = publicSiteOrigin(import.meta.env.VITE_PUBLIC_SITE_URL);
+  const pathname = typeof window === 'undefined' ? '/' : window.location.pathname;
+  const privatePage = isPrivatePage(pathname);
   const fullTitle = title === 'MarketEdgePros' ? title : `${title} | MarketEdgePros`;
-  const canonicalUrl = canonical || `${siteUrl}${window.location.pathname}`;
-  const ogImageUrl = ogImage.startsWith('http') ? ogImage : `${siteUrl}${ogImage}`;
-
+  // Absolute tags require an explicit deployment origin, never the request host.
+  const path = canonical || pathname;
+  let canonicalUrl = publicPageUrl(siteOrigin, path);
+  if (!canonicalUrl && siteOrigin && typeof canonical === 'string') {
+    try { const url = new URL(canonical); if (url.origin === siteOrigin && !url.username && !url.password) canonicalUrl = url.href; } catch { /* omit invalid canonical */ }
+  }
+  const imageUrl = publicPageUrl(siteOrigin, ogImage);
+  const hidden = noindex || privatePage;
   return (
     <Helmet>
-      {/* Basic Meta Tags */}
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       <meta name="keywords" content={keywords} />
-      
-      {/* Canonical URL */}
-      <link rel="canonical" href={canonicalUrl} />
-      
-      {/* Robots */}
-      {(noindex || nofollow) && (
-        <meta name="robots" content={`${noindex ? 'noindex' : 'index'},${nofollow ? 'nofollow' : 'follow'}`} />
-      )}
-      
-      {/* Open Graph */}
+      {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+      <meta name="robots" content={`${hidden ? 'noindex' : 'index'},${nofollow || privatePage ? 'nofollow' : 'follow'}`} />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content={ogType} />
-      <meta property="og:url" content={canonicalUrl} />
-      <meta property="og:image" content={ogImageUrl} />
+      {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+      {imageUrl && <meta property="og:image" content={imageUrl} />}
       <meta property="og:site_name" content="MarketEdgePros" />
-      
-      {/* Twitter Card */}
-      <meta name="twitter:card" content={twitterCard} />
+      <meta name="twitter:card" content={imageUrl ? twitterCard : 'summary'} />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={ogImageUrl} />
-      <meta name="twitter:site" content="@marketedgepros" />
-      <meta name="twitter:creator" content="@marketedgepros" />
-      
-      {/* Additional Meta Tags */}
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <meta httpEquiv="Content-Type" content="text/html; charset=utf-8" />
-      <meta name="language" content="English" />
-      <meta name="revisit-after" content="7 days" />
-      <meta name="author" content="MarketEdgePros" />
-      
-      {/* Favicon */}
+      {imageUrl && <meta name="twitter:image" content={imageUrl} />}
       <link rel="icon" type="image/x-icon" href="/favicon.ico" />
       <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-      <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-      
-      {/* Structured Data */}
-      {structuredData && (
-        <script type="application/ld+json">
-          {JSON.stringify(structuredData)}
-        </script>
-      )}
+      {structuredData && !hidden && <script type="application/ld+json">{serializePublicSchema(structuredData)}</script>}
     </Helmet>
   );
 }
 
-// Predefined SEO configurations for common pages
+// These describe page destinations, not business-policy or live-provider guarantees.
 export const SEOConfigs = {
-  home: {
-    title: 'Professional Prop Trading Firm',
-    description: 'Get funded with MarketEdgePros. Trade with up to $200K capital. Instant funding, one-phase, and two-phase challenges available. 80% profit split.',
-    keywords: 'prop trading, funded trading account, trading challenge, instant funding, forex funding',
-    structuredData: {
-      '@context': 'https://schema.org',
-      '@type': 'Organization',
-      name: 'MarketEdgePros',
-      url: 'https://marketedgepros.com',
-      logo: 'https://marketedgepros.com/logo.png',
-      description: 'Professional prop trading firm offering funded trading accounts',
-      sameAs: [
-        'https://twitter.com/marketedgepros',
-        'https://facebook.com/marketedgepros',
-        'https://linkedin.com/company/marketedgepros'
-      ]
-    }
-  },
-  
-  programs: {
-    title: 'Trading Programs & Challenges',
-    description: 'Choose from instant funding, one-phase, or two-phase trading challenges. Account sizes from $5K to $200K. 80% profit split. Start trading today.',
-    keywords: 'trading programs, trading challenge, prop firm programs, funded account sizes',
-    structuredData: {
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
-      name: 'Trading Programs',
-      description: 'Available trading programs and challenges',
-      itemListElement: []
-    }
-  },
-  
-  onePhase: {
-    title: 'One Phase Challenge',
-    description: 'Single evaluation phase trading challenge. Prove your skills in one step and get funded. Account sizes from $5K to $200K.',
-    keywords: 'one phase challenge, single step evaluation, quick funding, prop trading'
-  },
-  
-  twoPhase: {
-    title: 'Two Phase Challenge',
-    description: 'Two-step evaluation trading challenge. Phase 1: 8% target, Phase 2: 5% target. Get funded with proven consistency.',
-    keywords: 'two phase challenge, two step evaluation, consistent trading, prop firm evaluation'
-  },
-  
-  instantFunding: {
-    title: 'Instant Funding',
-    description: 'Get funded immediately with no evaluation required. Start trading with real capital today. Account sizes from $5K to $50K.',
-    keywords: 'instant funding, no evaluation, immediate funding, funded account'
-  },
-  
-  about: {
-    title: 'About Us',
-    description: 'Learn about MarketEdgePros, our mission, values, and commitment to empowering traders worldwide.',
-    keywords: 'about marketedgepros, prop firm mission, trading company'
-  },
-  
-  howItWorks: {
-    title: 'How It Works',
-    description: 'Step-by-step guide to getting funded with MarketEdgePros. From registration to payout, we make it simple.',
-    keywords: 'how prop trading works, getting funded, trading evaluation process'
-  },
-  
-  faq: {
-    title: 'Frequently Asked Questions',
-    description: 'Find answers to common questions about our trading programs, rules, payouts, and more.',
-    keywords: 'prop trading faq, trading questions, funded account questions',
-    structuredData: {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: []
-    }
-  },
-  
-  contact: {
-    title: 'Contact Us',
-    description: 'Get in touch with MarketEdgePros. We\'re here to help with any questions about our trading programs.',
-    keywords: 'contact prop firm, trading support, customer service'
-  },
-  
-  login: {
-    title: 'Login',
-    description: 'Login to your MarketEdgePros account. Access your dashboard, challenges, and trading statistics.',
-    keywords: 'trader login, account access, dashboard login',
-    noindex: true
-  },
-  
-  register: {
-    title: 'Register',
-    description: 'Create your MarketEdgePros account and start your journey to becoming a funded trader.',
-    keywords: 'register trader account, sign up, create account'
-  },
-  
-  dashboard: {
-    title: 'Dashboard',
-    description: 'Your MarketEdgePros trading dashboard. View your challenges, performance, and account statistics.',
-    keywords: 'trading dashboard, account overview, trader portal',
-    noindex: true
-  }
+  home: { title: 'Trading Programs & Account Portal', description: SITE_DESCRIPTION },
+  programs: { title: 'Trading Programs & Challenges', description: 'Compare published program settings, base fees and optional add-ons. Review payment availability before requesting a quote.' },
+  onePhase: { title: 'One Phase Programs', description: 'Review one-phase program settings in the current catalog. Availability and terms depend on the published program.' },
+  twoPhase: { title: 'Two Phase Programs', description: 'Review two-phase program settings in the current catalog. Targets and limits are program-specific.' },
+  instantFunding: { title: 'Program Availability', description: 'Explore the current program catalog and review its published settings. Catalog information is not confirmation of funding.' },
+  about: { title: 'About MarketEdgePros', description: 'Learn about the MarketEdgePros platform, program comparison and account tools.' },
+  howItWorks: { title: 'How It Works', description: 'Understand program comparison, account registration and quote availability. A quote is not a payment or trading account.' },
+  faq: { title: 'Frequently Asked Questions', description: 'Find information about the catalog, account access, support and current service availability.' },
+  contact: { title: 'Contact & Support', description: 'Find available support routes for questions about your MarketEdgePros account and program information.' },
+  login: { title: 'Login', description: 'Sign in to access the tools available to your MarketEdgePros account.', noindex: true },
+  register: { title: 'Create an Account', description: 'Create a MarketEdgePros account. Registration does not purchase a program or confirm funding.', noindex: true },
+  dashboard: { title: 'Account Dashboard', description: 'View the records and account tools available to your MarketEdgePros account.', noindex: true }
 };
-

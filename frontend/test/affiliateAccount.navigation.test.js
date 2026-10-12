@@ -52,7 +52,7 @@ test('affiliate dashboard copies only safe server links with a single in-flight 
 });
 
 test('affiliate payout remains a read-only status page with safe account navigation', () => {
-  assert.match(payoutSource, /Payout execution is not enabled/);
+  assert.match(payoutSource, /Payout execution is unavailable/);
   for (const route of [
     '/affiliate/dashboard',
     '/affiliate/commissions',

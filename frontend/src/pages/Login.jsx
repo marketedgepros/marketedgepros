@@ -50,7 +50,8 @@ export default function Login() {
       } else {
         navigate(postLoginDestination(result.user, location.search), { replace: true });
       }
-    } catch (err) {
+    } catch {
+      // authStore owns login errors; its state is rendered below.
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +85,9 @@ export default function Login() {
                   <Lock className="w-8 h-8 text-cyan-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white">Two-Factor Authentication</h2>
-                <p className="text-gray-400 mt-2">Enter the 6-digit code from your authenticator app</p>
+                <label htmlFor="two-factor-code" className="block text-gray-400 mt-2">
+                  Enter the 6-digit code from your authenticator app
+                </label>
               </div>
 
               {error && (
@@ -97,6 +100,7 @@ export default function Login() {
               <form onSubmit={handle2FASubmit} className="space-y-6">
                 <div>
                   <input
+                    id="two-factor-code"
                     type="text"
                     value={twoFactorToken}
                     onChange={(e) => {
@@ -206,11 +210,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input type="checkbox" className="rounded border-gray-600 bg-slate-900/50 text-cyan-500 focus:ring-cyan-500" />
-                  <span className="ml-2 text-sm text-gray-400">Remember me</span>
-                </label>
+              <div className="flex justify-end">
                 <Link to="/forgot-password" className="text-sm text-cyan-400 hover:text-cyan-300 font-medium">
                   Forgot password?
                 </Link>

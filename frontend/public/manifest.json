@@ -1,23 +1,13 @@
 {
-  "name": "MarketEdgePros - Professional Prop Trading Platform",
+  "name": "MarketEdgePros \u2014 Trading Programs & Account Portal",
   "short_name": "MarketEdgePros",
-  "description": "Get funded up to $200,000 with MarketEdgePros. Professional prop trading platform for ambitious traders.",
+  "description": "Explore trading programs, compare published settings and manage your MarketEdgePros account.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F172A",
   "theme_color": "#0F172A",
   "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "/favicon-16x16.png",
-      "sizes": "16x16",
-      "type": "image/png"
-    },
-    {
-      "src": "/favicon-32x32.png",
-      "sizes": "32x32",
-      "type": "image/png"
-    },
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
@@ -31,8 +21,10 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["finance", "business"],
+  "categories": [
+    "finance",
+    "business"
+  ],
   "lang": "en-US",
   "dir": "ltr"
 }
-

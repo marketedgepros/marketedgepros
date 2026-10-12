@@ -28,8 +28,11 @@ export default function BlogPost() {
       const windowHeight = window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const progress = (scrollTop / (documentHeight - windowHeight)) * 100;
-      setReadingProgress(Math.min(progress, 100));
+      const scrollableHeight = documentHeight - windowHeight;
+      const progress = scrollableHeight > 0
+        ? (scrollTop / scrollableHeight) * 100
+        : 0;
+      setReadingProgress(Math.min(Math.max(progress, 0), 100));
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -226,7 +229,7 @@ export default function BlogPost() {
                   {post.tags.map((tag, index) => (
                     <span
                       key={index}
-                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-gray-300 text-sm hover:border-cyan-500/50 transition-colors cursor-pointer"
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-gray-300 text-sm"
                     >
                       #{tag}
                     </span>
@@ -241,18 +244,24 @@ export default function BlogPost() {
                 <span className="text-gray-400 font-semibold">Share:</span>
                 <button
                   onClick={() => shareOnSocial('facebook')}
+                  aria-label="Share on Facebook"
+                  type="button"
                   className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300"
                 >
                   <Facebook className="w-5 h-5 text-gray-300" />
                 </button>
                 <button
                   onClick={() => shareOnSocial('twitter')}
+                  aria-label="Share on X/Twitter"
+                  type="button"
                   className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300"
                 >
                   <Twitter className="w-5 h-5 text-gray-300" />
                 </button>
                 <button
                   onClick={() => shareOnSocial('linkedin')}
+                  aria-label="Share on LinkedIn"
+                  type="button"
                   className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300"
                 >
                   <Linkedin className="w-5 h-5 text-gray-300" />
@@ -308,4 +317,3 @@ export default function BlogPost() {
     </Layout>
   );
 }
-

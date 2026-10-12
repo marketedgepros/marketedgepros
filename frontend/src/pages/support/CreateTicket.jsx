@@ -155,7 +155,7 @@ export function CreateTicketView({ user }) {
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
             Create Support <span className="bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">Ticket</span>
           </h1>
-          <p className="text-xl text-gray-300">Describe your issue for the account you are signed in to.</p>
+          <p className="text-xl text-gray-300">Describe your issue for the account you are signed in to. Your request is associated with that account.</p>
         </div>
       </section>
 
@@ -191,7 +191,7 @@ export function CreateTicketView({ user }) {
                 />
               </div>
             </div>
-            <p className="text-sm text-gray-500 -mt-3">Account identity is derived by the secure support service and is not sent from this form.</p>
+            <p className="text-sm text-gray-400 -mt-3">Account identity is derived by the support service and is not sent from this form.</p>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2" htmlFor="ticket-subject">Subject *</label>

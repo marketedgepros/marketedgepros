@@ -9,6 +9,7 @@ export default function SupportHub() {
   const [searchTerm, setSearchTerm] = useState('');
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // Fetch articles from API
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function SupportHub() {
         setArticles(response.data.articles || []);
       } catch (error) {
         console.error('Error fetching articles:', error);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -45,7 +47,6 @@ export default function SupportHub() {
           categoryMap[category].articles.push({
             title: article.title,
             link: `/support/${article.slug}`,
-            views: article.views || 0
           });
         }
       }
@@ -56,22 +57,10 @@ export default function SupportHub() {
 
   const categories = getCategorizedArticles();
 
-  const popularArticles = articles
-    .filter(a => a.status === 'published')
-    .sort((a, b) => (b.views || 0) - (a.views || 0))
-    .slice(0, 5)
-    .map(a => ({
-      title: a.title,
-      link: `/support/${a.slug}`,
-      views: a.views ? `${(a.views / 1000).toFixed(1)}K` : '0'
-    }));
-
   const quickLinks = [
     { title: 'Create Support Ticket', icon: MessageCircle, link: '/support/create-ticket' },
-    { title: 'Browse FAQ', icon: HelpCircle, link: '/faq' },
-    { title: 'Join Discord Community', icon: ExternalLink, link: 'https://discord.gg/jKbmeSe7', external: true }
+    { title: 'Browse FAQ', icon: HelpCircle, link: '/faq' }
   ];
-
   // Filter articles based on search term
   const getFilteredArticles = () => {
     if (!searchTerm.trim()) return categories;
@@ -109,9 +98,10 @@ export default function SupportHub() {
             <input
               type="text"
               placeholder="Search for help articles..."
+              aria-label="Search help articles"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-400"
             />
           </div>
         </div>
@@ -163,6 +153,10 @@ export default function SupportHub() {
             <div className="text-center py-12">
               <p className="text-gray-400 text-lg">Loading articles...</p>
             </div>
+          ) : loadError ? (
+            <div className="rounded-xl border border-cyan-500/20 bg-slate-900/70 px-6 py-12 text-center" role="status">
+              <p className="text-gray-300 text-lg">Articles could not be loaded. Please try again later.</p>
+            </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredCategories.length > 0 ? filteredCategories.map((category, index) => {
@@ -195,41 +189,13 @@ export default function SupportHub() {
                 );
               }) : (
                 <div className="col-span-full text-center py-12">
-                  <p className="text-gray-400 text-lg">No articles found matching "{searchTerm}"</p>
+                  <p className="text-gray-400 text-lg">No articles match “{searchTerm}”. Try another search.</p>
                 </div>
               )}
             </div>
           )}
         </div>
       </section>
-
-      {/* Popular Articles */}
-      {popularArticles.length > 0 && (
-        <section className="py-20 bg-black border-t border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-12 text-center">
-              Popular Articles
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {popularArticles.map((article, index) => (
-                <Link
-                  key={index}
-                  to={article.link}
-                  className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 hover:border-cyan-500/30 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                      {article.title}
-                    </h3>
-                    <ChevronRight className="w-5 h-5 text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2" />
-                  </div>
-                  <p className="text-sm text-gray-400">{article.views} views</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Contact Support CTA */}
       <section className="py-20 bg-black border-t border-white/10">
@@ -238,7 +204,7 @@ export default function SupportHub() {
             Still Need Help?
           </h2>
           <p className="text-xl text-gray-400 mb-8">
-            Can't find what you're looking for? Our support team is here to assist you 24/7.
+            Can't find what you're looking for? You can submit a support ticket.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -248,15 +214,6 @@ export default function SupportHub() {
               <MessageCircle className="w-5 h-5 mr-2" />
               Contact Support
             </Link>
-            <a
-              href="https://discord.gg/jKbmeSe7"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white/5 border border-white/10 text-white font-semibold rounded-lg hover:bg-white/10 hover:border-cyan-500/50 transition-all"
-            >
-              <ExternalLink className="w-5 h-5 mr-2" />
-              Join Discord Community
-            </a>
           </div>
         </div>
       </section>

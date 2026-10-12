@@ -125,7 +125,7 @@ const Article = () => {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
-          <div className="text-white text-xl">Loading...</div>
+          <div className="text-white text-xl" role="status" aria-live="polite">Loading...</div>
         </div>
       </Layout>
     );
@@ -135,12 +135,12 @@ const Article = () => {
     return (
       <Layout>
         <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-white mb-4">Article Not Found</h1>
-            <p className="text-gray-400 mb-8">The article you're looking for doesn't exist.</p>
+          <div className="text-center" role="alert">
+            <h1 className="text-4xl font-bold text-white mb-4">Unable to Load Article</h1>
+            <p className="text-gray-400 mb-8">We couldn't load this article. Please try again or browse the Support Hub.</p>
             <Link 
               to="/support" 
-              className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-3 rounded-lg transition-colors"
+              className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-3 rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
             >
               Back to Support Hub
             </Link>
@@ -253,7 +253,7 @@ const Article = () => {
           <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl p-8 text-center">
             <h2 className="text-2xl font-bold text-white mb-4">Still Need Help?</h2>
             <p className="text-gray-400 mb-6">
-              Can't find what you're looking for? Our support team is here to assist you 24/7.
+              Can't find what you're looking for? Contact us and we'll do our best to help.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
@@ -266,7 +266,7 @@ const Article = () => {
                 to="/support"
                 className="bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg transition-colors font-medium"
               >
-                Browse FAQ
+                Browse Support Articles
               </Link>
             </div>
           </div>

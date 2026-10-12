@@ -24,9 +24,9 @@ const markup = () => renderToStaticMarkup(React.createElement(MemoryRouter, null
 
 test('payout page renders real component with explicit unavailable state and no fake amount or form', () => {
   const html = markup();
-  assert.match(html, /Payout execution is not enabled/);
-  assert.match(html, /does not provide verified payout data/);
-  assert.match(html, /not your account status/);
+  assert.match(html, /Payout execution is unavailable/);
+  assert.match(html, /does not show a verified withdrawable balance or payout history/);
+  assert.match(html, /not approved business or legal policy/);
   assert.doesNotMatch(html, /<form|<input|<button|\$[0-9]|15%|14 days|50 dollars/);
   assert.doesNotMatch(source, /fetch\(|axios|prepare_payout|claim_payout|confirm_payout|useEffect/);
 });
@@ -36,10 +36,10 @@ test('payout page has only supported links, ordered requirements and accessible 
   const html = markup();
   const paths = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(paths, ['/affiliate/dashboard', '/affiliate/commissions', '/support/create-ticket']);
-  for (const heading of ['Identity and attribution', 'Verified payment', 'Eligibility review', 'Payout confirmation']) {
+  for (const heading of ['Referral records', 'Payment records', 'Review status', 'Transfer handling']) {
     assert.ok(html.includes(heading));
   }
-  assert.match(html, /<ol[^>]+aria-label="Requirements before live payouts"/);
+  assert.match(html, /<ol[^>]+aria-label="Conceptual checks for a possible future payout service"/);
   assert.equal([...html.matchAll(/<li /g)].length, 4);
   assert.equal([...html.matchAll(/aria-labelledby=/g)].length, 3);
   assert.match(source, /focus-visible:ring-2/);

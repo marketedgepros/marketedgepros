@@ -58,7 +58,7 @@ export default function ProgramsNew() {
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-300">
             Compare account sizes, fees and published limits. Choose a program
-            to review its options before requesting a server-priced quote.
+            to review its options. Quote requests may not be available.
           </p>
           <a href="#program-comparison" className={`${secondaryAction} mt-7`}>
             Compare programs
@@ -78,7 +78,7 @@ export default function ProgramsNew() {
                 FileText,
                 "02",
                 "Review a quote",
-                "Your selection is priced and recorded by the server.",
+                "If enabled, the server can return a quote for your selection.",
               ],
               [
                 ShieldCheck,
@@ -112,8 +112,8 @@ export default function ProgramsNew() {
               Compare current programs
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Fees are shown in USD. Unspecified rules are never treated as
-              zero.
+              Catalog fees are shown in USD. Unspecified rules are never treated
+              as zero.
             </p>
           </div>
         </div>

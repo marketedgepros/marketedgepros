@@ -9,6 +9,7 @@ export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { register, error, clearError } = useAuthStore();
+  const [validationError, setValidationError] = useState('');
 
   const [formData, setFormData] = useState({
     email: '',
@@ -33,6 +34,7 @@ export default function Register() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setValidationError('');
     clearError();
   };
 
@@ -41,19 +43,21 @@ export default function Register() {
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      toast.warning('Passwords do not match');
+      setValidationError('Passwords do not match. Please enter the same password in both fields.');
       return;
     }
+    setValidationError('');
 
     setIsLoading(true);
 
     try {
       const { confirmPassword, ...registerData } = formData;
-      const result = await register(registerData);
+      await register(registerData);
       
       // Navigate to verify email page with email in state
       navigate('/verify-email', { state: { email: formData.email } });
-    } catch (err) {
+    } catch {
+      // authStore exposes the request error; do not navigate on failure.
     } finally {
       setIsLoading(false);
     }
@@ -78,22 +82,23 @@ export default function Register() {
               <p className="text-gray-400 mt-2">Start your trading journey with MarketEdgePros</p>
             </div>
 
-            {error && (
+            {(validationError || error) && (
               <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-300">{error}</p>
+                <p className="text-sm text-red-300" role="alert">{validationError || error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="first_name" className="block text-sm font-medium text-gray-300 mb-2">
                     First Name
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
+                      id="first_name"
                       type="text"
                       name="first_name"
                       value={formData.first_name}
@@ -106,12 +111,13 @@ export default function Register() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label htmlFor="last_name" className="block text-sm font-medium text-gray-300 mb-2">
                     Last Name
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
+                      id="last_name"
                       type="text"
                       name="last_name"
                       value={formData.last_name}
@@ -125,12 +131,13 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                      id="email"
                     type="email"
                     name="email"
                     value={formData.email}
@@ -143,12 +150,13 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
                   Phone Number
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                      id="phone"
                     type="tel"
                     name="phone"
                     value={formData.phone}
@@ -161,12 +169,13 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                      id="password"
                     type="password"
                     name="password"
                     value={formData.password}
@@ -179,12 +188,13 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                      id="confirmPassword"
                     type="password"
                     name="confirmPassword"
                     value={formData.confirmPassword}
@@ -197,10 +207,11 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="referral_code" className="block text-sm font-medium text-gray-300 mb-2">
                   Referral Code (Optional)
                 </label>
                 <input
+                      id="referral_code"
                   type="text"
                   name="referral_code"
                   value={formData.referral_code}

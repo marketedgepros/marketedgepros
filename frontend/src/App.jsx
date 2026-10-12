@@ -150,7 +150,8 @@ function AccountChatWidget() {
   // The page has a supported support-ticket link instead of a floating overlay.
   if (location.pathname === '/affiliate/payout') return null;
   if (location.pathname === '/programs' || /^\/programs\/[^/]+(?:\/checkout)?$/.test(location.pathname)) return null;
-  return <ChatWidget />;
+  // On narrow screens, use the normal support navigation instead of covering copy.
+  return <div className="hidden md:block"><ChatWidget /></div>;
 }
 
 function App() {

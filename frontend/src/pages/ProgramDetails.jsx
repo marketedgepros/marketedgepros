@@ -87,8 +87,9 @@ export default function ProgramDetails() {
                   Optional add-ons
                 </h2>
                 <p className="mt-2 text-sm text-slate-400">
-                  Select options on the quote page. Percentage add-ons use the
-                  base program fee, not the combined total.
+                  If quotes are available, options can be selected there.
+                  Percentage add-ons use the base program fee, not the combined
+                  total.
                 </p>
                 {program.addons.length ? (
                   <ul className="mt-5 divide-y divide-slate-700">
@@ -130,8 +131,9 @@ export default function ProgramDetails() {
                   {formatCatalogMoney(program.price)}
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-slate-400">
-                  This is the current base fee. Your quote will record the
-                  server's current price, options and terms. No charge is made.
+                  This is the base fee shown in the catalog. If quotes are
+                  available, the server records the price, selected options and
+                  terms in an unpaid quote. No charge is made.
                 </p>
               </div>
               <button
@@ -139,7 +141,7 @@ export default function ProgramDetails() {
                 onClick={proceed}
                 className={`${primaryAction} w-full`}
               >
-                Review quote options
+                Check quote availability
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
               <PaymentBoundary />

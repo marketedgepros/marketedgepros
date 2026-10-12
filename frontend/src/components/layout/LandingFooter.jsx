@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Linkedin, Youtube, Mail, MessageCircle } from 'lucide-react';
 
 export default function LandingFooter() {
-  const currentYear = 2020; // Fixed year as requested
+  const currentYear = new Date().getFullYear();
   
   const footerSections = [
     {
@@ -18,11 +18,8 @@ export default function LandingFooter() {
     {
       title: 'Programs',
       links: [
-        { name: 'One-Phase Challenge', to: '/programs?filter=one-phase' },
-        { name: 'Two-Phase Challenge', to: '/programs?filter=two-phase' },
-        { name: 'Three-Phase Challenge', to: '/programs?filter=three-phase' },
-        // { name: 'Instant Funding', to: '/programs?filter=instant' }, // Removed - program doesn't exist
-        // { name: 'Compare Programs', to: '/programs' }, // Removed - page doesn't exist
+        { name: 'Current catalog', to: '/programs' },
+        { name: 'Compare programs', to: '/programs#program-comparison' },
       ],
     },
     {
@@ -68,7 +65,7 @@ export default function LandingFooter() {
               <span className="text-xl font-bold text-white">MarketEdgePros</span>
             </Link>
             <p className="text-gray-400 text-sm mb-6">
-              Empowering traders worldwide with professional funding and cutting-edge trading technology.
+              Explore program settings, compare options and manage your account in one place.
             </p>
             
             {/* Social Links */}

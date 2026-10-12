@@ -29,7 +29,6 @@ function CookiePolicy() {
       <div className="min-h-screen bg-gray-900 text-white">
         {/* Hero Section */}
         <div className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-blue-900/20 to-purple-900/20">
-          <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-24 relative">
             <div className="text-center max-w-4xl mx-auto">
               <div className="flex justify-center mb-6">

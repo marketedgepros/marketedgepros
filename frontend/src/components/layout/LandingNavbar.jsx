@@ -31,22 +31,22 @@ export default function LandingNavbar() {
             <div className="w-8 h-8 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">M</div>
             <span className="text-xl font-bold text-white">MarketEdgePros</span>
           </Link>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             {navLinks.map((link) => (
               link.to ? (
-                <Link 
+                <Link
                   key={link.name}
-                  to={link.to} 
+                  to={link.to}
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   {link.name}
                 </Link>
               ) : (
-                <a 
+                <a
                   key={link.name}
-                  href={link.href} 
+                  href={link.href}
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   {link.name}
@@ -54,13 +54,13 @@ export default function LandingNavbar() {
               )
             ))}
           </div>
-          
+
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             {isAuthenticated ? (
               <>
-                <Link 
-                  to="/dashboard" 
+                <Link
+                  to="/dashboard"
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   Dashboard
@@ -78,17 +78,17 @@ export default function LandingNavbar() {
               </>
             ) : (
               <>
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="text-gray-300 hover:text-white transition-colors"
                 >
                   Login
                 </Link>
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/programs"
                   className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full text-sm font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all text-white"
                 >
-                  Get Funded
+                  View programs
                 </Link>
               </>
             )}
@@ -97,7 +97,10 @@ export default function LandingNavbar() {
           {/* Mobile menu button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden text-gray-300 hover:text-white"
+            aria-label={isOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={isOpen}
+            aria-controls="mobile-navigation"
+            className="md:hidden text-gray-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -105,7 +108,7 @@ export default function LandingNavbar() {
 
         {/* Mobile Navigation */}
         {isOpen && (
-          <div className="md:hidden py-4 space-y-4">
+          <div id="mobile-navigation" className="md:hidden py-4 space-y-4">
             {navLinks.map((link) => (
               link.to ? (
                 <Link
@@ -155,11 +158,11 @@ export default function LandingNavbar() {
                     Login
                   </Link>
                   <Link
-                    to="/register"
+                    to="/programs"
                     className="block px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg text-center text-white font-semibold"
                     onClick={() => setIsOpen(false)}
                   >
-                    Get Funded
+                    View programs
                   </Link>
                 </>
               )}
