@@ -90,6 +90,9 @@ const catalogUiStub = writeModule('catalog-ui.mjs', `
 `);
 
 const replaceLayout = (text) => text.replace(/import Layout from ['"][^'"]+\/components\/layout\/Layout['"];?/, `import Layout from ${JSON.stringify(layoutStub)};`);
+const withoutHomepageVisuals = (text) => text
+  .replace(/import useScrollReveal from ['"][^'"]+useScrollReveal['"];?\s*/, "const useScrollReveal = () => ({ ref: null, state: 'visible', className: '' });\n")
+  .replace(/import ['"][^'"]+homeMotion\.css['"];?\s*/, '');
 const replaceApi = (text) => text.replace(/import api from ['"][^'"]+\/services\/api['"];?/, `import api from ${JSON.stringify(apiStub)};`);
 const withoutSeo = (text) => text.replace(/import SEO from ['"][^'"]+\/components\/SEO['"];?/, `import SEO from ${JSON.stringify(noOpStub)};`);
 const withoutArticleLibraries = (text) => text
@@ -98,9 +101,9 @@ const withoutArticleLibraries = (text) => text
   .replace(/import DOMPurify from ['"]isomorphic-dompurify['"];?/, 'const DOMPurify = { sanitize: (value) => value };');
 
 const pages = {
-  Home: (await compile('pages/NewHomePage.jsx', 'home', (text) => replaceLayout(text)
+  Home: (await compile('pages/NewHomePage.jsx', 'home', (text) => withoutHomepageVisuals(replaceLayout(text)
     .replace(/import SchemaMarkup from ['"][^'"]+SchemaMarkup['"];?/, `import SchemaMarkup from ${JSON.stringify(noOpStub)};`)
-    .replace(/import CatalogPreview from ['"][^'"]+CatalogPreview['"];?/, `import CatalogPreview from ${JSON.stringify(noOpStub)};`))).default,
+    .replace(/import CatalogPreview from ['"][^'"]+CatalogPreview['"];?/, `import CatalogPreview from ${JSON.stringify(noOpStub)};`)))).default,
   About: (await compile('pages/AboutUs.jsx', 'about', replaceLayout)).default,
   How: (await compile('pages/HowItWorks.jsx', 'how', replaceLayout)).default,
   FAQ: (await compile('pages/FAQ.jsx', 'faq', (text) => replaceLayout(text).replace(/import StructuredData from ['"][^'"]+StructuredData['"];?/, `import StructuredData from ${JSON.stringify(noOpStub)};`))).default,

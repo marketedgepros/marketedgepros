@@ -1,6 +1,6 @@
 """
 Integration Tests for MT5 Routes
-Professional tests following PropTradePro patterns
+Professional tests following MarketEdgePros patterns
 """
 import pytest
 import uuid

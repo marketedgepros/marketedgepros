@@ -68,7 +68,7 @@ Your MT5 account has been disabled automatically.
 If you believe this is an error, please contact support immediately.
 
 Best regards,
-PropTradePro Team
+MarketEdgePros Team
             """
             
             # Send email
@@ -93,7 +93,11 @@ PropTradePro Team
                 logger.warning("Mail not configured")
                 return False
             
-            admin_email = self.app.config.get('ADMIN_EMAIL', 'admin@proptradepro.com')
+            admin_email = self.app.config.get('ADMIN_EMAIL') if self.app else None
+            if not admin_email:
+                logger.warning('ADMIN_EMAIL not configured; skipping admin alert')
+                return False
+
             
             # Build email content
             subject = f"🚨 Challenge Violation Alert - ID {challenge.id}"
@@ -288,7 +292,7 @@ Current Status:
 Please manage your risk carefully to avoid violating the daily loss limit.
 
 Best regards,
-PropTradePro Team
+MarketEdgePros Team
             """
             
             msg = Message(
@@ -314,8 +318,8 @@ MAIL_PORT=587
 MAIL_USE_TLS=True
 MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=your-app-password
-MAIL_DEFAULT_SENDER=noreply@proptradepro.com
-ADMIN_EMAIL=admin@proptradepro.com
+MAIL_DEFAULT_SENDER=your-verified-sender@example.com
+ADMIN_EMAIL=your-admin-email@example.com
 
 # Twilio (SMS)
 TWILIO_ACCOUNT_SID=your-twilio-sid

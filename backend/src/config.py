@@ -103,7 +103,7 @@ class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'DATABASE_URL',
-        'postgresql://postgres:postgres@localhost:5432/proptradepro_dev'
+        'postgresql://postgres:postgres@localhost:5432/marketedgepros_dev'
     )
     SQLALCHEMY_ECHO = True
     RATELIMIT_ENABLED = False

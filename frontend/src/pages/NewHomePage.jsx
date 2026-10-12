@@ -3,16 +3,29 @@ import SchemaMarkup from "../components/seo/SchemaMarkup";
 import { Link } from 'react-router-dom';
 import CatalogPreview from '../components/programs/CatalogPreview';
 import Layout from '../components/layout/Layout';
+import useScrollReveal from '../hooks/useScrollReveal';
+import '../components/visual/homeMotion.css';
 
-const NewHomePage = () => (
-  <Layout>
-    <div className="min-h-screen overflow-hidden scroll-smooth bg-slate-950 text-white">
+const NewHomePage = () => {
+  const heroCopy = useScrollReveal();
+  const heroArtwork = useScrollReveal();
+  const heroDetails = useScrollReveal();
+  const catalogIntro = useScrollReveal();
+  const explorationSteps = useScrollReveal();
+  const supportPanel = useScrollReveal();
+
+  return (
+    <Layout>
+      <div className="home-motion min-h-screen overflow-hidden scroll-smooth bg-slate-950 text-white">
       <SchemaMarkup />
       <section className="relative isolate flex min-h-[76vh] items-center overflow-hidden">
-        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_rgba(8,145,178,0.28),_transparent_55%),linear-gradient(140deg,#071426_0%,#0b1730_55%,#06111f_100%)]" />
-        <div aria-hidden="true" className="absolute -right-24 top-16 h-80 w-80 rounded-full border border-cyan-300/10" />
-        <div className="mx-auto grid w-full max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.2fr_.8fr] lg:items-center lg:px-8">
-          <div>
+        <div aria-hidden="true" className="home-motion__hero-background pointer-events-none absolute inset-0">
+          <img src="/images/abstract-trading-flow.webp" alt="" width="1536" height="1024" fetchpriority="high" decoding="async" className="h-full w-full object-cover opacity-[0.65]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/65 to-slate-950/30" />
+        </div>
+        <div aria-hidden="true" className="home-motion__ambient-ring pointer-events-none absolute -right-24 top-16 h-80 w-80 rounded-full border border-cyan-300/10" />
+        <div className="home-motion__content mx-auto grid w-full max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.2fr_.8fr] lg:items-center lg:px-8">
+          <div ref={heroCopy.ref} className={heroCopy.className}>
             <p className="mb-6 text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">MarketEdgePros · Trading programs</p>
             <h1 className="max-w-3xl text-5xl font-bold leading-tight tracking-tight sm:text-6xl">Explore trading programs with <span className="text-cyan-300">clear information.</span></h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300">Compare the programs currently shown in our catalog. Review each program’s displayed price and terms before requesting a quote.</p>
@@ -22,21 +35,27 @@ const NewHomePage = () => (
             </div>
             <p className="mt-6 max-w-2xl text-sm leading-6 text-slate-400">Catalog details may vary by program. A quote is not a payment, funded account, or account activation; payments are not enabled.</p>
           </div>
-          <aside className="rounded-2xl border border-cyan-200/20 bg-slate-900/70 p-8 shadow-2xl shadow-cyan-950/30">
-            <div className="mb-5 h-1 w-14 rounded bg-cyan-400" />
-            <h2 className="text-2xl font-semibold">Start with the published details</h2>
-            <ol className="mt-6 space-y-5 text-slate-300">
-              <li className="flex gap-4"><span className="font-mono text-cyan-300">01</span><span>Browse programs available in the catalog.</span></li>
-              <li className="flex gap-4"><span className="font-mono text-cyan-300">02</span><span>Check the displayed price and program-specific terms.</span></li>
-              <li className="flex gap-4"><span className="font-mono text-cyan-300">03</span><span>Request a quote if that option is available.</span></li>
-            </ol>
-          </aside>
+          <div className="min-w-0 space-y-5">
+            <figure ref={heroArtwork.ref} className={`${heroArtwork.className} home-motion__panel home-motion__image-panel overflow-hidden rounded-2xl border border-cyan-200/15 bg-slate-950/70 shadow-2xl shadow-cyan-950/30`}>
+              <img src="/images/hero-trading-3d.webp" alt="Decorative illustration of trading charts on three screens" width="1536" height="1024" decoding="async" className="h-auto w-full object-contain" />
+              <figcaption className="border-t border-cyan-200/10 px-5 py-3 text-xs leading-5 text-slate-300">Illustrative artwork, not a live platform view or account performance.</figcaption>
+            </figure>
+            <aside ref={heroDetails.ref} className={`${heroDetails.className} home-motion__panel rounded-2xl border border-cyan-200/20 bg-slate-900/85 p-6`}>
+              <div className="mb-4 h-1 w-14 rounded bg-cyan-400" />
+              <h2 className="text-xl font-semibold">Start with the published details</h2>
+              <ol className="mt-5 space-y-4 text-sm leading-6 text-slate-300">
+                <li className="flex gap-4"><span className="font-mono text-cyan-300">01</span><span>Browse programs available in the catalog.</span></li>
+                <li className="flex gap-4"><span className="font-mono text-cyan-300">02</span><span>Check the displayed price and program-specific terms.</span></li>
+                <li className="flex gap-4"><span className="font-mono text-cyan-300">03</span><span>Request a quote if that option is available.</span></li>
+              </ol>
+            </aside>
+          </div>
         </div>
       </section>
 
       <section id="programs" className="border-y border-white/5 bg-slate-900/50 py-20">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div ref={catalogIntro.ref} className={`${catalogIntro.className} mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end`}>
             <div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Current catalog</p><h2 className="mt-3 text-3xl font-bold sm:text-4xl">Review available programs</h2></div>
             <p className="max-w-xl text-sm leading-6 text-slate-400">Only catalog information returned for display is shown here. Availability of programs and their terms depends on the current catalog data.</p>
           </div>
@@ -47,20 +66,22 @@ const NewHomePage = () => (
       <section id="how-it-works" className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
         <div className="grid gap-10 md:grid-cols-[.7fr_1.3fr]">
           <div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">A transparent starting point</p><h2 className="mt-3 text-3xl font-bold">How to explore</h2></div>
-          <div className="grid gap-5 sm:grid-cols-3">
-            {[['Browse','Open the catalog to see the programs currently listed.'],['Review','Read the displayed price and terms for the specific program.'],['Understand','A quote does not itself take payment or activate an account.']].map(([title, text], index) => <article key={title} className="rounded-xl border border-slate-700 bg-slate-900/60 p-6"><p className="font-mono text-sm text-cyan-300">0{index + 1}</p><h3 className="mt-4 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{text}</p></article>)}
+          <div ref={explorationSteps.ref} className={`${explorationSteps.className} grid gap-5 sm:grid-cols-3`}>
+            {[['Browse','Open the catalog to see the programs currently listed.'],['Review','Read the displayed price and terms for the specific program.'],['Understand','A quote does not itself take payment or activate an account.']].map(([title, text], index) => <article key={title} className="home-motion__panel rounded-xl border border-slate-700 bg-slate-900/60 p-6"><p className="font-mono text-sm text-cyan-300">0{index + 1}</p><h3 className="mt-4 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{text}</p></article>)}
           </div>
         </div>
       </section>
 
       <section className="border-t border-white/5 bg-[#081426] py-16">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+        <div ref={supportPanel.ref} className={`${supportPanel.className} home-motion__panel mx-auto flex max-w-7xl flex-col gap-6 px-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:px-8`}>
+          <img src="/images/stats-globe-hologram.webp" alt="" width="1024" height="1024" loading="lazy" decoding="async" className="h-auto w-48 shrink-0 rounded-xl" />
           <div><h2 className="text-2xl font-bold">Questions before you decide?</h2><p className="mt-2 text-slate-400">Review the available help and program information.</p></div>
           <div className="flex flex-wrap gap-5"><Link to="/faq" className="font-semibold text-cyan-300 hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Read FAQs</Link><Link to="/support" className="font-semibold text-cyan-300 hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Visit support</Link><Link to="/programs" className="font-semibold text-cyan-300 hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-cyan-200">Browse programs</Link></div>
         </div>
       </section>
-    </div>
-  </Layout>
-);
+      </div>
+    </Layout>
+  );
+};
 
 export default NewHomePage;

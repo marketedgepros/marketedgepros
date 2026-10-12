@@ -1,5 +1,5 @@
 """
-Improved logging configuration for PropTradePro
+Improved logging configuration for MarketEdgePros
 Add this to app.py to replace the current logging.basicConfig()
 """
 
@@ -95,7 +95,7 @@ def setup_logging(app):
     
     # Log startup
     app.logger.info('='*50)
-    app.logger.info('PropTradePro Backend Starting')
+    app.logger.info('MarketEdgePros Backend Starting')
     app.logger.info(f'Environment: {app.config.get("ENV", "unknown")}')
     app.logger.info(f'Log Level: {logging.getLevelName(log_level)}')
     app.logger.info(f'Logs Directory: {logs_dir}')

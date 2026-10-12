@@ -1,0 +1,78 @@
+/* Homepage-only motion: it remains visible until JavaScript confirms observer support. */
+.home-motion {
+  position: relative;
+}
+
+.home-motion__hero-background {
+  z-index: 0;
+}
+
+.home-motion__content {
+  position: relative;
+  z-index: 1;
+}
+
+.scroll-reveal {
+  will-change: opacity, transform;
+}
+
+.scroll-reveal--pending {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+}
+
+.scroll-reveal--revealed {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition: opacity 620ms ease-out, transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.home-motion__panel {
+  transition: border-color 220ms ease-out, box-shadow 220ms ease-out, transform 220ms ease-out;
+}
+
+.home-motion__image-panel {
+  box-shadow: 0 24px 65px rgba(8, 145, 178, 0.12);
+}
+
+.home-motion__ambient-ring {
+  box-shadow: 0 0 42px rgba(103, 232, 249, 0.13), inset 0 0 24px rgba(103, 232, 249, 0.04);
+  animation: homeMotionGlowBreath 5.6s ease-in-out 3;
+}
+
+@keyframes homeMotionGlowBreath {
+  0%, 100% {
+    opacity: 0.34;
+    box-shadow: 0 0 30px rgba(103, 232, 249, 0.09), inset 0 0 18px rgba(103, 232, 249, 0.03);
+  }
+
+  50% {
+    opacity: 0.58;
+    box-shadow: 0 0 54px rgba(103, 232, 249, 0.2), inset 0 0 32px rgba(103, 232, 249, 0.07);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-motion__panel:hover {
+    transform: translateY(-2px);
+    border-color: rgba(103, 232, 249, 0.45);
+    box-shadow: 0 28px 70px rgba(8, 145, 178, 0.22);
+  }
+
+  .home-motion__image-panel:hover img {
+    filter: brightness(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal,
+  .scroll-reveal--pending,
+  .scroll-reveal--revealed,
+  .home-motion__panel,
+  .home-motion__ambient-ring {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

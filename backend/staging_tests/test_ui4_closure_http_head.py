@@ -20,7 +20,7 @@ def test_ui4_closure_six_domains_real_factory_http_and_persisted_user_actions(st
     with quote_database(staging_resources, monkeypatch, revision="heads") as app:
         app.config["EXPANDED_HIERARCHY_ENABLED"] = True
         with app.app_context():
-            assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalars().all() == ["20261012_000001"]
+            assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalars().all() == ["20261013_000001"]
             subject = db.session.get(User, 2)
             subject.kyc_status = "pending"
             subject.kyc_submitted_at = datetime(2026, 10, 12, 12, 0, 0)

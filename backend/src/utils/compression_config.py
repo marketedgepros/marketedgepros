@@ -1,5 +1,5 @@
 """
-Response compression configuration for PropTradePro
+Response compression configuration for MarketEdgePros
 Compress API responses to reduce bandwidth and improve speed
 """
 
