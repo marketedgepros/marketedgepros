@@ -3,11 +3,10 @@ Commission Service
 Handles automatic commission calculation and tracking
 """
 from src.database import db
-from src.models import Commission, Agent, Referral, Challenge, User
-from datetime import datetime
+from src.models import Commission, Agent
 from decimal import Decimal
 import logging
-from src.services.notification_service import NotificationService
+from src.services.affiliate_financial_boundary import refuse_unverified_affiliate_mutation
 
 logger = logging.getLogger(__name__)
 
@@ -17,204 +16,23 @@ class CommissionService:
     
     @staticmethod
     def calculate_and_create_commission(challenge_id, sale_amount):
+        """Refuse legacy commission creation before any lookup or side effect.
+
+        A verified affiliate settlement, identity, and ledger integration must
+        replace this mutator before commissions can be created again. Reporting
+        methods below remain deliberately read-only.
         """
-        Calculate and create commission when a challenge is purchased
-        
-        Args:
-            challenge_id: ID of the purchased challenge
-            sale_amount: Total sale amount
-            
-        Returns:
-            Commission object if created, None otherwise
-        """
-        try:
-            # Get the challenge
-            challenge = Challenge.query.get(challenge_id)
-            if not challenge:
-                logger.error(f"Challenge {challenge_id} not found")
-                return None
-            
-            # Get the user who purchased
-            user = User.query.get(challenge.user_id)
-            if not user:
-                logger.error(f"User {challenge.user_id} not found")
-                return None
-            
-            # Check if user was referred by an agent
-            referral = Referral.query.filter_by(
-                referred_user_id=user.id,
-                status='active'
-            ).first()
-            
-            if not referral:
-                logger.info(f"No active referral found for user {user.id}")
-                return None
-            
-            # Get the agent
-            agent = Agent.query.get(referral.agent_id)
-            if not agent or not agent.is_active:
-                logger.warning(f"Agent {referral.agent_id} not found or inactive")
-                return None
-            
-            # Calculate commission
-            commission_rate = agent.commission_rate
-            commission_amount = (Decimal(str(sale_amount)) * commission_rate) / Decimal('100')
-            
-            # Check if commission already exists for this challenge
-            existing_commission = Commission.query.filter_by(
-                challenge_id=challenge_id
-            ).first()
-            
-            if existing_commission:
-                logger.warning(f"Commission already exists for challenge {challenge_id}")
-                return existing_commission
-            
-            # Create commission record
-            commission = Commission(
-                agent_id=agent.id,
-                referral_id=referral.id,
-                challenge_id=challenge_id,
-                sale_amount=sale_amount,
-                commission_rate=commission_rate,
-                commission_amount=commission_amount,
-                status='pending'
-            )
-            
-            db.session.add(commission)
-            
-            # Update agent statistics
-            agent.total_sales = (agent.total_sales or Decimal('0')) + Decimal(str(sale_amount))
-            agent.pending_balance = (agent.pending_balance or Decimal('0')) + commission_amount
-            
-            # Update referral statistics
-            referral.total_purchases = (referral.total_purchases or 0) + 1
-            referral.total_spent = (referral.total_spent or Decimal('0')) + Decimal(str(sale_amount))
-            
-            db.session.commit()
-            
-            # Send notification to agent
-            NotificationService.create_notification(
-                user_id=agent.user_id,
-                notification_type='commission',
-                title='New Commission Earned',
-                message=f'You earned ${commission_amount} commission from a sale of ${sale_amount}.',
-                data={'commission_id': commission.id, 'amount': float(commission_amount), 'sale_amount': float(sale_amount)},
-                priority='normal'
-            )
-            
-            logger.info(f"Commission created: {commission.id} for agent {agent.id}, amount: {commission_amount}")
-            return commission
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error creating commission: {str(e)}")
-            return None
+        refuse_unverified_affiliate_mutation()
     
     @staticmethod
     def approve_commission(commission_id, approved_by_id):
-        """
-        Approve a commission
-        
-        Args:
-            commission_id: ID of the commission
-            approved_by_id: ID of the user approving
-            
-        Returns:
-            Commission object if approved, None otherwise
-        """
-        try:
-            commission = Commission.query.get(commission_id)
-            if not commission:
-                return None
-            
-            if commission.status != 'pending':
-                logger.warning(f"Commission {commission_id} is not pending")
-                return None
-            
-            commission.status = 'approved'
-            commission.approved_at = datetime.utcnow()
-            
-            db.session.commit()
-            
-            # Send notification to agent
-            agent = Agent.query.get(commission.agent_id)
-            if agent:
-                NotificationService.create_notification(
-                    user_id=agent.user_id,
-                    notification_type='commission',
-                    title='Commission Approved',
-                    message=f'Your commission of ${commission.commission_amount} has been approved.',
-                    data={'commission_id': commission.id, 'amount': float(commission.commission_amount)},
-                    priority='high'
-                )
-            
-            logger.info(f"Commission {commission_id} approved by user {approved_by_id}")
-            
-            return commission
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error approving commission: {str(e)}")
-            return None
+        """Refuse legacy commission approval before any lookup or side effect."""
+        refuse_unverified_affiliate_mutation()
     
     @staticmethod
     def mark_commission_paid(commission_id, payment_method, transaction_id):
-        """
-        Mark a commission as paid
-        
-        Args:
-            commission_id: ID of the commission
-            payment_method: Payment method used
-            transaction_id: Transaction ID
-            
-        Returns:
-            Commission object if marked paid, None otherwise
-        """
-        try:
-            commission = Commission.query.get(commission_id)
-            if not commission:
-                return None
-            
-            if commission.status != 'approved':
-                logger.warning(f"Commission {commission_id} is not approved")
-                return None
-            
-            # Get agent
-            agent = Agent.query.get(commission.agent_id)
-            if not agent:
-                return None
-            
-            # Update commission
-            commission.status = 'paid'
-            commission.paid_at = datetime.utcnow()
-            commission.payment_method = payment_method
-            commission.transaction_id = transaction_id
-            
-            # Update agent balances
-            agent.pending_balance = (agent.pending_balance or Decimal('0')) - commission.commission_amount
-            agent.total_earned = (agent.total_earned or Decimal('0')) + commission.commission_amount
-            agent.total_withdrawn = (agent.total_withdrawn or Decimal('0')) + commission.commission_amount
-            
-            db.session.commit()
-            
-            # Send notification to agent
-            NotificationService.create_notification(
-                user_id=agent.user_id,
-                notification_type='commission',
-                title='Commission Paid',
-                message=f'Your commission of ${commission.commission_amount} has been paid via {payment_method}.',
-                data={'commission_id': commission.id, 'amount': float(commission.commission_amount), 'payment_method': payment_method, 'transaction_id': transaction_id},
-                priority='normal'
-            )
-            
-            logger.info(f"Commission {commission_id} marked as paid")
-            
-            return commission
-            
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error marking commission as paid: {str(e)}")
-            return None
+        """Refuse legacy commission payment before any lookup or side effect."""
+        refuse_unverified_affiliate_mutation()
     
     @staticmethod
     def get_agent_commissions(agent_id, status=None, page=1, per_page=20):
@@ -321,4 +139,3 @@ class CommissionService:
         except Exception as e:
             logger.error(f"Error getting commission stats: {str(e)}")
             return None
-

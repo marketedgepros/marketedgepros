@@ -15,16 +15,19 @@ from src.models.affiliate import (
 )
 from src.models.user import User
 from src.utils.decorators import token_required, admin_required
+from src.services.affiliate_financial_boundary import affiliate_mutation_unavailable_response
+from src.utils.hierarchy_scoping import platform_root_scope
 
 affiliate_bp = Blueprint('affiliate', __name__)
 
 
 def generate_affiliate_code(length=8):
-    """Generate unique affiliate code"""
-    while True:
+    """Generate a code with bounded work; the DB unique constraint is final."""
+    for _ in range(5):
         code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(length))
         if not AffiliateLink.query.filter_by(code=code).first():
             return code
+    raise RuntimeError('Affiliate code allocation unavailable')
 
 
 # ============================================================================
@@ -46,14 +49,16 @@ def get_affiliate_info():
                 'commission_rate': float(settings.default_commission_rate),
                 'min_payout': float(settings.min_payout_amount),
                 'cookie_duration_days': settings.cookie_duration_days,
-                'terms': settings.terms_and_conditions
+                'terms': settings.terms_and_conditions,
+                'payouts_enabled': False,
+                'settlement_verification': 'not_configured'
             },
             'benefits': [
-                f'{float(settings.default_commission_rate)}% commission on all sales',
+                f'{float(settings.default_commission_rate)}% configured rate; commission eligibility requires verified settlement',
                 f'${float(settings.min_payout_amount)} minimum payout',
                 f'{settings.cookie_duration_days}-day cookie duration',
                 'Real-time tracking dashboard',
-                'Monthly payouts',
+                'Payouts unavailable until settlement and identity verification are configured',
                 'Dedicated affiliate support'
             ]
         }), 200
@@ -145,7 +150,10 @@ def get_dashboard(current_user):
                 'conversion_rate': round((total_conversions / total_clicks * 100) if total_clicks > 0 else 0, 2),
                 'pending_commission': float(pending_commission),
                 'approved_commission': float(approved_commission),
-                'paid_commission': float(paid_commission)
+                'paid_commission': float(paid_commission),
+                'available_for_payout': None,
+                'payouts_enabled': False,
+                'commission_verification': 'unverified_legacy'
             },
             'links': [link.to_dict() for link in links],
             'recent_referrals': [ref.to_dict() for ref in recent_referrals]
@@ -257,6 +265,8 @@ def get_commissions(current_user):
         
         return jsonify({
             'commissions': [comm.to_dict() for comm in commissions.items],
+            'payouts_enabled': False,
+            'verification': 'unverified_legacy',
             'pagination': {
                 'page': page,
                 'per_page': per_page,
@@ -273,75 +283,8 @@ def get_commissions(current_user):
 @affiliate_bp.route('/payout', methods=['POST'])
 @token_required
 def request_payout(current_user):
-    """Request payout"""
-    try:
-        data = request.get_json()
-        method = data.get('method')
-        payment_details = data.get('payment_details')
-        
-        if not method or not payment_details:
-            return jsonify({'error': 'Method and payment details required'}), 400
-        
-        # Get approved commissions
-        approved_commissions = AffiliateCommission.query.filter_by(
-            affiliate_user_id=current_user.id,
-            status='approved',
-            payout_id=None
-        ).all()
-        
-        if not approved_commissions:
-            return jsonify({'error': 'No approved commissions available'}), 400
-        
-        total_amount = sum(c.amount for c in approved_commissions)
-        
-        # Check minimum payout
-        settings = AffiliateSettings.query.first()
-        if settings and total_amount < settings.min_payout_amount:
-            return jsonify({
-                'error': f'Minimum payout amount is ${float(settings.min_payout_amount)}'
-            }), 400
-        
-        # Check minimum unique customers (10 required)
-        from sqlalchemy import func
-        unique_customers = db.session.query(
-            func.count(func.distinct(AffiliateReferral.referred_user_id))
-        ).filter(
-            AffiliateReferral.affiliate_user_id == current_user.id,
-            AffiliateReferral.status == 'converted'
-        ).scalar() or 0
-        
-        if unique_customers < 10:
-            return jsonify({
-                'error': f'You need {10 - unique_customers} more unique customers to request payout. Current: {unique_customers}/10'
-            }), 400
-        
-        
-        # Create payout request
-        payout = AffiliatePayout(
-            affiliate_user_id=current_user.id,
-            amount=total_amount,
-            method=method,
-            payment_details=payment_details
-        )
-        
-        db.session.add(payout)
-        db.session.flush()
-        
-        # Link commissions to payout
-        for commission in approved_commissions:
-            commission.payout_id = payout.id
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Payout requested successfully',
-            'payout': payout.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'Request payout error: {str(e)}')
-        return jsonify({'error': 'Failed to request payout'}), 500
+    """Legacy approved rows are not authority to reserve or request funds."""
+    return affiliate_mutation_unavailable_response()
 
 
 @affiliate_bp.route('/payouts', methods=['GET'])
@@ -353,7 +296,7 @@ def get_payouts(current_user):
             affiliate_user_id=current_user.id
         ).order_by(AffiliatePayout.requested_at.desc()).all()
         
-        return jsonify({'payouts': [p.to_dict() for p in payouts]}), 200
+        return jsonify({'payouts': [p.to_dict() for p in payouts], 'verification': 'unverified_legacy', 'payouts_enabled': False}), 200
         
     except Exception as e:
         current_app.logger.error(f'Get payouts error: {str(e)}')
@@ -436,62 +379,56 @@ def get_all_payouts(current_user):
 
 
 @affiliate_bp.route('/admin/payout/<int:payout_id>/process', methods=['POST'])
+@token_required
 @admin_required
 def process_payout(current_user, payout_id):
-    """Process payout (admin only)"""
-    try:
-        data = request.get_json()
-        status = data.get('status')  # completed or failed
-        transaction_id = data.get('transaction_id')
-        notes = data.get('notes')
-        
-        payout = AffiliatePayout.query.get(payout_id)
-        
-        if not payout:
-            return jsonify({'error': 'Payout not found'}), 404
-        
-        payout.status = status
-        payout.transaction_id = transaction_id
-        payout.notes = notes
-        payout.processed_at = datetime.utcnow()
-        
-        if status == 'completed':
-            payout.completed_at = datetime.utcnow()
-            # Mark commissions as paid
-            for commission in payout.commissions:
-                commission.status = 'paid'
-                commission.paid_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Payout processed successfully',
-            'payout': payout.to_dict()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'Process payout error: {str(e)}')
-        return jsonify({'error': 'Failed to process payout'}), 500
+    """Client-supplied status/transaction text cannot prove disbursement."""
+    return affiliate_mutation_unavailable_response()
 
 
 @affiliate_bp.route('/admin/settings', methods=['GET', 'PUT'])
+@token_required
 @admin_required
 def manage_settings(current_user):
     """Get or update affiliate settings (admin only)"""
+    # This legacy table has no tenant key: only the explicitly configured
+    # platform owner may read or edit its global program settings.
+    if not platform_root_scope(current_user):
+        return jsonify({'error': 'Platform owner access required'}), 403
     try:
+        data = None
+        if request.method == 'PUT':
+            if not request.is_json:
+                return jsonify({'error': 'JSON request required'}), 415
+            raw = request.stream.read(4097)
+            if len(raw) > 4096:
+                return jsonify({'error': 'Affiliate settings request too large'}), 413
+            import json
+            def unique_fields(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError('Duplicate field')
+                    result[key] = value
+                return result
+            def reject_constant(value):
+                raise ValueError('Non-finite JSON number')
+            try:
+                data = json.loads(raw, object_pairs_hook=unique_fields, parse_constant=reject_constant)
+            except (ValueError, RecursionError):
+                return jsonify({'error': 'Invalid affiliate settings request'}), 400
+            if not isinstance(data, dict):
+                return jsonify({'error': 'Invalid affiliate settings request'}), 400
+            if 'auto_approve_commissions' in data and data['auto_approve_commissions'] is not False:
+                return jsonify({'error': 'Automatic commission approval requires verified settlement and identity',
+                                'code': 'AFFILIATE_AUTO_APPROVAL_UNAVAILABLE'}), 409
+
         settings = AffiliateSettings.query.first()
-        
         if not settings:
-            settings = AffiliateSettings()
-            db.session.add(settings)
-            db.session.commit()
-        
+            return jsonify({'error': 'Affiliate settings not configured'}), 404
         if request.method == 'GET':
-            return jsonify({'settings': settings.to_dict()}), 200
-        
-        # PUT - Update settings
-        data = request.get_json()
+            return jsonify({'settings': settings.to_dict(), 'payouts_enabled': False,
+                            'settlement_verification': 'not_configured'}), 200
         
         if 'default_commission_rate' in data:
             settings.default_commission_rate = data['default_commission_rate']
@@ -520,4 +457,3 @@ def manage_settings(current_user):
         db.session.rollback()
         current_app.logger.error(f'Manage settings error: {str(e)}')
         return jsonify({'error': 'Failed to manage settings'}), 500
-
