@@ -9,6 +9,7 @@ from src.database import db
 from src.models.agent import Agent
 from src.models.tenant import Tenant
 from src.models.token_blacklist import TokenBlacklist
+from src.models.trading_program import Challenge, TradingProgram
 from src.models.user import User
 from src.models.wallet import Transaction, Wallet
 from src.models.withdrawal import Withdrawal
@@ -30,16 +31,21 @@ def _make_app(*, expanded_hierarchy):
     })
     tables = [
         Tenant.__table__, User.__table__, TokenBlacklist.__table__, Wallet.__table__,
-        Transaction.__table__, Agent.__table__, Withdrawal.__table__,
+        Transaction.__table__, Agent.__table__, TradingProgram.__table__, Challenge.__table__,
+        Withdrawal.__table__,
     ]
-    # The production Tenant.settings column is PostgreSQL JSONB.  This focused
-    # suite intentionally uses an isolated SQLite fixture, so only its temporary
-    # test metadata rendering uses portable JSON; production metadata is restored
-    # by the fixture teardown below.
-    tenant_settings_type = Tenant.__table__.c.settings.type
+    # Only this isolated SQLite fixture renders PostgreSQL JSONB as portable JSON.
+    # Every affected metadata column is restored after the fixture drops its rows.
+    portable_column_types = [
+        (Tenant.__table__.c.settings, Tenant.__table__.c.settings.type),
+        (TradingProgram.__table__.c.rules, TradingProgram.__table__.c.rules.type),
+        (Challenge.__table__.c.addons, Challenge.__table__.c.addons.type),
+        (Challenge.__table__.c.daily_drawdown_history, Challenge.__table__.c.daily_drawdown_history.type),
+    ]
     with app.app_context():
         if db.engine.dialect.name == 'sqlite':
-            Tenant.__table__.c.settings.type = JSON()
+            for column, _original_type in portable_column_types:
+                column.type = JSON()
         db.metadata.create_all(bind=db.engine, tables=tables)
         db.session.add_all([
             Tenant(id=1, name='Synthetic Wallet Brand', subdomain='wallet-brand', status='active'),
@@ -74,29 +80,31 @@ def _make_app(*, expanded_hierarchy):
             identity: db.session.get(User, identity).generate_access_token()
             for identity in (1, 2, 3, 4)
         }
-    return app, tables, tenant_settings_type
+    return app, tables, portable_column_types
 
 
 @pytest.fixture
 def wallet_boundary_app():
     """Launch-mode factory: canonical root/tenant configuration is real."""
-    app, tables, tenant_settings_type = _make_app(expanded_hierarchy=False)
+    app, tables, portable_column_types = _make_app(expanded_hierarchy=False)
     yield app
     with app.app_context():
         db.session.remove()
         db.metadata.drop_all(bind=db.engine, tables=list(reversed(tables)))
-        Tenant.__table__.c.settings.type = tenant_settings_type
+        for column, original_type in portable_column_types:
+            column.type = original_type
 
 
 @pytest.fixture
 def scoped_wallet_boundary_app():
     """Expanded hierarchy factory solely for tenant/hierarchy list proof."""
-    app, tables, tenant_settings_type = _make_app(expanded_hierarchy=True)
+    app, tables, portable_column_types = _make_app(expanded_hierarchy=True)
     yield app
     with app.app_context():
         db.session.remove()
         db.metadata.drop_all(bind=db.engine, tables=list(reversed(tables)))
-        Tenant.__table__.c.settings.type = tenant_settings_type
+        for column, original_type in portable_column_types:
+            column.type = original_type
 
 
 def _headers(app, actor=1):
@@ -173,9 +181,12 @@ def test_wallet_boundary_existing_decimal_read_and_history_are_bounded_stable_an
         assert response.status_code == 200
         payload = response.get_json()
         assert payload['balance_verification'] == 'unverified_legacy'
-        assert payload['pagination'] == {
-            'page': 1, 'per_page': 1, 'offset': 0, 'total': None, 'returned_count': 1,
-        }
+        assert payload['owner_context'] == {'user_id': 1, 'tenant_id': 1}
+        assert payload['payouts_enabled'] is False
+        assert payload['available_for_payout'] is None and payload['currency'] is None
+        assert payload['pagination'] == {'page': 1, 'per_page': 1, 'total': 2, 'pages': 2}
+        assert payload['filters'] == {'balance_type': None}
+        assert payload['transactions'][0]['amount'] == '5.66'
         assert payload['transactions'][0]['id'] == history[0].id
 
 
@@ -314,7 +325,10 @@ def test_wallet_boundary_admin_wallet_scope_uses_tenant_hierarchy_owner_set(scop
         assert response.status_code == 200
         payload = response.get_json()
         assert payload['balance_verification'] == 'unverified_legacy'
+        assert payload['owner_context'] == {'user_id': 2, 'tenant_id': 1}
+        assert payload['payouts_enabled'] is False
         assert {item['user_id'] for item in payload['wallets']} == {2, 3}
+        assert all('user' not in item and 'total_balance' not in item for item in payload['wallets'])
         assert payload['pagination']['total'] == 2
 
 
@@ -336,7 +350,10 @@ def test_wallet_boundary_withdrawal_scope_allows_only_unambiguous_direct_or_agen
             '/api/v1/wallet/admin/withdrawals', headers=_headers(scoped_wallet_boundary_app, actor=2),
         )
         assert response.status_code == 200
-        assert {item['id'] for item in response.get_json()['withdrawals']} == {101, 102}
+        payload = response.get_json()
+        assert payload['owner_context'] == {'user_id': 2, 'tenant_id': 1}
+        assert {item['id'] for item in payload['withdrawals']} == {101, 102}
+        assert all('user' not in item and 'transaction_id' not in item for item in payload['withdrawals'])
 
 
 def test_wallet_boundary_auth_and_csrf_are_checked_before_ledger_refusal(wallet_boundary_app):

@@ -74,3 +74,11 @@
 נוסף ב־12.10.2026: תשתית lifecycle סינתטית ודף **סטטוס פדיון** מעוצב ב־navy/cyan, ללא טופס או יתרות מדומות. בדיקת נייד 320/390 ודסקטופ 1440, ללא overlay צ׳אט במסלול זה. אין בכך השלמת מסכי עמלות מאומתים, סל פדיון, anti-fraud חי או UI-4.
 
 החסימה הראשונה אינה מנוע הונאות פעיל או פריסה. אין תפקיד חדש, שינוי נתוני לקוח, מחיקת היסטוריה או שינוי יתרה בחבילה.
+
+## ארנק ומשיכות בתוך UI-4 — 12.10.2026
+
+- [x] **קריאה בלבד ללא יתרות מדומות:** /wallet, /trader/withdrawals ו־/admin/withdrawals מציגים רק legacy תחום לבעלות משתמש/מותג; owner_context עצמאי, Decimal strings/null, currency=null/available_for_payout=null/payouts_enabled=false. אין minimum/split/יתרה זמינה מומצאים; missing wallet נפרד מכשל ואפס. הורים direct/Agent/challenge קוהרנטיים, פרטיות allow-list ללא פרטי תשלום/קשר וטקסט חופשי. דפדוף/מסנן bounded וסדר יציב, count ו־page בפקודת SQL אחת ובאותו snapshot כולל total מעבר לסוף; no-autoflush ו־timeout ב־PostgreSQL.
+- [x] **חסימת legacy משלימה:** POST traders/withdrawals וכל כניסות API/service payout הישנות מסרבים לפני JSON/resource SQL/שינוי יתרה או notifications אחרי JWT/admin/CSRF כנדרש; wallet adjust/approve/reject/complete נשארים חסומים. אין mark-paid באמצעות טקסט, אין ניחוש תוכנית ראשונה או זכאות מנתוני מסחר. ההיסטוריה נשמרת; אין schema/migration/delete.
+- [x] **מסכים מקצועיים וקבלה:** navy/cyan ומעטפת אחת, כותרות/טבלאות/מצבים נגישים, טקסט ארוך וגלילה פנימית בנייד; אין טופס כספי או הצלחה מדומה. key לפי auth/user/tenant/role ו־AbortSignal; רענון session יציב, מעבר route/page/filter מסיר נתונים ישנים. תגובה מאומתת מול בקשה ו־cardinality/unique/filter/ownership; refresh יחיד, no automatic polling/retry. parity HTTP מבודד, בדיקות React/נתב, ביקורת ורגרסיות; CI לפי SHA. UI-4 כולו, UI-5/6 והחלטות UI-3 עדיין פתוחים, אין live wallet/MT5/merge/deploy.
+
+תיעוד החבילה: `backend/docs/FINANCIAL_RECORDS_UI4_HE.md`. 36 מקרי App סינתטיים, 9 מקרי build/הרשאות, parity של ארבע תגובות HTTP, תחרות PostgreSQL ותיקוני ביקורת נבדקו. GET פיננסי אינו מבצע refresh/replay אוטומטי אחרי 401. יתר מסכי הניהול, UI-5/6 והכרעות UI-3 פתוחים; CI לפי SHA המדויק בדוח המסירה.

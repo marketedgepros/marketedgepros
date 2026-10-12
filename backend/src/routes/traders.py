@@ -175,128 +175,44 @@ def get_trading_history():
 @traders_bp.route('/withdrawals', methods=['GET'])
 @token_required
 def get_withdrawals():
-    """Get withdrawal history"""
+    """Return one safe, tenant-owned page of legacy withdrawal records."""
     try:
-        user_id = g.current_user.id
-        
-        # Get user's withdrawals
-        withdrawals = Withdrawal.query.filter_by(
-            user_id=user_id
-        ).order_by(desc(Withdrawal.created_at)).all()
-        
-        # Calculate statistics
-        total_withdrawn = sum([
-            float(w.amount) for w in withdrawals if w.status == 'completed'
-        ])
-        pending_amount = sum([
-            float(w.amount) for w in withdrawals if w.status == 'pending'
-        ])
-        completed_count = len([w for w in withdrawals if w.status == 'completed'])
-        
-        # Get available balance (from active funded challenge)
-        active_challenge = Challenge.query.filter_by(
-            user_id=user_id,
-            status='funded'
-        ).first()
-        
-        available_balance = 0
-        if active_challenge:
-            balance = float(active_challenge.current_balance)
-            initial = float(active_challenge.initial_balance)
-            profit = balance - initial
-            # Trader keeps 90% of profit (configurable)
-            available_balance = profit * 0.9 if profit > 0 else 0
-        
+        from src.services.financial_records_read import (
+            FinancialRecordsQueryInvalid,
+            FinancialRecordsReadService,
+            FinancialRecordsTenantRequired,
+        )
+
+        arguments = FinancialRecordsReadService.parse_withdrawals_query(request.args)
+        return jsonify(FinancialRecordsReadService.withdrawals_for_owner(g.current_user, arguments)), 200
+    except FinancialRecordsTenantRequired:
         return jsonify({
-            'statistics': {
-                'available_balance': round(available_balance, 2),
-                'total_withdrawn': round(total_withdrawn, 2),
-                'pending_withdrawals': round(pending_amount, 2),
-                'completed_count': completed_count
-            },
-            'withdrawals': [{
-                'id': withdrawal.id,
-                'amount': float(withdrawal.amount),
-                'method': withdrawal.withdrawal_method,
-                'status': withdrawal.status,
-                'requested_at': withdrawal.created_at.isoformat(),
-                'processed_at': withdrawal.processed_at.isoformat() if withdrawal.processed_at else None,
-                'notes': withdrawal.notes
-            } for withdrawal in withdrawals]
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            'error': 'Tenant context is required',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+    except FinancialRecordsQueryInvalid:
+        return jsonify({
+            'error': 'Invalid withdrawal request',
+            'code': 'FINANCIAL_RECORDS_QUERY_INVALID',
+        }), 400
+    except Exception:
+        return jsonify({
+            'error': 'Withdrawal records are unavailable',
+            'code': 'FINANCIAL_RECORDS_UNAVAILABLE',
+        }), 503
 
 
 @traders_bp.route('/withdrawals', methods=['POST'])
 @token_required
 def request_withdrawal():
-    """Request a new withdrawal"""
-    try:
-        user_id = g.current_user.id
-        data = request.get_json()
-        
-        # Validate required fields
-        if not data.get('amount') or not data.get('method'):
-            return jsonify({'error': 'Amount and method are required'}), 400
-        
-        amount = float(data['amount'])
-        
-        # Validate minimum amount
-        if amount < 100:
-            return jsonify({'error': 'Minimum withdrawal amount is $100'}), 400
-        
-        # Get active funded challenge
-        active_challenge = Challenge.query.filter_by(
-            user_id=user_id,
-            status='funded'
-        ).first()
-        
-        if not active_challenge:
-            return jsonify({'error': 'No funded account found'}), 400
-        
-        # Calculate available balance
-        balance = float(active_challenge.current_balance)
-        initial = float(active_challenge.initial_balance)
-        profit = balance - initial
-        available_balance = profit * 0.9 if profit > 0 else 0
-        
-        # Check if sufficient balance
-        if amount > available_balance:
-            return jsonify({
-                'error': f'Insufficient balance. Available: ${available_balance:.2f}'
-            }), 400
-        
-        # Create withdrawal request
-        withdrawal = Withdrawal(
-            user_id=user_id,
-            challenge_id=active_challenge.id,
-            amount=amount,
-            withdrawal_method=data['method'],
-            account_details=data.get('account_details'),
-            status='pending'
-        )
-        
-        db.session.add(withdrawal)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Withdrawal request submitted successfully',
-            'withdrawal': {
-                'id': withdrawal.id,
-                'amount': float(withdrawal.amount),
-                'method': withdrawal.withdrawal_method,
-                'status': withdrawal.status,
-                'requested_at': withdrawal.created_at.isoformat()
-            }
-        }), 201
-        
-    except ValueError:
-        return jsonify({'error': 'Invalid amount'}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+    """Refuse legacy withdrawal creation after token/CSRF checks and before body I/O."""
+    from src.services.wallet_service import WalletLedgerNotConfigured
+
+    refusal = WalletLedgerNotConfigured()
+    return jsonify({
+        'error': 'Wallet ledger is not configured',
+        'code': refusal.code,
+    }), refusal.status
 
 
 @traders_bp.route('/challenges', methods=['GET'])
