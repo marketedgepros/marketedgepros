@@ -36,7 +36,7 @@ export default function ProgramDetails() {
     <CatalogPage>
       <BackToPrograms />
       {catalog.loading || catalog.error || !program ? (
-        <CatalogState {...catalog} />
+        <CatalogState loading={catalog.loading} error={catalog.error} retry={catalog.retry} />
       ) : (
         <>
           <header className="mb-9">

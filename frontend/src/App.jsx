@@ -48,7 +48,6 @@ const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const Careers = lazy(() => import("./pages/Careers"));
 
 // Shared Pages (Lazy Loaded)
-const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ScalingProgress = lazy(() => import("./pages/ScalingProgress"));
 const RoleBasedDashboard = lazy(() => import('./components/RoleBasedDashboard'));
 const KYC = lazy(() => import('./pages/KYC'));

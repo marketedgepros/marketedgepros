@@ -138,7 +138,9 @@ export default function ProgramsNew() {
         )}
         {catalog.loading || catalog.error || !programs.length ? (
           <CatalogState
-            {...catalog}
+            loading={catalog.loading}
+            error={catalog.error}
+            retry={catalog.retry}
             empty={!catalog.loading && !catalog.error}
           />
         ) : (

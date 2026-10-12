@@ -2,8 +2,8 @@
   "source": "reachable imports from frontend/src/main.jsx",
   "router": "frontend/src/App.jsx",
   "routeCount": 67,
-  "reachableJsFiles": 127,
-  "actionCount": 408,
+  "reachableJsFiles": 126,
+  "actionCount": 403,
   "missingImports": [],
   "routeDeclarations": [
     {
@@ -211,7 +211,7 @@
   "actions": [
     {
       "file": "frontend/src/App.jsx",
-      "line": 111,
+      "line": 110,
       "kind": "to",
       "destination": null,
       "expression": "{`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}",
@@ -220,7 +220,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 118,
+      "line": 117,
       "kind": "to",
       "destination": "/admin",
       "expression": null,
@@ -229,7 +229,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 141,
+      "line": 140,
       "kind": "to",
       "destination": null,
       "expression": "{postLoginDestination(user, location.search)}",
@@ -238,7 +238,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 215,
+      "line": 214,
       "kind": "to",
       "destination": "/terms-of-service",
       "expression": null,
@@ -247,7 +247,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 217,
+      "line": 216,
       "kind": "to",
       "destination": "/privacy-policy",
       "expression": null,
@@ -256,7 +256,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 623,
+      "line": 622,
       "kind": "href",
       "destination": "/",
       "expression": null,
@@ -1341,51 +1341,6 @@
       "status": "route-exists-static-only"
     },
     {
-      "file": "frontend/src/pages/Dashboard.jsx",
-      "line": 148,
-      "kind": "onClick",
-      "destination": null,
-      "expression": "{() => navigate('/programs')}",
-      "phase": "UI-4",
-      "status": "handler-or-external-review-required"
-    },
-    {
-      "file": "frontend/src/pages/Dashboard.jsx",
-      "line": 162,
-      "kind": "onClick",
-      "destination": null,
-      "expression": "{() => navigate('/profile')}",
-      "phase": "UI-4",
-      "status": "handler-or-external-review-required"
-    },
-    {
-      "file": "frontend/src/pages/Dashboard.jsx",
-      "line": 177,
-      "kind": "onClick",
-      "destination": null,
-      "expression": "{loadChallenges}",
-      "phase": "UI-4",
-      "status": "handler-or-external-review-required"
-    },
-    {
-      "file": "frontend/src/pages/Dashboard.jsx",
-      "line": 196,
-      "kind": "onClick",
-      "destination": null,
-      "expression": "{() => navigate('/programs')}",
-      "phase": "UI-4",
-      "status": "handler-or-external-review-required"
-    },
-    {
-      "file": "frontend/src/pages/Dashboard.jsx",
-      "line": 248,
-      "kind": "onClick",
-      "destination": null,
-      "expression": "{() => navigate(`/challenges/${challenge.id}`)}",
-      "phase": "UI-4",
-      "status": "handler-or-external-review-required"
-    },
-    {
       "file": "frontend/src/pages/ScalingProgress.jsx",
       "line": 49,
       "kind": "onClick",
@@ -1585,7 +1540,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 92,
+      "line": 101,
       "kind": "to",
       "destination": "/",
       "expression": null,
@@ -1594,7 +1549,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 103,
+      "line": 112,
       "kind": "onClick",
       "destination": null,
       "expression": "{closeMobileMenu}",
@@ -1603,7 +1558,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 141,
+      "line": 150,
       "kind": "to",
       "destination": null,
       "expression": "{item.path}",
@@ -1612,7 +1567,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 141,
+      "line": 150,
       "kind": "onClick",
       "destination": null,
       "expression": "{closeMobileMenu}",
@@ -1621,7 +1576,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 173,
+      "line": 182,
       "kind": "onClick",
       "destination": null,
       "expression": "{handleLogout}",
@@ -1630,7 +1585,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 185,
+      "line": 194,
       "kind": "onClick",
       "destination": null,
       "expression": "{closeMobileMenu}",
@@ -1639,7 +1594,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 196,
+      "line": 205,
       "kind": "onClick",
       "destination": null,
       "expression": "{() => setIsMobileMenuOpen(true)}",
@@ -1648,7 +1603,7 @@
     },
     {
       "file": "frontend/src/components/admin/AdminLayout.jsx",
-      "line": 213,
+      "line": 222,
       "kind": "to",
       "destination": "/support/my-tickets",
       "expression": null,
