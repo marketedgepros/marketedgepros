@@ -202,7 +202,12 @@ def test_my_challenge_list_is_owner_only_tenant_safe_and_preserves_null_and_zero
     owner = client.get(LIST_PATH + '?status=active', headers=challenge_data['headers']['owner'])
     assert owner.status_code == 200
     payload = owner.get_json()
-    assert set(payload) == {'challenges', 'pagination', 'data_status', 'provider_authenticated'}
+    assert set(payload) == {'challenges', 'pagination', 'owner_context', 'data_status', 'provider_authenticated'}
+    assert payload['owner_context']['user_id'] == challenge_data['ids']['owner']
+    with application.app_context():
+        from src.database import db
+        from src.models.user import User
+        assert payload['owner_context']['tenant_id'] == db.session.get(User, challenge_data['ids']['owner']).tenant_id
     assert payload['data_status'] == 'unverified_legacy'
     assert payload['provider_authenticated'] is False
     assert payload['pagination'] == {'page': 1, 'per_page': 20, 'total': 1, 'pages': 1}

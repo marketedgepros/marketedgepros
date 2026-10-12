@@ -24,6 +24,14 @@
 
 זו חבילת חשבון ראשונה, לא השלמת UI-4 כולו. יתר history/scaling/wallet/withdrawals/notifications/affiliate/admin נשארים פתוחים; תיעוד גבולות: `backend/docs/ACCOUNT_UI4_HE.md`.
 
+## חבילת מסחר בתוך UI-4 — 12.10.2026
+
+- [x] **אתגרים ובעלות:** רשימת האתגרים ופרטי האתגר מאמתים owner_context מתוך JWT וכל challenge.user_id; מעבר auth/id/tenant/role ו־route/page אינו מחזיר מידע או pending מבקשה קודמת. אין ניחוש מותג, נתוני חסר אינם אפס, metadata MT5 מסומן לא מאומת; קריאה בלבד ויעדי רשימה/פרטים/תוכניות קיימים. שומר התפקידים תואם non-admin מוכר ולא תפקיד user שאינו קיים.
+- [x] **היסטוריית מסחר:** נתיב /traders/history הקנוני, Trade.volume המקורי ומחרוזות Decimal/null; מסננים מדויקים ופרמטרים bounded לפני SQL, count/aggregate בשרת ותחימת owner/tenant. אין מטבע, lots/pips או הצלחה מומצאים. כשל/ריק מובחנים; ייצוא CSV של העמוד הנוכחי בלבד, נוסחאות עם leading Unicode מנוטרלות, URL/DOM מנוקים; מעבר זהות/פילטר/role חוסם ייצוא ישן. טבלה נגללת בתוך מכולה, לא overflow של כל העמוד.
+- [x] **Scaling לקריאה בלבד:** רשומה עצמית או רשימת מנהל bounded ב־root מפורש/CRM scope, לא רשימת לקוחות לאפיליאט; legacy כפול מסרב, no-autoflush בקריאה, נתונים חסרים null; eligibility/scaling_enabled false. initialize/update-profit/scale-up/pause/resume מסרבים בשירות וב־HTTP לפני SQL משאב, אחרי JWT/CSRF/admin כנדרש. אין default tiers מאושרים או scale-up מדומה. navy/cyan ומעטפת אחת ב־/scaling.
+
+שלושת הסעיפים מכסים ארבעה מודולי מסך, לא UI-4 כולו. תיעוד: `backend/docs/TRADING_UI4_HE.md`. יתר wallet/withdrawals/support/notifications/affiliate/admin/dashboard, UI-5/6 והכרעות policy ב־UI-3 פתוחים. אין ספק מסחר חי, capital command, merge או deploy; תוצאות CI לפי ה־SHA המדויק בדוח החבילה.
+
 ## תלות אפיליאט — מצב בתוך שלב 4 ו־UI-4
 
 - [x] חבילת חסימה ראשונה: מסלולי יצירה/אישור/פדיון של עמלות legacy מסרבים ללא מקור מאומת; אין סכום זמין לפדיון; עריכת תוכנית גלובלית מוגבלת לבעל הפלטפורמה; אין הפעלת auto-approval. תיעוד: `backend/docs/AFFILIATE_FINANCIAL_BOUNDARY_HE.md`.

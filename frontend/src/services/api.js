@@ -309,7 +309,7 @@ export const challengesAPI = {
 // Traders API
 export const tradersAPI = {
   getDashboard: () => api.get('/traders/dashboard'),
-  getTradingHistory: (params) => api.get('/traders/trading-history', { params }),
+  getTradingHistory: (params, config = {}) => api.get('/traders/history', { ...config, params }),
   getWithdrawals: () => api.get('/traders/withdrawals'),
   requestWithdrawal: (data) => api.post('/traders/withdrawals', data),
   getDocuments: () => api.get('/traders/documents'),

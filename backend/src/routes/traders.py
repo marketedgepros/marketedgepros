@@ -8,6 +8,10 @@ from src.models.trading_program import Challenge
 from src.models.trade import Trade
 from src.models.withdrawal import Withdrawal
 from src.utils.decorators import token_required
+from src.services.trading_history_service import (
+    TradingHistoryArgumentError,
+    TradingHistoryService,
+)
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, desc
 
@@ -140,85 +144,32 @@ def get_trader_dashboard():
 @traders_bp.route('/history', methods=['GET'])
 @token_required
 def get_trading_history():
-    """Get complete trading history with filters"""
-    try:
-        user_id = g.current_user.id
-        
-        # Get query parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 50, type=int)
-        symbol = request.args.get('symbol')
-        trade_type = request.args.get('type')
-        period = request.args.get('period')
-        
-        # Get user's challenges
-        challenges = Challenge.query.filter_by(user_id=user_id).all()
-        challenge_ids = [c.id for c in challenges]
-        
-        # Build query
-        query = Trade.query.filter(Trade.challenge_id.in_(challenge_ids))
-        
-        # Apply filters
-        if symbol:
-            query = query.filter(Trade.symbol.ilike(f'%{symbol}%'))
-        if trade_type:
-            query = query.filter_by(trade_type=trade_type)
-        if period:
-            if period == 'today':
-                start_date = datetime.utcnow().replace(hour=0, minute=0, second=0)
-                query = query.filter(Trade.close_time >= start_date)
-            elif period == 'week':
-                start_date = datetime.utcnow() - timedelta(days=7)
-                query = query.filter(Trade.close_time >= start_date)
-            elif period == 'month':
-                start_date = datetime.utcnow() - timedelta(days=30)
-                query = query.filter(Trade.close_time >= start_date)
-        
-        # Calculate statistics
-        all_trades = query.all()
-        total_trades = len(all_trades)
-        winning_trades = len([t for t in all_trades if t.profit > 0])
-        losing_trades = len([t for t in all_trades if t.profit < 0])
-        total_profit = sum([float(t.profit) for t in all_trades])
-        total_pips = sum([float(t.pips) for t in all_trades if t.pips])
-        
-        # Paginate
-        pagination = query.order_by(desc(Trade.close_time)).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
+    """Return the JWT owner's bounded, tenant-consistent legacy trade records."""
+    actor = g.current_user
+    # Do not inspect Challenge, TradingProgram, or Trade when tenant identity is
+    # absent.  Admin role is deliberately not a bypass for this personal route.
+    if actor.tenant_id is None:
         return jsonify({
-            'statistics': {
-                'total_trades': total_trades,
-                'winning_trades': winning_trades,
-                'losing_trades': losing_trades,
-                'total_profit': round(total_profit, 2),
-                'total_pips': round(total_pips, 2)
-            },
-            'trades': [{
-                'id': trade.id,
-                'symbol': trade.symbol,
-                'type': trade.trade_type,
-                'lots': float(trade.lots),
-                'open_price': float(trade.open_price),
-                'close_price': float(trade.close_price),
-                'profit': float(trade.profit),
-                'pips': float(trade.pips) if trade.pips else 0,
-                'open_time': trade.open_time.isoformat(),
-                'close_time': trade.close_time.isoformat() if trade.close_time else None,
-                'commission': float(trade.commission) if trade.commission else 0,
-                'swap': float(trade.swap) if trade.swap else 0
-            } for trade in pagination.items],
-            'pagination': {
-                'page': pagination.page,
-                'per_page': pagination.per_page,
-                'total': pagination.total,
-                'pages': pagination.pages
-            }
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            'error': 'Tenant context is required',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    try:
+        arguments = TradingHistoryService.parse_arguments(request.args)
+    except TradingHistoryArgumentError:
+        return jsonify({
+            'error': 'Invalid trading history query',
+            'code': 'TRADING_HISTORY_QUERY_INVALID',
+        }), 400
+
+    try:
+        return jsonify(TradingHistoryService.get_history(actor, arguments)), 200
+    except Exception:
+        # Legacy data must never expose a provider/database exception verbatim.
+        return jsonify({
+            'error': 'Trading history is unavailable',
+            'code': 'TRADING_HISTORY_UNAVAILABLE',
+        }), 503
 
 
 @traders_bp.route('/withdrawals', methods=['GET'])
@@ -440,4 +391,3 @@ def get_challenge_details(challenge_id):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-

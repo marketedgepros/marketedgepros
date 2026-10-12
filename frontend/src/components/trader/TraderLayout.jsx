@@ -17,6 +17,7 @@ export default function TraderLayout({ children }) {
   const navigation = [
     { name: 'Dashboard', href: accountHome(user), icon: LayoutDashboard },
     { name: 'My Challenges', href: '/challenges', icon: LayoutDashboard },
+    { name: 'Scaling records', href: '/scaling', icon: FileText },
     { name: 'Wallet', href: '/wallet', icon: Wallet },
     ...(user?.role === 'trader' ? [
       { name: 'Trading History', href: '/trader/history', icon: TrendingUp },

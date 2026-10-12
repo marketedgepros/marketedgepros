@@ -14,6 +14,9 @@ const isNullableDecimalString = (value) => value === null
   || (typeof value === 'string' && value.length > 0 && value.length <= 128 && DECIMAL_STRING.test(value));
 const isNullableNonNegativeInteger = (value) => value === null
   || (Number.isSafeInteger(value) && value >= 0);
+const isNullableOwnerTenant = (value) => value === null
+  || (Number.isSafeInteger(value) && value >= 1 && value <= MAX_CHALLENGE_ID);
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
 const requireObject = (value, message) => {
   if (!isPlainObject(value)) throw new Error(message);
@@ -44,6 +47,48 @@ const requireNullableNonNegativeInteger = (value, label) => {
     throw new Error(`${label} must be a non-negative integer or null.`);
   }
   return value;
+};
+
+const normaliseOwner = (value, label) => {
+  const owner = requireObject(value, `${label} is missing.`);
+  if (!hasOwn(owner, 'user_id') || !hasOwn(owner, 'tenant_id')) {
+    throw new Error(`${label} is incomplete.`);
+  }
+  if (!isNullableOwnerTenant(owner.tenant_id)) {
+    throw new Error(`${label} tenant ID must be a positive integer or null.`);
+  }
+
+  return {
+    user_id: requireBoundedInteger(owner.user_id, `${label} user ID`, MAX_CHALLENGE_ID),
+    tenant_id: owner.tenant_id,
+  };
+};
+
+/**
+ * Challenge views receive this local hint from the authenticated store. It is
+ * deliberately typed: a missing tenant is explicitly null, never inferred
+ * from a fallback brand or another profile field.
+ */
+export const normaliseExpectedOwner = (expectedOwner) => (
+  normaliseOwner(expectedOwner, 'Expected owner')
+);
+
+const assertResponseOwner = (payload, expectedOwner, label) => {
+  if (expectedOwner === undefined) return null;
+
+  const ownerContext = normaliseOwner(payload.owner_context, `${label} owner context`);
+  if (ownerContext.user_id !== expectedOwner.user_id
+    || ownerContext.tenant_id !== expectedOwner.tenant_id) {
+    throw new Error(`${label} owner context does not match the active account.`);
+  }
+  return ownerContext;
+};
+
+const throwIfAborted = (signal) => {
+  if (!signal?.aborted) return;
+  const error = new Error('Challenge request was cancelled.');
+  error.name = 'AbortError';
+  throw error;
 };
 
 /**
@@ -170,8 +215,9 @@ const normalisePagination = (value) => {
   };
 };
 
-export const normaliseChallengeListResponse = (data) => {
+export const normaliseChallengeListResponse = (data, { expectedOwner } = {}) => {
   const payload = requireObject(data, 'Challenge list response is unavailable.');
+  const owner = expectedOwner === undefined ? undefined : normaliseExpectedOwner(expectedOwner);
   const context = normaliseLegacyContext(payload, 'Challenge list');
   if (!Array.isArray(payload.challenges)) {
     throw new Error('Challenge list response is incomplete.');
@@ -188,20 +234,30 @@ export const normaliseChallengeListResponse = (data) => {
     if (ids.has(challenge.id)) throw new Error('Challenge list contains duplicate records.');
     ids.add(challenge.id);
   }
+  const ownerContext = assertResponseOwner(payload, owner, 'Challenge list');
+  if (owner !== undefined && challenges.some((challenge) => challenge.user_id !== owner.user_id)) {
+    throw new Error('Challenge list contains a record from a different account.');
+  }
 
   return {
     challenges,
     pagination,
     ...context,
+    ...(ownerContext ? { owner_context: ownerContext } : {}),
   };
 };
 
-export const normaliseChallengeProgressResponse = (data, expectedChallengeId) => {
+export const normaliseChallengeProgressResponse = (data, expectedChallengeId, { expectedOwner } = {}) => {
   const payload = requireObject(data, 'Challenge progress response is unavailable.');
+  const owner = expectedOwner === undefined ? undefined : normaliseExpectedOwner(expectedOwner);
   const context = normaliseLegacyContext(payload, 'Challenge progress');
   const challenge = normaliseChallenge(payload.challenge);
   if (expectedChallengeId !== undefined && challenge.id !== validateChallengeId(expectedChallengeId)) {
     throw new Error('Challenge progress response does not match the requested challenge.');
+  }
+  const ownerContext = assertResponseOwner(payload, owner, 'Challenge progress');
+  if (owner !== undefined && challenge.user_id !== owner.user_id) {
+    throw new Error('Challenge progress contains a record from a different account.');
   }
 
   return {
@@ -209,6 +265,7 @@ export const normaliseChallengeProgressResponse = (data, expectedChallengeId) =>
     progress: normaliseProgress(payload.progress),
     mt5_account: normaliseMt5Account(payload.mt5_account),
     ...context,
+    ...(ownerContext ? { owner_context: ownerContext } : {}),
   };
 };
 
@@ -265,13 +322,16 @@ export const createChallengeViewService = (apiClient = api) => {
 
   return {
     async getMyChallenges(options = {}) {
-      const { signal } = options;
+      const { signal, expectedOwner } = options;
       const params = buildChallengeListParams(options);
+      const owner = expectedOwner === undefined ? undefined : normaliseExpectedOwner(expectedOwner);
+      throwIfAborted(signal);
       const response = await apiClient.get(CHALLENGE_LIST_ENDPOINT, {
         params,
         signal,
       });
-      const result = normaliseChallengeListResponse(response?.data);
+      throwIfAborted(signal);
+      const result = normaliseChallengeListResponse(response?.data, { expectedOwner: owner });
       if (result.pagination.page !== params.page || result.pagination.per_page !== params.per_page
         || (params.status && result.challenges.some((row) => row.legacy_status !== params.status))) {
         throw new Error('Challenge list response does not match the requested context.');
@@ -279,10 +339,13 @@ export const createChallengeViewService = (apiClient = api) => {
       return result;
     },
 
-    async getChallengeProgress(challengeId, { signal } = {}) {
+    async getChallengeProgress(challengeId, { signal, expectedOwner } = {}) {
       const id = validateChallengeId(challengeId);
+      const owner = expectedOwner === undefined ? undefined : normaliseExpectedOwner(expectedOwner);
+      throwIfAborted(signal);
       const response = await apiClient.get(getChallengeProgressPath(id), { signal });
-      return normaliseChallengeProgressResponse(response?.data, id);
+      throwIfAborted(signal);
+      return normaliseChallengeProgressResponse(response?.data, id, { expectedOwner: owner });
     },
   };
 };

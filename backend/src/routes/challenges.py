@@ -311,6 +311,10 @@ def get_my_challenges(current_user):
         pages = (total + arguments['per_page'] - 1) // arguments['per_page']
         return jsonify({
             'challenges': challenges,
+            'owner_context': {
+                'user_id': current_user.id,
+                'tenant_id': current_user.tenant_id,
+            },
             'pagination': {
                 'page': arguments['page'],
                 'per_page': arguments['per_page'],
@@ -485,6 +489,10 @@ def get_challenge_progress(current_user, challenge_id):
             'challenge': _legacy_challenge_projection(challenge, program),
             'progress': _legacy_progress(challenge, program),
             'mt5_account': _legacy_mt5_projection(accounts[0]) if accounts else None,
+            'owner_context': {
+                'user_id': current_user.id,
+                'tenant_id': current_user.tenant_id,
+            },
             'data_status': _UNVERIFIED_LEGACY,
             'provider_authenticated': False,
         }), 200
