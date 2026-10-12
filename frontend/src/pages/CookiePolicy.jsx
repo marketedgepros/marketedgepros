@@ -1,6 +1,7 @@
 import React from 'react';
 import Layout from '../components/layout/Layout';
 import { Cookie, Shield, BarChart3, Settings } from 'lucide-react';
+import AnalyticsStatus from '../components/privacy/AnalyticsStatus';
 
 function CookiePolicy() {
   const cookieTypes = [
@@ -49,6 +50,16 @@ function CookiePolicy() {
         {/* Content */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="max-w-4xl mx-auto space-y-8">
+            <AnalyticsStatus />
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-950/20 p-5 text-sm leading-6 text-amber-100 sm:p-8">
+              <h2 className="text-lg font-semibold">Cookie policy draft — awaiting approval</h2>
+              <p className="mt-2">
+                The policy wording below is retained for review and has not been confirmed as the
+                current collection configuration. In particular, the analytics category below does
+                not mean that Google Analytics is enabled in this version. The technical status above
+                describes the current implementation; final policy wording remains to be approved.
+              </p>
+            </div>
             {/* What are cookies */}
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50">
               <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
@@ -109,4 +120,3 @@ function CookiePolicy() {
 }
 
 export default CookiePolicy;
-

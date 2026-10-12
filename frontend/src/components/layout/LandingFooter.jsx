@@ -40,6 +40,7 @@ export default function LandingFooter() {
         { name: 'Risk Disclosure', to: '/risk-disclosure' },
         { name: 'Refund Policy', to: '/refund-policy' },
         { name: 'Cookie Policy', to: '/cookie-policy' },
+        { name: 'Analytics status', to: '/cookie-policy#analytics-status' },
       ],
     },
   ];
