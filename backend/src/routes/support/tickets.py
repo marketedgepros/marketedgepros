@@ -283,6 +283,64 @@ def _pagination_payload(pagination, page, per_page, total_key='total_tickets'):
     }
 
 
+def _owner_context(current_user):
+    """Return the JWT-authenticated account binding for customer responses.
+
+    ``support_tickets`` deliberately has no tenant column.  Its account owner is
+    therefore joined to the principal's current tenant in every customer query;
+    this response receipt does not invent ticket-level tenant attribution.
+    """
+    user_id = getattr(current_user, 'id', None)
+    tenant_id = getattr(current_user, 'tenant_id', None)
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id < 1:
+        raise RuntimeError('Authenticated support principal has no valid user id')
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
+        tenant_id = None
+    return {'user_id': user_id, 'tenant_id': tenant_id}
+
+
+_CUSTOMER_TICKET_FIELDS = frozenset({
+    'id', 'ticket_number', 'user_id', 'subject', 'description', 'category',
+    'priority', 'status', 'first_response_at', 'resolved_at', 'closed_at',
+    'rating', 'feedback', 'created_at', 'updated_at', 'message_count',
+})
+_CUSTOMER_MESSAGE_FIELDS = frozenset({
+    'id', 'ticket_id', 'user_id', 'message', 'is_staff', 'is_internal', 'created_at',
+})
+
+
+def _customer_ticket_projection(payload):
+    """Customer HTTP must not carry staff/contact/attachment/preview metadata."""
+    projected = {key: value for key, value in payload.items() if key in _CUSTOMER_TICKET_FIELDS}
+    if 'messages' in payload:
+        projected['messages'] = [
+            {key: value for key, value in message.items() if key in _CUSTOMER_MESSAGE_FIELDS}
+            for message in payload['messages'] if message.get('is_internal') is False
+        ]
+    if 'message_pagination' in payload:
+        projected['message_pagination'] = payload['message_pagination']
+    return projected
+
+
+def _customer_response(current_user, payload):
+    """Apply a customer allow-list before HTTP, not after delivery in the UI."""
+    if 'id' in payload and 'ticket_number' in payload:
+        response = _customer_ticket_projection(payload)
+    else:
+        response = dict(payload)
+        if 'ticket' in response:
+            response['ticket'] = _customer_ticket_projection(response['ticket'])
+        if 'tickets' in response:
+            response['tickets'] = [_customer_ticket_projection(ticket) for ticket in response['tickets']]
+        if 'ticket_message' in response:
+            response['ticket_message'] = {
+                key: value for key, value in response['ticket_message'].items()
+                if key in _CUSTOMER_MESSAGE_FIELDS
+            }
+    response['owner_context'] = _owner_context(current_user)
+    return response
+
+
 def _visible_customer_message_clause():
     # A legacy NULL does not prove that a note is customer-safe.  Fail closed:
     # only an explicitly false flag is visible outside support administration.
@@ -324,7 +382,14 @@ def _ticket_list_page(query, arguments, *, customer_visible):
 
 
 def _owned_ticket_query(current_user):
-    return SupportTicket.query.filter(SupportTicket.user_id == current_user.id)
+    owner = _owner_context(current_user)
+    query = SupportTicket.query.join(User, SupportTicket.user_id == User.id).filter(
+        SupportTicket.user_id == owner['user_id'],
+        User.id == owner['user_id'],
+    )
+    if owner['tenant_id'] is None:
+        return query.filter(User.tenant_id.is_(None))
+    return query.filter(User.tenant_id == owner['tenant_id'])
 
 
 def _admin_ticket_query(current_user):
@@ -364,7 +429,8 @@ def _get_admin_ticket(current_user, ticket_id, *, lock=False):
     query = _admin_ticket_query(current_user).filter(SupportTicket.id == ticket_id)
     if lock:
         query = query.with_for_update()
-    return query.options(selectinload(SupportTicket.user), selectinload(SupportTicket.assigned_user)).first()
+    with db.session.no_autoflush:
+        return query.options(selectinload(SupportTicket.user), selectinload(SupportTicket.assigned_user)).first()
 
 
 def _customer_messages(ticket_id, arguments):
@@ -468,11 +534,11 @@ def create_my_ticket(current_user):
     if ticket is None:
         return _error('Unable to create ticket', 503, 'TICKET_CREATE_UNAVAILABLE')
     logger.info('Account support ticket created id=%s owner_id=%s', ticket.id, current_user.id)
-    return jsonify({
+    return jsonify(_customer_response(current_user, {
         'message': 'Support ticket created successfully',
         'ticket': _ticket_payload(ticket, include_related=False),
         'delivery_status': 'not_configured',
-    }), 201
+    })), 201
 
 
 @tickets_bp.route('/my', methods=['GET'])
@@ -490,10 +556,10 @@ def get_my_tickets(current_user):
             query = query.filter(SupportTicket.status == arguments['status'])
         with db.session.no_autoflush:
             tickets, pagination = _ticket_list_page(query, arguments, customer_visible=True)
-        return jsonify({
+        return jsonify(_customer_response(current_user, {
             'tickets': tickets,
             'pagination': _pagination_payload(pagination, arguments['page'], arguments['per_page']),
-        }), 200
+        })), 200
     except Exception:
         logger.exception('Customer support ticket list failed owner_id=%s', current_user.id)
         return _error('Unable to retrieve tickets', 500, 'TICKET_READ_UNAVAILABLE')
@@ -519,7 +585,7 @@ def get_ticket_by_number(current_user, ticket_number):
         payload['message_pagination'] = _pagination_payload(
             pagination, arguments['page'], arguments['per_page'], total_key='total_messages'
         )
-        return jsonify(payload), 200
+        return jsonify(_customer_response(current_user, payload)), 200
     except Exception:
         logger.exception('Customer ticket detail failed owner_id=%s', current_user.id)
         return _error('Unable to retrieve ticket', 500, 'TICKET_READ_UNAVAILABLE')
@@ -557,10 +623,11 @@ def add_ticket_message(current_user, ticket_number):
         if ticket.status == 'waiting_customer':
             ticket.status = 'in_progress'
         db.session.commit()
-        return jsonify({
+        return jsonify(_customer_response(current_user, {
             'message': 'Message added successfully',
+            'ticket_number': ticket.ticket_number,
             'ticket_message': _message_payload(message),
-        }), 201
+        })), 201
     except Exception:
         db.session.rollback()
         logger.exception('Customer ticket message failed owner_id=%s', current_user.id)
@@ -584,7 +651,7 @@ def get_ticket(current_user, ticket_id):
         payload['message_pagination'] = _pagination_payload(
             pagination, arguments['page'], arguments['per_page'], total_key='total_messages'
         )
-        return jsonify(payload), 200
+        return jsonify(_customer_response(current_user, payload)), 200
     except Exception:
         logger.exception('Customer ticket id detail failed owner_id=%s', current_user.id)
         return _error('Unable to retrieve ticket', 500, 'TICKET_READ_UNAVAILABLE')
@@ -610,10 +677,10 @@ def close_ticket(current_user, ticket_id):
         if ticket.closed_at is None:
             ticket.closed_at = datetime.utcnow()
         db.session.commit()
-        return jsonify({
+        return jsonify(_customer_response(current_user, {
             'message': 'Ticket closed successfully',
             'ticket': _ticket_payload(ticket, include_related=True),
-        }), 200
+        })), 200
     except Exception:
         db.session.rollback()
         logger.exception('Customer ticket close failed owner_id=%s', current_user.id)
@@ -643,10 +710,10 @@ def rate_ticket(current_user, ticket_id):
         ticket.rating = rating
         ticket.feedback = feedback
         db.session.commit()
-        return jsonify({
+        return jsonify(_customer_response(current_user, {
             'message': 'Thank you for your feedback',
             'ticket': _ticket_payload(ticket, include_related=True),
-        }), 200
+        })), 200
     except Exception:
         db.session.rollback()
         logger.exception('Customer ticket rating failed owner_id=%s', current_user.id)
@@ -679,7 +746,8 @@ def get_all_tickets(current_user):
             query = query.filter(SupportTicket.priority == arguments['priority'])
         if arguments['assigned_to'] is not None:
             query = query.filter(SupportTicket.assigned_to == arguments['assigned_to'])
-        tickets, pagination = _ticket_list_page(query, arguments, customer_visible=False)
+        with db.session.no_autoflush:
+            tickets, pagination = _ticket_list_page(query, arguments, customer_visible=False)
         return jsonify({
             'tickets': tickets,
             'pagination': _pagination_payload(pagination, arguments['page'], arguments['per_page']),

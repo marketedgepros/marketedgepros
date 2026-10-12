@@ -36,6 +36,7 @@ const notification = (overrides = {}) => ({
 });
 
 const page = (overrides = {}) => ({
+  owner_context: { user_id: 1, tenant_id: 10 },
   notifications: [notification()],
   total: 1,
   page: 1,
@@ -46,6 +47,7 @@ const page = (overrides = {}) => ({
 
 const preferences = (overrides = {}) => ({
   ...createDefaultNotificationPreferences(),
+  owner_context: { user_id: 1, tenant_id: 10 },
   ...overrides,
   in_app: { ...createDefaultNotificationPreferences().in_app, ...overrides.in_app },
   email: { ...createDefaultNotificationPreferences().email, ...overrides.email },
@@ -71,7 +73,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-const contextKey = 'number:1|number:10';
+const contextKey = 'number:1|number:10|role:trader';
 
 const setActor = (id = 1, tenantId = 10, role = 'trader') => {
   useAuthStore.setState({
@@ -101,7 +103,11 @@ test('notification page uses one canonical Axios request, bounds values, and nev
   const calls = [];
   await withAdapter(async (config) => {
     calls.push(config);
-    return axiosResponse(config, page({ page: 5, per_page: 100 }));
+    return axiosResponse(config, page({
+      page: 5,
+      per_page: 100,
+      notifications: [notification({ priority: 'high' })],
+    }));
   }, async () => {
     const view = await loadNotifications(api, {
       page: 5,
@@ -140,7 +146,7 @@ test('notification service rejects malformed list data and has an offline inject
   const offline = createNotificationViewService({
     get: async (url, config) => {
       calls.push([url, config]);
-      return { data: page() };
+      return { data: page({ notifications: [notification({ is_read: true, read_at: '2026-10-11T12:01:00Z' })] }) };
     },
   });
   await offline.loadNotifications({ filters: { is_read: true } });
@@ -200,7 +206,7 @@ test('reset invalidates a late list response and a late mark-read mutation respo
     if (config.url === '/notifications/7/read') return markResponse.promise;
     if (config.url === '/notifications/unread-count') {
       countCalls += 1;
-      return Promise.resolve(axiosResponse(config, { count: 0 }));
+      return Promise.resolve(axiosResponse(config, { count: 0, owner_context: { user_id: 1, tenant_id: 10 } }));
     }
     throw new Error(`Unexpected request ${config.url}`);
   }, async () => {
@@ -215,11 +221,12 @@ test('reset invalidates a late list response and a late mark-read mutation respo
     const pendingMark = useNotificationStore.getState().markAsRead(7);
     useNotificationStore.getState().reset();
     markResponse.resolve(axiosResponse({ url: '/notifications/7/read' }, {
+      owner_context: { user_id: 1, tenant_id: 10 },
       notification: notification({ is_read: true, read_at: '2026-10-11T12:01:00Z' }),
     }));
     assert.equal(await pendingMark, false);
     assert.deepEqual(useNotificationStore.getState().notifications, []);
-    assert.equal(useNotificationStore.getState().unreadCount, 0);
+    assert.equal(useNotificationStore.getState().unreadCount, null);
     assert.equal(countCalls, 0, 'a stale mutation must not begin a count refresh');
   });
 });
@@ -236,7 +243,7 @@ test('repeat mark-read shares one mutation flight and refreshes the authoritativ
     }
     if (config.url === '/notifications/unread-count') {
       countCalls += 1;
-      return Promise.resolve(axiosResponse(config, { count: 0 }));
+      return Promise.resolve(axiosResponse(config, { count: 0, owner_context: { user_id: 1, tenant_id: 10 } }));
     }
     throw new Error(`Unexpected request ${config.url}`);
   }, async () => {
@@ -253,6 +260,7 @@ test('repeat mark-read shares one mutation flight and refreshes the authoritativ
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(markCalls, 1);
     markResponse.resolve(axiosResponse({ url: '/notifications/7/read' }, {
+      owner_context: { user_id: 1, tenant_id: 10 },
       notification: notification({ is_read: true, read_at: '2026-10-11T12:01:00Z' }),
     }));
     assert.equal(await first, true);
@@ -274,7 +282,8 @@ test('repeat mark-read shares one mutation flight and refreshes the authoritativ
 test('notification destinations enforce canonical role-safe navigation and sources contain no polling loop', () => {
   assert.equal(notificationDestination('withdrawal', 'trader'), '/trader/withdrawals');
   assert.equal(notificationDestination('withdrawal', 'affiliate'), '/notifications');
-  assert.equal(notificationDestination('kyc', 'trader'), '/documents');
+  assert.equal(notificationDestination('kyc', 'trader'), '/trader/documents');
+  assert.equal(notificationDestination('kyc', 'master'), '/notifications');
   assert.equal(notificationDestination('challenge', 'trader'), '/challenges');
   assert.equal(notificationDestination('challenge', 'master'), '/notifications');
   assert.equal(notificationDestination('commission', 'affiliate'), '/affiliate/commissions');

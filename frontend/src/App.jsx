@@ -162,6 +162,7 @@ function App() {
     const identity = (state) => JSON.stringify([
       state.isAuthenticated, state.user?.id ?? null,
       state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null,
+      state.user?.role ?? null,
     ]);
     const unsubscribe = useAuthStore.subscribe((state, previous) => {
       if (identity(state) !== identity(previous)) useNotificationStore.getState().reset();

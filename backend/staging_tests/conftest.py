@@ -64,8 +64,9 @@ def app(staging_resources):
     """A deliberately minimal Flask host for real application route/model modules.
 
     ``create_app`` remains protected by testing_safety and must not be altered for
-    this opt-in harness.  This fixture activates only the analytics blueprint and
-    its real decorators on runner-validated Unix sockets.
+    this opt-in harness.  This fixture activates only analytics, support, and
+    in-app notification blueprints plus their real decorators on runner-validated
+    Unix sockets.
     """
     from flask import Flask
     import redis
@@ -78,11 +79,15 @@ def app(staging_resources):
     from src.models.lead import Lead
     from src.models.payment import Payment
     from src.models.referral import Referral
+    from src.models.notification import EmailQueue, Notification, NotificationPreference
+    from src.models.support_ticket import SupportTicket, TicketMessage
     from src.models.tenant import Tenant
     from src.models.token_blacklist import TokenBlacklist
     from src.models.trading_program import Challenge, TradingProgram
     from src.models.user import EmailVerificationToken, PasswordResetToken, User
     from src.routes.analytics import analytics_bp
+    from src.routes.notifications import notifications_bp
+    from src.routes.support import support_bp
     from src.utils.hierarchy_scoping import init_hierarchy_scoping
 
     flask_app = Flask("marketedgepros-staging-integration")
@@ -113,11 +118,15 @@ def app(staging_resources):
     )
     database_module.redis_client.ping()
     flask_app.register_blueprint(analytics_bp, url_prefix="/api/v1/analytics")
+    flask_app.register_blueprint(notifications_bp, url_prefix="/api/v1/notifications")
+    flask_app.register_blueprint(support_bp, url_prefix="/api/v1/support")
     tables = [
         Tenant.__table__, User.__table__, TokenBlacklist.__table__,
         EmailVerificationToken.__table__, PasswordResetToken.__table__,
         TradingProgram.__table__, Challenge.__table__, Payment.__table__,
         Agent.__table__, Referral.__table__, Commission.__table__, Lead.__table__,
+        SupportTicket.__table__, TicketMessage.__table__, Notification.__table__,
+        NotificationPreference.__table__, EmailQueue.__table__,
     ]
     flask_app.extensions["staging_tables"] = tables
 

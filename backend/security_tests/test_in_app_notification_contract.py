@@ -144,7 +144,9 @@ def test_in_app_notification_list_count_filter_and_stable_pagination(in_app_noti
     )
     assert filtered.status_code == 200
     assert [row["title"] for row in filtered.get_json()["notifications"]] == ["newest"]
-    assert client.get(NOTIFICATIONS + "unread-count", headers=_headers(app)).get_json() == {"count": 2}
+    assert client.get(NOTIFICATIONS + "unread-count", headers=_headers(app)).get_json() == {
+        "count": 2, "owner_context": {"user_id": 2, "tenant_id": 1},
+    }
 
 
 @pytest.mark.parametrize("query,code", [
@@ -198,7 +200,9 @@ def test_in_app_notification_read_all_soft_delete_and_unread_exclusion(in_app_no
     read_all = client.post(NOTIFICATIONS + "read-all", headers=_headers(app))
     assert read_all.status_code == 200
     assert read_all.get_json()["count"] == 2
-    assert client.get(NOTIFICATIONS + "unread-count", headers=_headers(app)).get_json() == {"count": 0}
+    assert client.get(NOTIFICATIONS + "unread-count", headers=_headers(app)).get_json() == {
+        "count": 0, "owner_context": {"user_id": 2, "tenant_id": 1},
+    }
 
     deleted_response = client.delete(f"{NOTIFICATIONS}{first_id}", headers=_headers(app))
     assert deleted_response.status_code == 200

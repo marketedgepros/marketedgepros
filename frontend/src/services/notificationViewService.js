@@ -17,6 +17,17 @@ const isSafeNonNegativeInteger = (value) => Number.isSafeInteger(value) && value
 const isSafePositiveInteger = (value) => Number.isSafeInteger(value) && value > 0;
 const isText = (value) => typeof value === 'string';
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+const isNullableTimestamp = (value) => {
+  if (value === null) return true;
+  if (!isText(value) || value.length > 64) return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?$/.exec(value);
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1]
+    && hour <= 23 && minute <= 59 && second <= 59;
+};
 
 const defaultCategories = (systemValue) => ({
   withdrawal: true,
@@ -70,31 +81,49 @@ export const buildNotificationQuery = ({ page = 1, perPage = DEFAULT_PER_PAGE, f
   const isRead = input.is_read;
 
   if (type !== null) {
-    if (!NOTIFICATION_TYPES.includes(type)) {
-      throw new TypeError('Notification type filter is invalid');
-    }
+    if (!NOTIFICATION_TYPES.includes(type)) throw new TypeError('Notification type filter is invalid');
     params.type = type;
   }
   if (priority !== null) {
-    if (!NOTIFICATION_PRIORITIES.includes(priority)) {
-      throw new TypeError('Notification priority filter is invalid');
-    }
+    if (!NOTIFICATION_PRIORITIES.includes(priority)) throw new TypeError('Notification priority filter is invalid');
     params.priority = priority;
   }
   if (isRead !== null && isRead !== undefined && isRead !== '') {
-    if (isRead === true || isRead === 'true') {
-      params.is_read = 'true';
-    } else if (isRead === false || isRead === 'false') {
-      params.is_read = 'false';
-    } else {
-      throw new TypeError('Notification read filter is invalid');
-    }
+    if (isRead === true || isRead === 'true') params.is_read = 'true';
+    else if (isRead === false || isRead === 'false') params.is_read = 'false';
+    else throw new TypeError('Notification read filter is invalid');
   }
-
   return params;
 };
 
-export const normalizeNotification = (value) => {
+/** Validate an owner supplied by a trusted UI/store principal, never by an API response. */
+export const normalizeExpectedNotificationOwner = (value) => {
+  if (!isRecord(value)
+    || !isSafePositiveInteger(value.user_id)
+    || !(value.tenant_id === null || isSafePositiveInteger(value.tenant_id))) {
+    throw new TypeError('Notification owner is invalid');
+  }
+  return { user_id: value.user_id, tenant_id: value.tenant_id };
+};
+
+const expectedOwnerOrNull = (expectedOwner) => (
+  expectedOwner === undefined ? null : normalizeExpectedNotificationOwner(expectedOwner)
+);
+
+const verifyOwnerContext = (payload, expectedOwner) => {
+  const owner = expectedOwnerOrNull(expectedOwner);
+  if (!owner) return null;
+  const responseOwner = payload?.owner_context;
+  if (!isRecord(responseOwner)
+    || responseOwner.user_id !== owner.user_id
+    || responseOwner.tenant_id !== owner.tenant_id) {
+    throw new TypeError('Notification response owner does not match the active account');
+  }
+  return owner;
+};
+
+export const normalizeNotification = (value, { expectedOwner } = {}) => {
+  const owner = expectedOwnerOrNull(expectedOwner);
   if (!isRecord(value)
     || !isSafePositiveInteger(value.id)
     || !isSafePositiveInteger(value.user_id)
@@ -104,12 +133,14 @@ export const normalizeNotification = (value) => {
     || !isText(value.message)
     || !NOTIFICATION_PRIORITIES.includes(value.priority)
     || typeof value.is_read !== 'boolean'
-    || !(value.read_at === null || isText(value.read_at))
-    || !(value.created_at === null || isText(value.created_at))
+    || !isNullableTimestamp(value.read_at)
+    || !isNullableTimestamp(value.created_at)
     || !hasOwn(value, 'data')) {
     throw new TypeError('Notification response has an invalid notification');
   }
-
+  if (owner && value.user_id !== owner.user_id) {
+    throw new TypeError('Notification response belongs to another account');
+  }
   return {
     id: value.id,
     user_id: value.user_id,
@@ -124,7 +155,14 @@ export const normalizeNotification = (value) => {
   };
 };
 
-export const normalizeNotificationPage = (payload) => {
+const matchesRequestedFilter = (notification, query) => (
+  (!query.type || notification.type === query.type)
+  && (!query.priority || notification.priority === query.priority)
+  && (!hasOwn(query, 'is_read') || notification.is_read === (query.is_read === 'true'))
+);
+
+export const normalizeNotificationPage = (payload, { expectedOwner, query } = {}) => {
+  const owner = verifyOwnerContext(payload, expectedOwner);
   if (!isRecord(payload)
     || !Array.isArray(payload.notifications)
     || !isSafeNonNegativeInteger(payload.total)
@@ -140,9 +178,15 @@ export const normalizeNotificationPage = (payload) => {
     || payload.pages !== Math.ceil(payload.total / payload.per_page)) {
     throw new TypeError('Notification list pagination is invalid');
   }
-
+  if (query && (payload.page !== query.page || payload.per_page !== query.per_page)) {
+    throw new TypeError('Notification list response does not match the request');
+  }
+  const notifications = payload.notifications.map((row) => normalizeNotification(row, { expectedOwner: owner || expectedOwner }));
+  if (query && notifications.some((row) => !matchesRequestedFilter(row, query))) {
+    throw new TypeError('Notification list response does not match the requested filters');
+  }
   return {
-    notifications: payload.notifications.map(normalizeNotification),
+    notifications,
     total: payload.total,
     page: payload.page,
     per_page: payload.per_page,
@@ -150,7 +194,8 @@ export const normalizeNotificationPage = (payload) => {
   };
 };
 
-export const normalizeUnreadCount = (payload) => {
+export const normalizeUnreadCount = (payload, { expectedOwner } = {}) => {
+  verifyOwnerContext(payload, expectedOwner);
   if (!isRecord(payload) || !isSafeNonNegativeInteger(payload.count)) {
     throw new TypeError('Unread notification count response is unavailable');
   }
@@ -158,19 +203,15 @@ export const normalizeUnreadCount = (payload) => {
 };
 
 const normalizeCategories = (value, name) => {
-  if (!isRecord(value)) {
-    throw new TypeError(`${name} notification preferences are unavailable`);
-  }
-
+  if (!isRecord(value)) throw new TypeError(`${name} notification preferences are unavailable`);
   return Object.fromEntries(NOTIFICATION_TYPES.map((type) => {
-    if (typeof value[type] !== 'boolean') {
-      throw new TypeError(`${name} notification preference is invalid`);
-    }
+    if (typeof value[type] !== 'boolean') throw new TypeError(`${name} notification preference is invalid`);
     return [type, value[type]];
   }));
 };
 
-export const normalizeNotificationPreferences = (payload) => {
+export const normalizeNotificationPreferences = (payload, { expectedOwner } = {}) => {
+  verifyOwnerContext(payload, expectedOwner);
   if (!isRecord(payload)
     || !(payload.id === null || isSafePositiveInteger(payload.id))
     || typeof payload.persisted !== 'boolean'
@@ -179,7 +220,9 @@ export const normalizeNotificationPreferences = (payload) => {
     || !EMAIL_FREQUENCIES.includes(payload.settings.email_frequency)) {
     throw new TypeError('Notification preferences response is unavailable');
   }
-
+  if ((payload.persisted && payload.id === null) || (!payload.persisted && payload.id !== null)) {
+    throw new TypeError('Notification preference persistence state is inconsistent');
+  }
   return {
     id: payload.id,
     persisted: payload.persisted,
@@ -202,89 +245,89 @@ export const notificationPreferencesPayload = (preferences) => {
   };
 };
 
-const requestConfig = (signal, extra = {}) => ({
-  ...extra,
-  ...(signal ? { signal } : {}),
-});
+const samePreferencePayload = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const requestConfig = (signal, extra = {}) => ({ ...extra, ...(signal ? { signal } : {}) });
+const mutationRequestConfig = (signal) => requestConfig(signal, { _skipAuthRefresh: true });
 
 export const loadNotifications = async (
   apiClient = api,
-  { page = 1, perPage = DEFAULT_PER_PAGE, filters = {}, signal } = {},
+  { page = 1, perPage = DEFAULT_PER_PAGE, filters = {}, signal, expectedOwner } = {},
 ) => {
-  const response = await apiClient.get(
-    NOTIFICATIONS_ENDPOINT,
-    requestConfig(signal, { params: buildNotificationQuery({ page, perPage, filters }) }),
-  );
-  return normalizeNotificationPage(response?.data);
+  const query = buildNotificationQuery({ page, perPage, filters });
+  const response = await apiClient.get(NOTIFICATIONS_ENDPOINT, requestConfig(signal, { params: query }));
+  return normalizeNotificationPage(response?.data, { expectedOwner, query });
 };
 
-export const loadUnreadNotificationCount = async (apiClient = api, { signal } = {}) => {
+export const loadUnreadNotificationCount = async (apiClient = api, { signal, expectedOwner } = {}) => {
   const response = await apiClient.get(UNREAD_COUNT_ENDPOINT, requestConfig(signal));
-  return normalizeUnreadCount(response?.data);
+  return normalizeUnreadCount(response?.data, { expectedOwner });
 };
 
-export const markNotificationRead = async (apiClient = api, notificationId, { signal } = {}) => {
-  if (!isSafePositiveInteger(notificationId)) {
-    throw new TypeError('Notification id is invalid');
+export const markNotificationRead = async (apiClient = api, notificationId, { signal, expectedOwner } = {}) => {
+  if (!isSafePositiveInteger(notificationId)) throw new TypeError('Notification id is invalid');
+  const response = await apiClient.post(`/notifications/${notificationId}/read`, undefined, mutationRequestConfig(signal));
+  if (!isRecord(response?.data)) throw new TypeError('Mark read response is unavailable');
+  verifyOwnerContext(response.data, expectedOwner);
+  const notification = normalizeNotification(response.data.notification, { expectedOwner });
+  if (notification.id !== notificationId || notification.is_read !== true) {
+    throw new TypeError('Mark read response does not confirm the requested notification');
   }
-  const response = await apiClient.post(
-    `/notifications/${notificationId}/read`,
-    undefined,
-    requestConfig(signal),
-  );
-  if (!isRecord(response?.data)) {
-    throw new TypeError('Mark read response is unavailable');
-  }
-  return normalizeNotification(response.data.notification);
+  return notification;
 };
 
-export const markAllNotificationsRead = async (apiClient = api, { signal } = {}) => {
-  const response = await apiClient.post('/notifications/read-all', undefined, requestConfig(signal));
-  return normalizeUnreadCount(response?.data);
+export const markAllNotificationsRead = async (apiClient = api, { signal, expectedOwner } = {}) => {
+  const response = await apiClient.post('/notifications/read-all', undefined, mutationRequestConfig(signal));
+  if (!isRecord(response?.data)) throw new TypeError('Mark all read response is unavailable');
+  verifyOwnerContext(response.data, expectedOwner);
+  if (response.data.message !== 'Notifications marked as read' || !isSafeNonNegativeInteger(response.data.count)) {
+    throw new TypeError('Mark all read response does not confirm changed rows');
+  }
+  return { count: response.data.count };
 };
 
-export const removeNotification = async (apiClient = api, notificationId, { signal } = {}) => {
-  if (!isSafePositiveInteger(notificationId)) {
-    throw new TypeError('Notification id is invalid');
+export const removeNotification = async (apiClient = api, notificationId, { signal, expectedOwner } = {}) => {
+  if (!isSafePositiveInteger(notificationId)) throw new TypeError('Notification id is invalid');
+  const response = await apiClient.delete(`/notifications/${notificationId}`, mutationRequestConfig(signal));
+  if (!isRecord(response?.data)) throw new TypeError('Delete notification response is unavailable');
+  verifyOwnerContext(response.data, expectedOwner);
+  if (response.data.notification?.id !== notificationId || response.data.notification?.is_deleted !== true) {
+    throw new TypeError('Delete response does not confirm the requested notification');
   }
-  const response = await apiClient.delete(`/notifications/${notificationId}`, requestConfig(signal));
-  if (!isRecord(response?.data)) {
-    throw new TypeError('Delete notification response is unavailable');
-  }
-  return normalizeNotification(response.data.notification);
+  return normalizeNotification(response.data.notification, { expectedOwner });
 };
 
-export const loadNotificationPreferences = async (apiClient = api, { signal } = {}) => {
+export const loadNotificationPreferences = async (apiClient = api, { signal, expectedOwner } = {}) => {
   const response = await apiClient.get(NOTIFICATION_PREFERENCES_ENDPOINT, requestConfig(signal));
-  return normalizeNotificationPreferences(response?.data);
+  return normalizeNotificationPreferences(response?.data, { expectedOwner });
 };
 
-export const saveNotificationPreferences = async (apiClient = api, preferences, { signal } = {}) => {
+export const saveNotificationPreferences = async (apiClient = api, preferences, { signal, expectedOwner } = {}) => {
+  const submitted = notificationPreferencesPayload(preferences);
   const response = await apiClient.put(
     NOTIFICATION_PREFERENCES_ENDPOINT,
-    notificationPreferencesPayload(preferences),
-    requestConfig(signal),
+    submitted,
+    mutationRequestConfig(signal),
   );
-  if (!isRecord(response?.data)) {
-    throw new TypeError('Save notification preferences response is unavailable');
+  if (!isRecord(response?.data)) throw new TypeError('Save notification preferences response is unavailable');
+  verifyOwnerContext(response.data, expectedOwner);
+  const saved = normalizeNotificationPreferences(response.data.preferences);
+  if (!saved.persisted || saved.id === null || !samePreferencePayload(notificationPreferencesPayload(saved), submitted)) {
+    throw new TypeError('Saved notification preferences do not match the submitted values');
   }
-  return normalizeNotificationPreferences(response.data.preferences);
+  return saved;
 };
 
-/** Never send a user to a route outside their known role. */
+/** Return only destinations explicitly guarded for the actor role in App.jsx. */
 export const notificationDestination = (notificationType, actorRole) => {
   switch (notificationType) {
     case 'withdrawal':
       return actorRole === 'trader' ? '/trader/withdrawals' : '/notifications';
     case 'kyc':
-      return '/documents';
+      return actorRole === 'trader' ? '/trader/documents' : '/notifications';
     case 'challenge':
-      return actorRole === 'supermaster' || actorRole === 'master' ? '/notifications' : '/challenges';
+      return actorRole === 'trader' ? '/challenges' : '/notifications';
     case 'commission':
-      return actorRole === 'affiliate' || actorRole === 'agent'
-        ? '/affiliate/commissions'
-        : '/notifications';
-    // There is no verified /orders route in the application, so payment notices stay here.
+      return actorRole === 'affiliate' ? '/affiliate/commissions' : '/notifications';
     case 'payment':
     case 'system':
     default:
@@ -292,11 +335,7 @@ export const notificationDestination = (notificationType, actorRole) => {
   }
 };
 
-/**
- * Injectable facade for offline/unit callers.  It does not configure a URL or
- * perform any browser work; callers may supply an Axios instance with a
- * synthetic adapter.
- */
+/** Injectable facade for offline/unit callers. */
 export const createNotificationViewService = (apiClient) => ({
   loadNotifications: (options) => loadNotifications(apiClient, options),
   loadUnreadCount: (options) => loadUnreadNotificationCount(apiClient, options),

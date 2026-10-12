@@ -39,6 +39,14 @@
 
 שלושת הסעיפים מכסים ארבעה מודולי מסך, לא UI-4 כולו. תיעוד: `backend/docs/TRADING_UI4_HE.md`. יתר wallet/withdrawals/support/notifications/affiliate/admin/dashboard, UI-5/6 והכרעות policy ב־UI-3 פתוחים. אין ספק מסחר חי, capital command, merge או deploy; תוצאות CI לפי ה־SHA המדויק בדוח החבילה.
 
+## חבילת תמיכה והתראות בתוך UI-4 — 12.10.2026
+
+- [x] **פניות אישיות ופעולות אמת:** יצירה/רשימה/פרטים/תשובה/סגירה/דירוג מאמתים owner_context מתוך principal בשרת, שדות הפעולה והפנייה המקורית; customer messages בלבד, no attachments/PII פנימי. מעבר auth/user/tenant/role/route/page מסיר מידע ו־pending ישנים; כשל אינו ריק או הוכחה שלא נכתב. אין retry אוטומטי לכתיבה, SLA או הצלחת משלוח מייל מדומה. חמש הכתובות נשארות במפה הקיימת.
+- [x] **התראות והעדפות:** list/count/read/read-all/soft-delete/preferences מאמתים זהות, id, עמוד/מסנן ותשובת שינוי לפני מצג הצלחה; mutation אינו נדרס על ידי GET ישן; defaults אינם שמורים, מונה חסר אינו אפס, עריכת draft מסירה saved וה־inputs נעולים בזמן save. כשל פעולה מובחן מכשל קריאה; פעולות keyboard/labels/focus נגישות, bell/dropdown באותו חוזה, תפקיד חדש אינו מפעיל ניווט מבקשה ישנה. email preferences אינן משלוח, רשומת אירוע אינה אישור תשלום/KYC/MT5, broadcast נשאר חסום.
+- [x] **עיצוב וקבלה בחבילה:** navy/cyan ומעטפת אחת, טקסט ארוך נשבר, כותרות ומרווחים מותאמים לנייד ולדסקטופ, כשל/טעינה/ריק מובחנים; parity מתגובות Flask סינתטיות, בדיקות בקשות מאוחרות וביקורת, רגרסיות ו־CI לפי SHA מדויק. אין ספק חי/ייצור/merge/deploy ואין סימון UI-4 כולו כהושלם.
+
+גבולות: `backend/docs/SUPPORT_NOTIFICATIONS_UI4_HE.md`. UI-3 החלטות ותוכן דינמי, יתר UI-4 ו־UI-5/6 נשארים פתוחים.
+
 ## תלות אפיליאט — מצב בתוך שלב 4 ו־UI-4
 
 - [x] חבילת חסימה ראשונה: מסלולי יצירה/אישור/פדיון של עמלות legacy מסרבים ללא מקור מאומת; אין סכום זמין לפדיון; עריכת תוכנית גלובלית מוגבלת לבעל הפלטפורמה; אין הפעלת auto-approval. תיעוד: `backend/docs/AFFILIATE_FINANCIAL_BOUNDARY_HE.md`.

@@ -236,7 +236,8 @@ def test_customer_detail_list_and_messages_filter_internal(application, actors):
     assert listing.status_code == 200
     owned = next(ticket for ticket in listing.get_json()['tickets'] if ticket['ticket_number'] == 'TICKET-OWNED')
     assert owned['message_count'] == 1
-    assert owned['last_message']['message'] == 'customer visible'
+    assert 'last_message' not in owned
+    assert not {'attachments', 'email', 'name', 'assigned_user', 'assigned_to', 'user'}.intersection(owned)
     assert client.get(_API + '/TICKET-OWNED?per_page=101', headers=headers).status_code == 400
 
     # The customer endpoint accepts message only and derives identity from JWT.
@@ -246,7 +247,8 @@ def test_customer_detail_list_and_messages_filter_internal(application, actors):
     assert rejected.status_code == 400
     accepted = client.post(_API + '/TICKET-OWNED/messages', headers=headers, json={'message': 'real owner update'})
     assert accepted.status_code == 201
-    assert accepted.get_json()['ticket_message']['email'] == 'owner@support.test'
+    assert accepted.get_json()['ticket_message']['user_id'] == actors['owner_id']
+    assert not {'email', 'name', 'attachments'}.intersection(accepted.get_json()['ticket_message'])
 
 
 def test_foreign_inactive_and_admin_scope_contract(application, actors):

@@ -91,7 +91,8 @@ def test_journey_factory_authenticated_create_list_reply(journey_app):
                                 'category': 'general', 'priority': 'medium'})
     assert created.status_code == 201, created.get_json()
     ticket = created.get_json()['ticket']
-    assert ticket['user_id'] == 2 and ticket['email'] == 'customer@example.invalid'
+    assert ticket['user_id'] == 2
+    assert 'email' not in ticket
     listing = client.get('/api/v1/support/tickets/my?page=1&per_page=10', headers=headers)
     assert listing.status_code == 200
     assert ticket['id'] in [row['id'] for row in listing.get_json()['tickets']]
@@ -101,6 +102,7 @@ def test_journey_factory_authenticated_create_list_reply(journey_app):
     with journey_app.app_context():
         assert EmailQueue.query.count() == 0
         assert db.session.get(SupportTicket, ticket['id']).user_id == 2
+        assert db.session.get(SupportTicket, ticket['id']).email == 'customer@example.invalid'
 
 
 def test_journey_factory_notifications_are_personal_and_preferences_read_only(journey_app):

@@ -166,6 +166,23 @@ def _valid_actor():
     return actor, None
 
 
+def _owner_context(actor):
+    """Return only the verified JWT principal binding for user-facing payloads."""
+    user_id = getattr(actor, "id", None)
+    tenant_id = getattr(actor, "tenant_id", None)
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id < 1:
+        raise RuntimeError("Authenticated notification principal has no valid user id")
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
+        tenant_id = None
+    return {"user_id": user_id, "tenant_id": tenant_id}
+
+
+def _customer_response(actor, payload: dict[str, Any]):
+    """Attach the server-derived principal receipt to one user API response."""
+    payload["owner_context"] = _owner_context(actor)
+    return payload
+
+
 def _owned_notifications(actor, *, include_deleted: bool = False):
     """A personal-only query; even the configured root is never global here."""
     query = (
@@ -301,13 +318,13 @@ def get_notifications():
                 .limit(filters["per_page"])
                 .all()
             )
-        return jsonify({
+        return jsonify(_customer_response(actor, {
             "notifications": [_notification_dict(row) for row in rows],
             "total": total,
             "page": filters["page"],
             "per_page": filters["per_page"],
             "pages": (total + filters["per_page"] - 1) // filters["per_page"],
-        }), 200
+        })), 200
     except Exception:
         logger.exception("Unable to list in-app notifications")
         return _internal_error()
@@ -328,7 +345,7 @@ def get_unread_count():
             count = _owned_notifications(actor).filter(
                 Notification.is_read.is_(False)
             ).count()
-        return jsonify({"count": count}), 200
+        return jsonify(_customer_response(actor, {"count": count})), 200
     except Exception:
         logger.exception("Unable to count in-app notifications")
         return _internal_error()
@@ -351,10 +368,10 @@ def mark_as_read(notification_id):
         changed = InAppNotificationService.mark_read(notification)
         if changed:
             db.session.commit()
-        return jsonify({
+        return jsonify(_customer_response(actor, {
             "message": "Notification marked as read",
             "notification": _notification_dict(notification),
-        }), 200
+        })), 200
     except Exception:
         db.session.rollback()
         logger.exception("Unable to mark in-app notification as read")
@@ -388,10 +405,10 @@ def mark_all_as_read():
             )
         )
         db.session.commit()
-        return jsonify({
+        return jsonify(_customer_response(actor, {
             "message": "Notifications marked as read",
             "count": count,
-        }), 200
+        })), 200
     except Exception:
         db.session.rollback()
         logger.exception("Unable to mark all in-app notifications as read")
@@ -414,10 +431,10 @@ def delete_notification(notification_id):
             return _error("Notification not found", 404, "NOTIFICATION_NOT_FOUND")
         InAppNotificationService.soft_delete(notification)
         db.session.commit()
-        return jsonify({
+        return jsonify(_customer_response(actor, {
             "message": "Notification deleted",
             "notification": _notification_dict(notification, include_deletion=True),
-        }), 200
+        })), 200
     except Exception:
         db.session.rollback()
         logger.exception("Unable to delete in-app notification")
@@ -438,9 +455,10 @@ def get_preferences():
         if failure:
             return failure
         prefs = InAppNotificationService.get_preferences_read_only(actor.id)
-        return jsonify(
-            InAppNotificationService.serialize_preferences(prefs, user_id=actor.id)
-        ), 200
+        return jsonify(_customer_response(
+            actor,
+            InAppNotificationService.serialize_preferences(prefs, user_id=actor.id),
+        )), 200
     except Exception:
         logger.exception("Unable to read notification preferences")
         return _internal_error()
@@ -463,12 +481,12 @@ def update_preferences():
         prefs = InAppNotificationService.update_preferences(
             user_id=actor.id, changes=changes
         )
-        return jsonify({
+        return jsonify(_customer_response(actor, {
             "message": "Preferences updated successfully",
             "preferences": InAppNotificationService.serialize_preferences(
                 prefs, user_id=actor.id
             ),
-        }), 200
+        })), 200
     except Exception:
         # update_preferences owns its single rollback; do not expose database
         # details or invoke the legacy auto-committing model helper.
