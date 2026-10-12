@@ -14,7 +14,7 @@ from sqlalchemy.engine import make_url
 
 
 @contextmanager
-def quote_database(resources, monkeypatch):
+def quote_database(resources, monkeypatch, revision='20261011_000006'):
     from src.app import create_app
     from src.database import db
     from src.models.user import User
@@ -39,7 +39,7 @@ def quote_database(resources, monkeypatch):
         try:
             with migration_engine.connect() as connection:
                 migration_config.attributes['connection'] = connection
-                command.upgrade(migration_config, '20261011_000006')
+                command.upgrade(migration_config, revision)
         finally:
             migration_engine.dispose()
         app = create_app('testing', config_overrides={
@@ -63,8 +63,8 @@ def quote_database(resources, monkeypatch):
                 VALUES (10, 1, 'Synthetic Program', 'one_phase', 'one_phase', 10000, 19.99, CAST(:rules AS jsonb), true,
                         10, 5, 10, 80)"""), {'rules': '{"unknown":null}'})
             db.session.execute(text("""INSERT INTO program_addons
-                (id, program_id, name, price, price_type, addon_type, is_active)
-                VALUES (20, 10, 'Synthetic Add-on', 10.00, 'percentage', 'synthetic', true)"""))
+                (id, program_id, name, price, price_type, addon_type, benefits, is_active)
+                VALUES (20, 10, 'Synthetic Add-on', 10.00, 'percentage', 'synthetic', '{}'::jsonb, true)"""))
             db.session.commit()
         yield app
     finally:

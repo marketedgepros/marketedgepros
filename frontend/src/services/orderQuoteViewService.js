@@ -224,6 +224,8 @@ export const mapOrderQuoteResponse = (payload, context) => {
     replayed: source.replayed,
     order: Object.freeze({
       id: order.id,
+      userId: order.user_id,
+      tenantId: order.tenant_id,
       amountMinor,
       amount,
       currency: order.currency,
@@ -231,10 +233,13 @@ export const mapOrderQuoteResponse = (payload, context) => {
       paid: order.paid,
       snapshotHash: order.snapshot_hash,
       snapshot: Object.freeze({
+        userId: snapshot.user_id,
+        tenantId: snapshot.tenant_id,
         baseAmount: requireMoneyText(snapshot.base_amount, 'Quote snapshot base amount'),
         amount: snapshot.amount,
         addons: Object.freeze(snapshotAddons),
         rounding: typeof snapshot.rounding === 'string' ? snapshot.rounding : null,
+        terms: isRecord(snapshot.terms) ? JSON.parse(JSON.stringify(snapshot.terms)) : null,
       }),
     }),
   });

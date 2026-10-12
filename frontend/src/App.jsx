@@ -149,6 +149,7 @@ function AccountChatWidget() {
   // Payout availability must remain unobscured, particularly on narrow screens.
   // The page has a supported support-ticket link instead of a floating overlay.
   if (location.pathname === '/affiliate/payout') return null;
+  if (location.pathname === '/programs' || /^\/programs\/[^/]+(?:\/checkout)?$/.test(location.pathname)) return null;
   return <ChatWidget />;
 }
 

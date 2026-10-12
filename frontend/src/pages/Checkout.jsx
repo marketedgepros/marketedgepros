@@ -1,379 +1,430 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Check, CheckCircle, Lock, Plus, RefreshCw } from 'lucide-react';
-import api from '../services/api';
-import useAuthStore from '../store/authStore';
-import { ADMIN_ROLES } from '../constants/roles';
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { FileText, RefreshCw, ArrowRight } from "lucide-react";
+import useAuthStore from "../store/authStore";
+import useProgramCatalog from "../hooks/useProgramCatalog";
+import { ADMIN_ROLES } from "../constants/roles";
+import {
+  addonPriceLabel,
+  formatCatalogMoney,
+  mapQuotedCatalog,
+} from "../services/programCatalogViewService";
 import {
   OrderQuoteIdempotencyKeys,
+  MAX_ORDER_ADDONS,
   formatUsdFromMinorUnits,
   normalizeQuoteContext,
   orderQuoteErrorMessage,
   requestOrderQuote,
-} from '../services/orderQuoteViewService';
+} from "../services/orderQuoteViewService";
+import {
+  CatalogPage,
+  CatalogState,
+  BackToPrograms,
+  ProgramRules,
+  PaymentBoundary,
+  primaryAction,
+  secondaryAction,
+  panelStyle,
+} from "../components/programs/CatalogUI";
 
-const isPositiveRouteId = (value) => /^\d+$/.test(String(value || '')) && Number(value) > 0 && Number(value) <= 2147483647;
-
-const Checkout = () => {
+export default function Checkout() {
   const { programId } = useParams();
+  const { user, isLoading: authLoading } = useAuthStore();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const [program, setProgram] = useState(null);
-  const [addons, setAddons] = useState([]);
-  const [selectedAddons, setSelectedAddons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [quote, setQuote] = useState(null);
-  const [quoteState, setQuoteState] = useState('idle');
-  const [quoteError, setQuoteError] = useState('');
-  const mountedRef = useRef(true);
-  const programRequestRef = useRef({ id: 0, controller: null });
-  const quoteRequestRef = useRef({ id: 0, controller: null });
-  const quoteKeysRef = useRef(new OrderQuoteIdempotencyKeys());
-
+  const catalog = useProgramCatalog(programId);
+  const program = catalog.data;
   const isAdmin = Boolean(user && ADMIN_ROLES.includes(user.role));
-  // A quote is not a purchase. Keep the server's existing quote authorization;
-  // payment/entitlement prerequisites belong to their separate server contracts.
+  const ownerKey = user
+    ? `${user.id}:${user.tenant_id}:${user.role}:${programId}`
+    : `guest:${programId}`;
+  const currentOwner = useRef(ownerKey);
+  currentOwner.current = ownerKey;
+  const [selection, setSelection] = useState({ ownerKey, ids: [] });
+  const addonIds = selection.ownerKey === ownerKey ? selection.ids : [];
+  const selectionKey = `${ownerKey}:${addonIds.join(",")}`;
+  const currentSelection = useRef(selectionKey);
+  currentSelection.current = selectionKey;
+  const [result, setResult] = useState({
+    key: "",
+    state: "idle",
+    quote: null,
+    catalogQuote: null,
+    error: "",
+  });
+  const quoteRequest = useRef({ id: 0, controller: null, pending: false });
+  const quoteKeys = useRef(new OrderQuoteIdempotencyKeys());
+  const alive = useRef(false);
+  const visible =
+    result.key === selectionKey
+      ? result
+      : { state: "idle", quote: null, catalogQuote: null, error: "" };
 
+  const invalidateQuote = () => {
+    quoteRequest.current.controller?.abort();
+    quoteRequest.current = {
+      id: quoteRequest.current.id + 1,
+      controller: null,
+      pending: false,
+    };
+    quoteKeys.current.invalidate();
+    setResult({
+      key: "",
+      state: "idle",
+      quote: null,
+      catalogQuote: null,
+      error: "",
+    });
+  };
   useEffect(() => {
-    if (!user) {
-      navigate('/login', {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      quoteRequest.current.controller?.abort();
+    };
+  }, []);
+  useEffect(() => {
+    invalidateQuote();
+    setSelection({ ownerKey, ids: [] });
+  }, [ownerKey]);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user)
+      navigate("/login", {
         replace: true,
         state: { from: `/programs/${programId}/checkout` },
       });
-    } else if (ADMIN_ROLES.includes(user.role)) {
-      navigate('/admin', { replace: true });
-    }
-  }, [user, navigate, programId]);
+    else if (isAdmin) navigate("/admin", { replace: true });
+  }, [ownerKey, user, authLoading, isAdmin, navigate, programId]);
 
-  useEffect(() => {
-    quoteRequestRef.current.controller?.abort();
-    quoteRequestRef.current.id += 1;
-    quoteKeysRef.current.invalidate();
-    setQuote(null);
-    setQuoteState('idle');
-    setQuoteError('');
-  }, [user?.id]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      programRequestRef.current.controller?.abort();
-      quoteRequestRef.current.controller?.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    programRequestRef.current.controller?.abort();
-    quoteRequestRef.current.controller?.abort();
-    quoteRequestRef.current.id += 1;
-    quoteKeysRef.current.invalidate();
-    setProgram(null);
-    setAddons([]);
-    setSelectedAddons([]);
-    setQuote(null);
-    setQuoteState('idle');
-    setQuoteError('');
-    setLoadError('');
-
-    if (!isPositiveRouteId(programId)) {
-      setLoading(false);
-      setLoadError('The program identifier is invalid.');
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    const requestId = programRequestRef.current.id + 1;
-    programRequestRef.current = { id: requestId, controller };
-    setLoading(true);
-
-    api.get(`/programs/${Number(programId)}`, { signal: controller.signal })
-      .then((response) => {
-        if (!mountedRef.current || programRequestRef.current.id !== requestId) return;
-        const data = response?.data;
-        if (!data || typeof data !== 'object' || Array.isArray(data)) {
-          throw new Error('The program response was invalid.');
-        }
-        setProgram(data);
-        setAddons(Array.isArray(data.addons) ? data.addons : []);
-        setLoading(false);
-      })
-      .catch((error) => {
-        if (controller.signal.aborted || !mountedRef.current || programRequestRef.current.id !== requestId) return;
-        setLoading(false);
-        setLoadError(error?.response?.data?.error || error?.message || 'Program details could not be loaded.');
-      });
-
-    return () => controller.abort();
-  }, [programId]);
-
-  const invalidateQuote = () => {
-    quoteRequestRef.current.controller?.abort();
-    quoteRequestRef.current.id += 1;
-    quoteKeysRef.current.invalidate();
-    setQuote(null);
-    setQuoteState('idle');
-    setQuoteError('');
-  };
-
-  const toggleAddon = (addonId) => {
-    if (!Number.isSafeInteger(addonId) || addonId < 1) return;
+  const toggleAddon = (id) => {
+    const selected = addonIds.includes(id);
+    if (!selected && addonIds.length >= MAX_ORDER_ADDONS) return;
     invalidateQuote();
-    setSelectedAddons((current) => (
-      current.includes(addonId)
-        ? current.filter((id) => id !== addonId)
-        : [...current, addonId]
-    ));
+    setSelection({
+      ownerKey,
+      ids: selected
+        ? addonIds.filter((value) => value !== id)
+        : [...addonIds, id].sort((a, b) => a - b),
+    });
   };
-
   const requestQuote = async () => {
-    if (!program || !user || isAdmin) return;
-
-    let context;
-    try {
-      context = normalizeQuoteContext(Number(programId), selectedAddons);
-    } catch (error) {
-      setQuote(null);
-      setQuoteState('error');
-      setQuoteError(orderQuoteErrorMessage(error));
-      return;
-    }
-
-    quoteRequestRef.current.controller?.abort();
+    if (!program || !user || isAdmin || quoteRequest.current.pending) return;
+    const key = selectionKey;
+    const owner = ownerKey;
     const controller = new AbortController();
-    const requestId = quoteRequestRef.current.id + 1;
-    quoteRequestRef.current = { id: requestId, controller };
-    setQuote(null);
-    setQuoteError('');
-    setQuoteState('loading');
-
+    const id = quoteRequest.current.id + 1;
+    quoteRequest.current = { id, controller, pending: true };
+    setResult({
+      key,
+      state: "loading",
+      quote: null,
+      catalogQuote: null,
+      error: "",
+    });
     try {
-      const idempotencyKey = quoteKeysRef.current.forContext(context);
-      const nextQuote = await requestOrderQuote({
+      const context = normalizeQuoteContext(program.id, addonIds);
+      const quote = await requestOrderQuote({
         programId: context.programId,
         addonIds: context.addonIds,
-        idempotencyKey,
+        idempotencyKey: quoteKeys.current.forContext(context),
         signal: controller.signal,
       });
-      if (!mountedRef.current || quoteRequestRef.current.id !== requestId || controller.signal.aborted) return;
-      setQuote(nextQuote);
-      setQuoteState('quoted');
+      const catalogQuote = mapQuotedCatalog(quote, program, user.id);
+      if (
+        !alive.current ||
+        controller.signal.aborted ||
+        quoteRequest.current.id !== id ||
+        currentOwner.current !== owner ||
+        currentSelection.current !== key
+      )
+        return;
+      setResult({ key, state: "quoted", quote, catalogQuote, error: "" });
     } catch (error) {
-      if (!mountedRef.current || quoteRequestRef.current.id !== requestId || controller.signal.aborted) return;
-      setQuote(null);
-      setQuoteState('error');
-      // Retry deliberately retains the same key for this unchanged selection.
-      setQuoteError(orderQuoteErrorMessage(error));
+      if (
+        !alive.current ||
+        controller.signal.aborted ||
+        quoteRequest.current.id !== id ||
+        currentOwner.current !== owner ||
+        currentSelection.current !== key
+      )
+        return;
+      setResult({
+        key,
+        state: "error",
+        quote: null,
+        catalogQuote: null,
+        error: orderQuoteErrorMessage(error),
+      });
+    } finally {
+      if (quoteRequest.current.id === id) quoteRequest.current.pending = false;
     }
   };
 
-  if (loading) {
+  if (authLoading || !user || isAdmin)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading program details…</div>
-      </div>
+      <CatalogPage>
+        <CatalogState loading />
+      </CatalogPage>
     );
-  }
-
-  if (loadError || !program) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
-        <div className="max-w-lg bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 text-center">
-          <p className="text-red-400 font-semibold">{loadError || 'Program not found.'}</p>
-          <button
-            onClick={() => navigate('/programs')}
-            className="mt-5 bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 transition"
-          >
-            Back to programs
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const quoteButtonDisabled = quoteState === 'loading' || !user || isAdmin;
-  const quoteButtonLabel = quoteState === 'loading'
-    ? 'Requesting server quote…'
-    : quoteState === 'error'
-      ? 'Retry server quote'
-      : quote
-        ? 'Refresh server quote'
-        : 'Request server quote';
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Review your program</h1>
-          <p className="text-gray-400">Select add-ons, then request an immutable server-priced quote.</p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          <section className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">Program details</h2>
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xl font-bold text-cyan-400 mb-2">{program.name}</h3>
-                {program.description && <p className="text-gray-400">{program.description}</p>}
-              </div>
-
-              <div className="border-t border-slate-700 pt-4 space-y-2">
-                {program.account_size !== undefined && program.account_size !== null && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-400">Account size</span>
-                    <span className="text-white font-semibold">{String(program.account_size)}</span>
+    <CatalogPage>
+      <BackToPrograms />
+      {catalog.loading || catalog.error || !program ? (
+        <CatalogState {...catalog} />
+      ) : (
+        <>
+          <header className="mb-9">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+              Program selection / Unpaid quote
+            </p>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">
+              Review your program.
+            </h1>
+            <p className="mt-4 max-w-2xl leading-relaxed text-slate-300">
+              Choose optional add-ons, then request a quote. Only the server
+              calculates the final amount and records the terms for this
+              selection.
+            </p>
+          </header>
+          <div className="grid items-start gap-6 lg:grid-cols-[1.25fr_1fr]">
+            <div className="space-y-6">
+              <section
+                className={panelStyle}
+                aria-labelledby="selection-program"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-400">
+                      Current catalog
+                    </p>
+                    <h2
+                      id="selection-program"
+                      className="mt-2 break-words text-xl font-semibold"
+                    >
+                      {program.terms.name}
+                    </h2>
                   </div>
-                )}
-                {program.profit_target !== undefined && program.profit_target !== null && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-400">Profit target</span>
-                    <span className="text-green-400 font-semibold">{String(program.profit_target)}%</span>
-                  </div>
-                )}
-                {program.max_daily_loss !== undefined && program.max_daily_loss !== null && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-400">Max daily loss</span>
-                    <span className="text-red-400 font-semibold">{String(program.max_daily_loss)}%</span>
-                  </div>
-                )}
-                {program.profit_split !== undefined && program.profit_split !== null && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-400">Profit split</span>
-                    <span className="text-cyan-400 font-semibold">{String(program.profit_split)}%</span>
-                  </div>
-                )}
-              </div>
-
-              {addons.length > 0 && (
-                <div className="border-t border-slate-700 pt-4">
-                  <h3 className="text-lg font-bold text-white mb-3 flex items-center">
-                    <Plus className="mr-2 text-cyan-400" />
-                    Optional add-ons
-                  </h3>
-                  <div className="space-y-2">
-                    {addons.map((addon) => {
-                      const selected = selectedAddons.includes(addon.id);
+                  <Link
+                    to={`/programs/${program.id}`}
+                    className="rounded text-sm text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  >
+                    View all rules
+                    <ArrowRight
+                      className="ml-1 inline"
+                      size={14}
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </div>
+                <div className="mt-5 border-l-2 border-cyan-400 pl-4">
+                  <p className="text-sm text-slate-400">Catalog base fee</p>
+                  <p className="mt-1 text-3xl font-bold tabular-nums text-cyan-200">
+                    {formatCatalogMoney(program.price)}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Not a final total or payment request.
+                  </p>
+                </div>
+                <div className="mt-5">
+                  <ProgramRules terms={program.terms} />
+                </div>
+              </section>
+              <section className={panelStyle} aria-labelledby="select-addons">
+                <h2 id="select-addons" className="text-xl font-semibold">
+                  Optional add-ons
+                </h2>
+                <p className="mt-2 text-sm text-slate-400">
+                  Choose up to {MAX_ORDER_ADDONS}. Percentage charges use the
+                  base fee and are rounded by the server per line.
+                </p>
+                {program.addons.length ? (
+                  <fieldset className="mt-5 space-y-3">
+                    <legend className="sr-only">Add-ons for your quote</legend>
+                    {program.addons.map((addon) => {
+                      const checked = addonIds.includes(addon.id);
                       return (
-                        <button
-                          type="button"
+                        <label
                           key={addon.id}
-                          onClick={() => toggleAddon(addon.id)}
-                          className={`w-full text-left p-3 rounded-lg border transition-all ${
-                            selected
-                              ? 'bg-cyan-500/20 border-cyan-500'
-                              : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'
-                          }`}
+                          className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${checked ? "border-cyan-400/60 bg-cyan-400/10" : "border-slate-700 hover:border-slate-500"}`}
                         >
-                          <div className="flex items-start">
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 ${
-                              selected ? 'bg-cyan-500 border-cyan-500' : 'border-slate-600'
-                            }`}>
-                              {selected && <Check className="w-3 h-3 text-white" />}
-                            </div>
-                            <div>
-                              <span className="font-semibold text-white">{addon.name}</span>
-                              {addon.description && <p className="text-sm text-gray-400 mt-1">{addon.description}</p>}
-                            </div>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleAddon(addon.id)}
+                            disabled={
+                              !checked && addonIds.length >= MAX_ORDER_ADDONS
+                            }
+                            className="mt-1 h-4 w-4 shrink-0 accent-cyan-400 focus-visible:outline focus-visible:outline-cyan-300"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="block break-words font-medium">
+                              {addon.name}
+                            </span>
+                            <span className="mt-1 block text-sm tabular-nums text-cyan-200">
+                              {addonPriceLabel(addon)}
+                            </span>
+                            {addon.description && (
+                              <span className="mt-2 block break-words text-xs leading-relaxed text-slate-400">
+                                {addon.description}
+                              </span>
+                            )}
                           </div>
-                        </button>
+                        </label>
                       );
                     })}
-                  </div>
-                </div>
-              )}
-
-              <div className="border-t border-slate-700 pt-4">
-                <div className="flex justify-between items-center gap-4">
-                  <span className="text-xl font-bold text-white">Server quote</span>
-                  <span className="text-right text-cyan-400 font-bold">
-                    {quote ? formatUsdFromMinorUnits(quote.order.amountMinor) : 'Not requested'}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  Totals are calculated only by the server after you request a quote.
-                </p>
-              </div>
+                  </fieldset>
+                ) : (
+                  <p className="mt-5 text-sm text-slate-300">
+                    No active add-ons are available.
+                  </p>
+                )}
+              </section>
             </div>
-          </section>
-
-          <section className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">Quote status</h2>
-
-            {isAdmin && (
-              <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-300 px-4 py-3 rounded-lg mb-4">
-                Administrative accounts cannot purchase programs.
-              </div>
-            )}
-            {quoteError && (
-              <div className="bg-red-500/10 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4" role="alert">
-                {quoteError}
-              </div>
-            )}
-
-            <div className="bg-slate-900/50 rounded-lg border border-slate-700 p-4 mb-5">
-              <p className="text-sm text-gray-400">Current state</p>
-              <p className="text-lg font-semibold text-white mt-1">
-                {quoteState === 'loading' && 'Requesting quote'}
-                {quoteState === 'quoted' && 'Quoted'}
-                {quoteState === 'error' && 'Quote request failed'}
-                {quoteState === 'idle' && 'Not requested'}
-              </p>
-              {quote && (
-                <>
-                  <p className="text-sm text-cyan-300 mt-2">Order state: {quote.order.state}</p>
-                  <p className="text-sm text-gray-300">Payment status: not paid</p>
-                  {quote.replayed && <p className="text-sm text-gray-400 mt-2">Existing quote returned for this selection.</p>}
-                </>
-              )}
-            </div>
-
-            {quote && (
-              <div className="border-t border-slate-700 pt-4 mb-5">
-                <h3 className="text-lg font-bold text-white mb-3">Immutable quote summary</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-gray-400">Base amount</span>
-                    <span className="text-white">USD {quote.order.snapshot.baseAmount}</span>
-                  </div>
-                  {quote.order.snapshot.addons.map((addon) => (
-                    <div className="flex justify-between gap-4" key={addon.id}>
-                      <span className="text-gray-400">{addon.name}</span>
-                      <span className="text-white">USD {addon.amount}</span>
-                    </div>
-                  ))}
-                  <div className="border-t border-slate-700 pt-2 flex justify-between gap-4 font-semibold">
-                    <span className="text-white">Quoted total</span>
-                    <span className="text-cyan-400">{formatUsdFromMinorUnits(quote.order.amountMinor)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={requestQuote}
-              disabled={quoteButtonDisabled}
-              className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-4 rounded-lg font-bold text-lg hover:shadow-lg hover:shadow-cyan-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            <section
+              className={`${panelStyle} space-y-6`}
+              aria-labelledby="quote-summary"
+              aria-busy={visible.state === "loading" || undefined}
             >
-              {quoteState === 'error' ? <RefreshCw className="mr-2" /> : <Lock className="mr-2" />}
-              {quoteButtonLabel}
-            </button>
-
-            <div className="mt-5 bg-cyan-500/10 border border-cyan-500/50 rounded-lg p-4">
-              <div className="flex items-start text-cyan-100">
-                <CheckCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0 text-cyan-400" />
-                <p className="text-sm">
-                  Payment integrations must be verified and enabled by the server before payment can be offered.
-                  This page only creates an unpaid quote; it does not initiate a provider, wallet transfer, account activation, or funding.
+              <div>
+                <div className="flex items-center gap-2 text-cyan-300">
+                  <FileText size={19} aria-hidden="true" />
+                  <p className="text-xs font-semibold uppercase tracking-wider">
+                    Server-priced quote
+                  </p>
+                </div>
+                <h2 id="quote-summary" className="mt-3 text-2xl font-semibold">
+                  Your quote summary
+                </h2>
+                <p className="mt-2 text-sm text-slate-400">
+                  No browser-calculated total is used.
                 </p>
               </div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
+              <div
+                className="rounded-xl border border-slate-700 bg-slate-950/40 p-4"
+                aria-live="polite"
+              >
+                <p className="text-xs uppercase tracking-wider text-slate-400">
+                  Current state
+                </p>
+                <p className="mt-2 font-semibold">
+                  {
+                    {
+                      idle: "Not requested",
+                      loading: "Requesting quote…",
+                      error: "Quote unavailable",
+                      quoted: "Quoted — not paid",
+                    }[visible.state]
+                  }
+                </p>
+                {visible.quote && (
+                  <p className="mt-2 text-sm text-slate-400">
+                    {visible.quote.replayed
+                      ? "Existing quote returned for this selection."
+                      : "The server recorded this unpaid quote."}
+                  </p>
+                )}
+              </div>
+              {visible.error && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-red-400/30 bg-red-400/5 p-4 text-sm leading-relaxed text-red-200"
+                >
+                  {visible.error}
+                </p>
+              )}
+              {visible.quote && (
+                <div>
+                  <p className="mb-4 text-sm font-semibold text-cyan-200">
+                    Immutable quote summary
+                  </p>
+                  <dl className="space-y-3 text-sm">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-slate-400">Base fee</dt>
+                      <dd className="tabular-nums">
+                        {formatCatalogMoney(visible.catalogQuote.baseAmount)}
+                      </dd>
+                    </div>
+                    {visible.quote.order.snapshot.addons.map((addon) => (
+                      <div
+                        key={addon.id}
+                        className="flex flex-wrap justify-between gap-2"
+                      >
+                        <dt className="break-words text-slate-400">
+                          {addon.name}
+                        </dt>
+                        <dd className="tabular-nums">
+                          {formatCatalogMoney(addon.amount)}
+                        </dd>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap justify-between gap-3 border-t border-slate-700 pt-4">
+                      <dt className="font-semibold">Quoted total</dt>
+                      <dd className="text-2xl font-semibold tabular-nums text-cyan-200">
+                        {formatUsdFromMinorUnits(
+                          visible.quote.order.amountMinor,
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                  {visible.catalogQuote.differsFromCatalog && (
+                    <p
+                      role="status"
+                      className="mt-4 rounded-lg border border-amber-300/30 p-3 text-sm text-amber-100"
+                    >
+                      The quoted price or terms differ from the catalog shown
+                      when you selected this program. Review the recorded terms
+                      below. This is not a payment.
+                    </p>
+                  )}
+                  <details className="mt-5 rounded-lg border border-slate-700 p-3">
+                    <summary className="cursor-pointer text-sm text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+                      Recorded program settings
+                    </summary>
+                    <h3 className="mt-4 break-words font-semibold">
+                      {visible.catalogQuote.terms.name}
+                    </h3>
+                    <ProgramRules terms={visible.catalogQuote.terms} />
+                    <pre className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-relaxed text-slate-400">
+                      {JSON.stringify(visible.catalogQuote.terms, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={requestQuote}
+                disabled={visible.state === "loading"}
+                className={`${primaryAction} w-full`}
+              >
+                {visible.state === "error" ? (
+                  <RefreshCw size={18} aria-hidden="true" />
+                ) : (
+                  <FileText size={18} aria-hidden="true" />
+                )}
+                {visible.state === "loading"
+                  ? "Requesting server quote…"
+                  : visible.state === "error"
+                    ? "Retry server quote"
+                    : visible.quote
+                      ? "View recorded quote again"
+                      : "Request server quote"}
+              </button>
+              <p className="text-xs leading-relaxed text-slate-400">
+                Retries for an unchanged selection use the same request key.
+                Changing a selection creates a new quote request.
+              </p>
+              <PaymentBoundary />
+              <Link
+                to="/support/create-ticket"
+                className={`${secondaryAction} w-full`}
+              >
+                Ask about availability
+              </Link>
+            </section>
+          </div>
+        </>
+      )}
+    </CatalogPage>
   );
-};
-
-export default Checkout;
+}

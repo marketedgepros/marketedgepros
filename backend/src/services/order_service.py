@@ -13,6 +13,7 @@ from src.models.purchase_order import PurchaseOrder
 from src.models.trading_program import TradingProgram, ProgramAddOn
 from src.models.user import User
 from src.middleware.tenant_middleware import get_tenant_from_request
+from src.services.program_catalog_service import CatalogValidationError, program_price, program_terms
 from src.utils.hierarchy_scoping import without_hierarchy_scope
 
 
@@ -86,9 +87,13 @@ class OrderService:
             # Runtime readiness is independent of an operator's enablement flag.
             # Bind explicitly to public, the frozen migration's owned namespace.
             ready = db.session.execute(text("""
-                SELECT EXISTS (
-                    SELECT 1 FROM public.alembic_version WHERE version_num IN ('20261011_000006', '20261011_000007')
-                ) AND EXISTS (
+                SELECT
+                    (SELECT count(*) FROM public.alembic_version) = 1
+                    AND (SELECT min(version_num) FROM public.alembic_version) IN (
+                        '20261011_000006', '20261011_000007',
+                        '20261011_000008', '20261012_000001'
+                    )
+                    AND EXISTS (
                     SELECT 1 FROM pg_trigger t
                     JOIN pg_class c ON c.oid = t.tgrelid
                     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -101,8 +106,10 @@ class OrderService:
                       AND pn.nspname = 'public' AND p.proname = 'marketedgepros_purchase_orders_immutable'
                       AND p.pronargs = 0 AND p.prorettype = 'trigger'::regtype AND l.lanname = 'plpgsql'
                       AND NOT p.prosecdef AND p.proconfig IS NULL
+                      AND p.proowner = c.relowner
+                      AND p.proowner = (SELECT oid FROM pg_roles WHERE rolname = session_user)
                       AND btrim(p.prosrc, chr(32) || chr(10) || chr(13) || chr(9)) = :body
-                )
+                    )
             """), {'body': "BEGIN\n    RAISE EXCEPTION 'purchase_orders are immutable';\nEND;"}).scalar_one()
             if not ready:
                 raise OrderError('Immutable quote storage is not ready', 'ORDER_STORAGE_NOT_READY', 503)
@@ -165,7 +172,13 @@ class OrderService:
                                            TradingProgram.is_active.is_(True)).with_for_update(read=True).execution_options(populate_existing=True)).scalar_one_or_none()
         if program is None:
             raise OrderError('Program is unavailable', 'PROGRAM_UNAVAILABLE', 404)
-        base = _price(program.price, positive=True)
+        try:
+            # Catalog and quote snapshots share the same stored-term validation
+            # and exact-cent base price representation; neither coerces a row.
+            base = _price(program_price(program), positive=True)
+            terms = program_terms(program)
+        except CatalogValidationError:
+            raise OrderError('Catalog terms are unavailable', 'CATALOG_INVALID', 409) from None
         addons = db.session.execute(select(ProgramAddOn).where(ProgramAddOn.id.in_(addon_ids), ProgramAddOn.program_id == program_id,
                                           ProgramAddOn.is_active.is_(True)).order_by(ProgramAddOn.id).with_for_update(read=True).execution_options(populate_existing=True)).scalars().all() if addon_ids else []
         if len(addons) != len(addon_ids):
@@ -177,6 +190,8 @@ class OrderService:
             if addon.price_type == 'fixed':
                 line = value
             elif addon.price_type == 'percentage':
+                if value > Decimal('100'):
+                    raise OrderError('Add-on pricing is unspecified', 'CATALOG_INVALID', 409)
                 line = (base * value / Decimal(100)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             else:
                 raise OrderError('Add-on pricing is unspecified', 'CATALOG_INVALID', 409)
@@ -186,11 +201,6 @@ class OrderService:
         total = _price(total, positive=True).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         if total <= 0:
             raise OrderError('Quote must be positive', 'CATALOG_INVALID', 409)
-        terms = {field: getattr(program, field) for field in ('name', 'type', 'description', 'payout_mode')}
-        for field in ('account_size', 'profit_target', 'max_daily_loss', 'max_total_loss', 'profit_split', 'profit_split_percentage', 'minimum_payout_amount'):
-            value = getattr(program, field)
-            terms[field] = str(value) if value is not None else None
-        terms['rules'] = deepcopy(program.rules)
         snapshot = {'schema': 1, 'kind': 'purchase_quote', 'user_id': user.id, 'tenant_id': brand.id, 'program_id': program_id,
                     'currency': 'USD', 'base_amount': _money(base), 'addons': line_items, 'amount': _money(total),
                     'rounding': 'USD cents; ROUND_HALF_UP per add-on line', 'terms': terms,

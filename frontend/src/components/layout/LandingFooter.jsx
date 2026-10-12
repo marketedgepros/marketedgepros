@@ -113,19 +113,12 @@ export default function LandingFooter() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
               <h3 className="text-white font-semibold mb-2">Stay Updated</h3>
-              <p className="text-gray-400 text-sm">Get the latest news and updates delivered to your inbox.</p>
+              <p className="text-gray-400 text-sm">Newsletter subscriptions are not available. Contact us for current information.</p>
             </div>
-            <div className="flex w-full md:w-auto">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 md:w-64 px-4 py-2 bg-white/5 border border-white/10 rounded-l-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
-              />
-              <button className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-r-lg text-white font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center">
+            <Link to="/contact" className="inline-flex max-w-full items-center rounded-lg bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
                 <Mail size={18} className="mr-2" />
-                Subscribe
-              </button>
-            </div>
+                Contact us
+            </Link>
           </div>
         </div>
       </div>

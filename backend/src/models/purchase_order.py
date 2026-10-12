@@ -32,6 +32,7 @@ class PurchaseOrder(db.Model):
     def to_dict(self):
         import json
         return {'id': self.id, 'program_id': self.program_id,
+                'user_id': self.user_id, 'tenant_id': self.tenant_id,
                 'amount_minor': self.amount_minor, 'amount': format(Decimal(self.amount_minor) / 100, '.2f'),
                 'currency': self.currency, 'state': self.state, 'paid': False,
                 'snapshot': json.loads(self.snapshot_json), 'snapshot_hash': self.snapshot_hash,

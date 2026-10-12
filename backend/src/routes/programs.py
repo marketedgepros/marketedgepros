@@ -4,6 +4,11 @@ Trading Programs routes
 from flask import Blueprint, request, jsonify, g
 from src.database import db
 from src.models import TradingProgram, ProgramAddOn, Challenge
+from src.services.program_catalog_service import (
+    ProgramCatalogError,
+    ProgramCatalogNotFound,
+    ProgramCatalogService,
+)
 from src.utils.decorators import token_required, role_required, tenant_required
 
 programs_bp = Blueprint('programs', __name__)
@@ -11,37 +16,30 @@ programs_bp = Blueprint('programs', __name__)
 
 @programs_bp.route('/', methods=['GET'])
 def get_programs():
-    """Get all active trading programs"""
-    # Get tenant_id from query params (for white label)
-    tenant_id = request.args.get('tenant_id', type=int)
-    
-    query = TradingProgram.query.filter_by(is_active=True)
-    
-    if tenant_id:
-        query = query.filter_by(tenant_id=tenant_id)
-    
-    programs = query.all()
-    
-    return jsonify({
-        'programs': [p.to_dict() for p in programs]
-    }), 200
+    """Return only active offers owned by the configured launch brand."""
+    try:
+        return jsonify({'programs': ProgramCatalogService.list_programs()}), 200
+    except ProgramCatalogError:
+        # Configuration and stored-row failures are intentionally non-disclosing.
+        return jsonify({
+            'error': 'Program catalog is unavailable',
+            'code': 'CATALOG_UNAVAILABLE',
+        }), 503
 
 
 @programs_bp.route('/<int:program_id>', methods=['GET'])
 def get_program(program_id):
-    """Get specific trading program"""
-    program = TradingProgram.query.get_or_404(program_id)
-    
-    # Get add-ons
-    addons = ProgramAddOn.query.filter_by(
-        program_id=program_id,
-        is_active=True
-    ).all()
-    
-    response = program.to_dict()
-    response['addons'] = [addon.to_dict() for addon in addons]
-    
-    return jsonify(response), 200
+    """Return one active configured-brand offer and its bounded active add-ons."""
+    try:
+        return jsonify(ProgramCatalogService.get_program(program_id)), 200
+    except ProgramCatalogNotFound:
+        # Foreign, inactive, and missing IDs are deliberately indistinguishable.
+        return jsonify({'error': 'Resource not found'}), 404
+    except ProgramCatalogError:
+        return jsonify({
+            'error': 'Program catalog is unavailable',
+            'code': 'CATALOG_UNAVAILABLE',
+        }), 503
 
 
 @programs_bp.route('/', methods=['POST'])

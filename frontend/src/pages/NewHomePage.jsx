@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SchemaMarkup from "../components/seo/SchemaMarkup";
 import { Link } from 'react-router-dom';
-import api from "../services/api";
+import CatalogPreview from '../components/programs/CatalogPreview';
 import Layout from '../components/layout/Layout';
 
 const NewHomePage = () => {
-  const [programs, setPrograms] = useState([]);
-  const [selectedPhase, setSelectedPhase] = useState('two');
   const [stats, setStats] = useState({
     countries: 0,
     capital: 0,
@@ -37,70 +35,6 @@ const NewHomePage = () => {
       };
       img.src = src;
     });
-  }, []);
-
-  // Fetch programs
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        const response = await api.get('/programs/');
-        const apiPrograms = response.data.programs || [];
-        
-        // If API returns empty, use static fallback
-        if (apiPrograms.length === 0) {
-          setPrograms([
-            // One Phase
-            { id: 1, account_size: 10000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-            { id: 2, account_size: 25000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-            { id: 3, account_size: 50000, profit_target: 8, max_daily_loss: 5, profit_split: 85, phases: 1 },
-            { id: 4, account_size: 100000, profit_target: 8, max_daily_loss: 5, profit_split: 90, phases: 1 },
-            // Two Phase
-            { id: 5, account_size: 10000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-            { id: 6, account_size: 25000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-            { id: 7, account_size: 50000, profit_target: 10, max_daily_loss: 5, profit_split: 85, phases: 2 },
-            { id: 8, account_size: 100000, profit_target: 10, max_daily_loss: 5, profit_split: 90, phases: 2 },
-            // Three Phase
-            { id: 9, account_size: 10000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-            { id: 10, account_size: 25000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-            { id: 11, account_size: 50000, profit_target: 12, max_daily_loss: 4, profit_split: 80, phases: 3 },
-            { id: 12, account_size: 100000, profit_target: 12, max_daily_loss: 4, profit_split: 85, phases: 3 },
-            // Instant Funding
-            { id: 13, account_size: 5000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-            { id: 14, account_size: 10000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-            { id: 15, account_size: 25000, profit_target: 0, max_daily_loss: 3, profit_split: 60, instant_funding: true },
-            { id: 16, account_size: 50000, profit_target: 0, max_daily_loss: 3, profit_split: 70, instant_funding: true },
-          ]);
-        } else {
-          setPrograms(apiPrograms);
-        }
-      } catch (error) {
-        console.error('Error fetching programs:', error);
-        // Fallback to static programs on error
-        setPrograms([
-          // One Phase
-          { id: 1, account_size: 10000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-          { id: 2, account_size: 25000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-          { id: 3, account_size: 50000, profit_target: 8, max_daily_loss: 5, profit_split: 85, phases: 1 },
-          { id: 4, account_size: 100000, profit_target: 8, max_daily_loss: 5, profit_split: 90, phases: 1 },
-          // Two Phase
-          { id: 5, account_size: 10000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-          { id: 6, account_size: 25000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-          { id: 7, account_size: 50000, profit_target: 10, max_daily_loss: 5, profit_split: 85, phases: 2 },
-          { id: 8, account_size: 100000, profit_target: 10, max_daily_loss: 5, profit_split: 90, phases: 2 },
-          // Three Phase
-          { id: 9, account_size: 10000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-          { id: 10, account_size: 25000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-          { id: 11, account_size: 50000, profit_target: 12, max_daily_loss: 4, profit_split: 80, phases: 3 },
-          { id: 12, account_size: 100000, profit_target: 12, max_daily_loss: 4, profit_split: 85, phases: 3 },
-          // Instant Funding
-          { id: 13, account_size: 5000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-          { id: 14, account_size: 10000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-          { id: 15, account_size: 25000, profit_target: 0, max_daily_loss: 3, profit_split: 60, instant_funding: true },
-          { id: 16, account_size: 50000, profit_target: 0, max_daily_loss: 3, profit_split: 70, instant_funding: true },
-        ]);
-      }
-    };
-    fetchPrograms();
   }, []);
 
   // Animated counter
@@ -154,14 +88,6 @@ const NewHomePage = () => {
       }
     }, stepDuration);
   };
-
-  const filteredPrograms = Array.isArray(programs) ? programs.filter(p => {
-    if (selectedPhase === 'one') return p.type === 'one_phase' || p.phases === 1;
-    if (selectedPhase === 'two') return p.type === 'two_phase' || p.phases === 2;
-    if (selectedPhase === 'three') return p.type === 'three_phase' || p.phases === 3;
-    if (selectedPhase === 'instant') return p.type === 'instant_funding' || p.instant_funding;
-    return false;
-  }).sort((a, b) => (a.account_size || 0) - (b.account_size || 0)) : [];
 
   return (
     <Layout>
@@ -354,83 +280,7 @@ const NewHomePage = () => {
               </h2>
             </div>
 
-            {/* Phase Tabs */}
-            <div className="flex flex-wrap justify-center gap-4 mb-16">
-              <button
-                onClick={() => setSelectedPhase('one')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'one'
-                    ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-2xl shadow-cyan-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                1️⃣ One Phase
-              </button>
-              <button
-                onClick={() => setSelectedPhase('two')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'two'
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-2xl shadow-purple-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                2️⃣ Two Phase
-              </button>
-              <button
-                onClick={() => setSelectedPhase('three')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'three'
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-2xl shadow-orange-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                3️⃣ Three Phase
-              </button>
-              <button
-                onClick={() => setSelectedPhase('instant')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'instant'
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-2xl shadow-blue-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                4️⃣ Instant Funding
-              </button>
-            </div>
-
-            {/* Programs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredPrograms.map((program) => (
-                <div
-                  key={program.id}
-                  className="group relative bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/30"
-                >
-                  <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 mb-4">
-                    ${(program.account_size / 1000).toFixed(0)}K
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Profit Target:</span>
-                      <span className="text-white font-semibold">{program.profit_target}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Max Daily Loss:</span>
-                      <span className="text-white font-semibold">{program.max_daily_loss}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Profit Split:</span>
-                      <span className="text-cyan-400 font-bold">{program.profit_split}%</span>
-                    </div>
-                  </div>
-                  <Link
-                    to={`/programs/${program.id}`}
-                    className="mt-6 block w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full text-center font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50"
-                  >
-                    Get Started
-                  </Link>
-                </div>
-              ))}
-            </div>
+            <CatalogPreview />
           </div>
         </section>
 
