@@ -28,6 +28,7 @@ const hookStub = new URL(
   import.meta.url,
 );
 
+const selectorTarget = new URL(`../node_modules/.ui5-selector-${process.pid}.mjs`, import.meta.url);
 let components;
 let CatalogPreview;
 try {
@@ -56,13 +57,20 @@ try {
   });
   fs.writeFileSync(uiTarget, compiledUi.code);
 
+  const selectorSource = fs.readFileSync(new URL('../src/components/programs/ProgramSelector.jsx', import.meta.url), 'utf8')
+    .replace(/import ['"][^'"]+\.css['"];?/, '')
+    .replace(/['"]\.\/CatalogUI['"]/, JSON.stringify(uiTarget.href))
+    .replace(/['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/, JSON.stringify(new URL('../src/services/programCatalogViewService.js', import.meta.url).href));
+  const compiledSelector = await transformWithEsbuild(selectorSource, 'ProgramSelector.jsx', { loader: 'jsx', jsx: 'automatic' });
+  fs.writeFileSync(selectorTarget, compiledSelector.code);
   const previewSource = fs
     .readFileSync(previewFile, "utf8")
     .replace(
       /['"]\.\.\/\.\.\/hooks\/useProgramCatalog['"]/,
       JSON.stringify(hookStub.href),
     )
-    .replace(/['"]\.\/CatalogUI['"]/, JSON.stringify(uiTarget.href));
+    .replace(/['"]\.\/CatalogUI['"]/, JSON.stringify(uiTarget.href))
+    .replace(/['"]\.\/ProgramSelector['"]/, JSON.stringify(selectorTarget.href));
   const compiledPreview = await transformWithEsbuild(
     previewSource,
     previewFile.pathname,
@@ -74,6 +82,7 @@ try {
   CatalogPreview = (await import(`${previewTarget.href}?ui5=${process.pid}`))
     .default;
 } finally {
+  fs.rmSync(selectorTarget, { force: true });
   fs.rmSync(uiTarget, { force: true });
   fs.rmSync(previewTarget, { force: true });
   fs.rmSync(hookStub, { force: true });

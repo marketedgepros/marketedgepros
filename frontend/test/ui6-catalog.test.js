@@ -93,9 +93,16 @@ uiSource = uiSource
 const catalogUi = await compile('catalog-ui', uiSource);
 const catalogUiUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('catalog-ui-')))).href;
 
+let selectorSource = fs.readFileSync(src('components', 'programs', 'ProgramSelector.jsx'), 'utf8').replace(/import ['"][^'"]+\.css['"];?/, '');
+selectorSource = replaceModule(selectorSource, './CatalogUI', catalogUiUrl);
+selectorSource = replaceModule(selectorSource, '../../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
+const ProgramSelector = (await compile('program-selector', selectorSource)).default;
+const selectorUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-selector-')))).href;
+
 let previewSource = fs.readFileSync(src('components', 'programs', 'CatalogPreview.jsx'), 'utf8');
 previewSource = replaceModule(previewSource, '../../hooks/useProgramCatalog', hookUrl);
 previewSource = replaceModule(previewSource, './CatalogUI', catalogUiUrl);
+previewSource = replaceModule(previewSource, './ProgramSelector', selectorUrl);
 const CatalogPreview = (await compile('catalog-preview', previewSource)).default;
 const previewUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('catalog-preview-')))).href;
 
@@ -103,6 +110,7 @@ let programsSource = fs.readFileSync(src('pages', 'ProgramsNew.jsx'), 'utf8');
 programsSource = replaceModule(programsSource, '../hooks/useProgramCatalog', hookUrl);
 programsSource = replaceModule(programsSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
 programsSource = replaceModule(programsSource, '../components/programs/CatalogUI', catalogUiUrl);
+programsSource = replaceModule(programsSource, '../components/programs/ProgramSelector', selectorUrl);
 const ProgramsNew = (await compile('programs-new', programsSource)).default;
 
 let detailsSource = fs.readFileSync(src('pages', 'ProgramDetails.jsx'), 'utf8');
@@ -129,6 +137,7 @@ lightningSource = replaceModule(lightningSource, '../components/programs/Catalog
 const LightningChallenge = (await compile('lightning-challenge', lightningSource)).default;
 
 const api = (await import(srcUrl('services', 'api.js'))).default;
+const { normalizeCatalogList } = await import(srcUrl('services', 'programCatalogViewService.js'));
 
 function terms(name, type) {
   return {
@@ -143,6 +152,17 @@ function program(id = 12, type = 'two_phase', name = 'Two phase synthetic') {
   return {
     ...value, id, tenant_id: 1, currency: 'USD', price: '199.99', is_active: true, terms: value,
     addons: [{ id: 9, program_id: id, name: 'Synthetic add-on', description: 'Synthetic option', price: '2.50', price_type: 'percentage', benefits: {}, is_active: true }],
+  };
+}
+function selectorProgram(id, { name, type, accountSize, price }) {
+  const value = terms(name, type);
+  value.account_size = accountSize;
+  value.profit_target = null;
+  value.max_daily_loss = null;
+  value.max_total_loss = null;
+  value.profit_split = null;
+  return {
+    ...value, id, tenant_id: 1, currency: 'USD', price, is_active: true, terms: value,
   };
 }
 const listFixture = () => ({ programs: [program(12, 'two_phase', 'Two phase synthetic'), program(13, 'lightning', 'Lightning synthetic')] });
@@ -262,9 +282,10 @@ test('UI6 catalog: Programs DOM loads via a signal-bound synthetic catalog, filt
     assert.equal(comparison.getAttribute('href'), '#program-comparison');
     assert.ok(harness.host.querySelector('#program-comparison'), 'the hash target is a real DOM element');
 
-    await click(button(harness.host, 'Two phase'));
+    const comparisonFilter = harness.host.querySelector('[aria-label="Filter by program type"]');
+    await click(button(comparisonFilter, 'Two phase'));
     assert.equal(harness.host.querySelector('[data-location]').textContent, '/programs?filter=two_phase');
-    assert.equal(button(harness.host, 'Two phase').getAttribute('aria-pressed'), 'true');
+    assert.equal(button(comparisonFilter, 'Two phase').getAttribute('aria-pressed'), 'true');
     assert.equal(harness.host.textContent.includes('Lightning synthetic'), false, 'filter changes the rendered cards rather than a source-only value');
 
     const detail = anchor(harness.host, 'View rules & options');
@@ -303,6 +324,75 @@ test('UI6 catalog: Programs DOM loads via a signal-bound synthetic catalog, filt
     await waitFor(() => harness.host.textContent.includes('Two phase synthetic'), 'permitted public catalog remount');
     assert.match(harness.host.innerHTML, /(?:sm|md|xl):/, 'the shared catalog DOM retains its responsive layout classes');
     assert.ok(calls.every((config) => config.url === '/programs/' && config.method === 'get'), 'catalog UI issued no write or provider activation');
+  } finally {
+    api.defaults.adapter = previousAdapter;
+    await harness.close();
+  }
+});
+
+test('UI6 catalog: ProgramSelector uses normalized props without mutation, preserves duplicate choices, and discards stale selections', { concurrency: false }, async () => {
+  const harness = installDom('/programs');
+  const initialPrograms = Object.freeze(normalizeCatalogList({ programs: [
+    selectorProgram(21, { name: 'Custom Duplicate A', type: 'custom_route', accountSize: '25000.00', price: '199.99' }),
+    selectorProgram(22, { name: 'Custom Duplicate B', type: 'custom_route', accountSize: '25000.00', price: '299.99' }),
+    selectorProgram(23, { name: 'Custom Fifty', type: 'custom_route', accountSize: '50000.00', price: '399.99' }),
+    selectorProgram(24, { name: 'One phase fixture', type: 'one_phase', accountSize: '10000.00', price: '109.99' }),
+  ] }));
+  const inputOrder = initialPrograms.map((program) => program.id);
+  const replacementPrograms = Object.freeze(normalizeCatalogList({ programs: [
+    selectorProgram(29, { name: 'Fresh replacement', type: 'fresh_type', accountSize: '15000.00', price: '149.99' }),
+  ] }));
+  try {
+    await renderRouter(harness, h(ProgramSelector, { programs: initialPrograms }), '/programs', 'program-selector');
+    await waitFor(() => harness.host.querySelector('[data-selected-program-id="21"]'), 'initial normalized selection');
+    assert.equal(button(harness.host, 'custom route').getAttribute('aria-pressed'), 'true', 'an unknown normalized type remains a selectable type');
+    assert.match(harness.host.textContent, /Not specified/, 'NULL rules are rendered by ProgramRules, not coerced to zero');
+
+    const duplicateGroup = harness.host.querySelector('[aria-label="Program chooser: choose matching program"]');
+    assert.ok(duplicateGroup, 'duplicate type/size records retain a dedicated selection group');
+    await click(button(duplicateGroup, 'Custom Duplicate B #22'));
+    await waitFor(() => harness.host.querySelector('[data-selected-program-id="22"]'), 'duplicate program selection');
+    assert.equal(anchor(harness.host, 'Review selected program').getAttribute('href'), '/programs/22', 'the selected card retains its concrete program route');
+    assert.match(harness.host.textContent, /USD 299\.99/, 'the selected duplicate uses its exact catalog price');
+
+    await click(button(harness.host, 'USD 50,000.00'));
+    await waitFor(() => harness.host.querySelector('[data-selected-program-id="23"]'), 'account size selection');
+    await click(button(harness.host, 'One phase'));
+    await waitFor(() => harness.host.querySelector('[data-selected-program-id="24"]'), 'type selection');
+    assert.deepEqual(initialPrograms.map((program) => program.id), inputOrder, 'selector interactions never sort or mutate the supplied normalized list');
+
+    await renderRouter(harness, h(ProgramSelector, { programs: replacementPrograms }), '/programs', 'program-selector');
+    await waitFor(() => harness.host.querySelector('[data-selected-program-id="29"]'), 'fresh prop selection');
+    assert.equal(harness.host.textContent.includes('One phase fixture'), false, 'a removed selected ID never renders as a stale foreign card');
+    assert.equal(anchor(harness.host, 'Review selected program').getAttribute('href'), '/programs/29');
+
+    await renderRouter(harness, h(ProgramSelector, { programs: [] }), '/programs', 'program-selector');
+    await waitFor(() => !harness.host.querySelector('[data-program-selector]'), 'empty selector props');
+    assert.equal(harness.host.querySelector('[data-selected-program-id]'), null, 'empty data does not retain a selected card');
+  } finally {
+    await harness.close();
+  }
+});
+
+test('UI6 catalog: CatalogPreview keeps its default card list and interactive selection makes no additional catalog read', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/');
+  const calls = [];
+  api.defaults.adapter = async (config) => {
+    calls.push(config);
+    assert.equal(config.method, 'get');
+    assert.equal(config.url, '/programs/');
+    return response(config, listFixture());
+  };
+  try {
+    globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
+    await renderRouter(harness, h(CatalogPreview, { interactive: true }), '/', 'interactive-preview');
+    await waitFor(() => harness.host.querySelector('[data-program-selector]'), 'interactive preview selector');
+    assert.equal(harness.host.querySelectorAll('[data-selected-program-id]').length, 1, 'interactive preview renders one current selected card');
+    await click(button(harness.host, 'Lightning'));
+    await waitFor(() => harness.host.querySelector('[data-selected-program-id="13"]'), 'interactive preview type selection');
+    assert.equal(anchor(harness.host, 'Review selected program').getAttribute('href'), '/programs/13');
+    assert.equal(calls.length, 1, 'changing an interactive selection only consumes the already-loaded catalog result');
   } finally {
     api.defaults.adapter = previousAdapter;
     await harness.close();

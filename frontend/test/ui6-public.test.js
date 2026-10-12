@@ -83,10 +83,12 @@ const apiStub = writeModule('api.mjs', `export default { get: (...args) => globa
 const catalogHookStub = writeModule('catalog-hook.mjs', `export default function useProgramCatalog() { return globalThis.__ui6Catalog; }`);
 const catalogUiStub = writeModule('catalog-ui.mjs', `
   import React from ${JSON.stringify(dependencies.get('react'))};
+  export const primaryAction = 'ui6-primary-action';
   export const secondaryAction = 'ui6-secondary-action';
   export const CatalogCard = ({ program }) => React.createElement('article', { 'data-catalog-card': program.id }, program.name);
   export const CatalogState = ({ loading, error, empty }) => React.createElement('p', { 'data-catalog-state': loading ? 'loading' : error ? 'error' : empty ? 'empty' : 'ready' }, loading ? 'Catalog loading' : error ? 'Catalog unavailable' : 'Catalog empty');
   export const PaymentBoundary = () => React.createElement('p', { 'data-payment-boundary': 'true' }, 'Payments unavailable');
+  export const ProgramRules = () => React.createElement('dl', { 'data-program-rules': 'true' });
 `);
 
 const replaceLayout = (text) => text.replace(/import Layout from ['"][^'"]+\/components\/layout\/Layout['"];?/, `import Layout from ${JSON.stringify(layoutStub)};`);
@@ -100,10 +102,23 @@ const withoutArticleLibraries = (text) => text
   .replace(/import ReactMarkdown from ['"]react-markdown['"];?/, 'const ReactMarkdown = ({ children }) => <div>{children}</div>;')
   .replace(/import DOMPurify from ['"]isomorphic-dompurify['"];?/, 'const DOMPurify = { sanitize: (value) => value };');
 
+await compile('components/programs/ProgramSelector.jsx', 'program-selector', (text) => text
+  .replace(/import ['"][^'"]+\.css['"];?/, '')
+  .replace(/import \{ ProgramRules, primaryAction \} from ['"]\.\/CatalogUI['"];?/, `import { ProgramRules, primaryAction } from ${JSON.stringify(catalogUiStub)};`)
+  .replace(/from ['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/, `from ${JSON.stringify(pathToFileURL(source('services', 'programCatalogViewService.js')).href)}`));
+const programSelectorUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-selector-')))).href;
+
+const revealUrl = writeModule('premium-reveal.mjs', externalize(fs.readFileSync(source('hooks', 'useScrollReveal.js'), 'utf8')));
+const ambientUrl = writeModule('premium-ambient.mjs', externalize(fs.readFileSync(source('hooks', 'useAmbientMotion.js'), 'utf8').replace("'./useScrollReveal'", JSON.stringify(revealUrl))));
+const showcaseSource = fs.readFileSync(source('components', 'visual', 'PlatformShowcase.jsx'), 'utf8');
+const showcaseCode = await transformWithEsbuild(externalize(showcaseSource), 'PlatformShowcase.jsx', { loader: 'jsx', jsx: 'automatic', format: 'esm' });
+const showcaseUrl = writeModule('premium-showcase.mjs', externalize(showcaseCode.code));
 const pages = {
   Home: (await compile('pages/NewHomePage.jsx', 'home', (text) => withoutHomepageVisuals(replaceLayout(text)
     .replace(/import SchemaMarkup from ['"][^'"]+SchemaMarkup['"];?/, `import SchemaMarkup from ${JSON.stringify(noOpStub)};`)
-    .replace(/import CatalogPreview from ['"][^'"]+CatalogPreview['"];?/, `import CatalogPreview from ${JSON.stringify(noOpStub)};`)))).default,
+    .replace(/import CatalogPreview from ['"][^'"]+CatalogPreview['"];?/, `import CatalogPreview from ${JSON.stringify(noOpStub)};`)
+    .replace(/import useAmbientMotion from ['"][^'"]+useAmbientMotion['"];?/, `import useAmbientMotion from ${JSON.stringify(ambientUrl)};`)
+    .replace(/import PlatformShowcase from ['"][^'"]+PlatformShowcase['"];?/, `import PlatformShowcase from ${JSON.stringify(showcaseUrl)};`)))).default,
   About: (await compile('pages/AboutUs.jsx', 'about', replaceLayout)).default,
   How: (await compile('pages/HowItWorks.jsx', 'how', replaceLayout)).default,
   FAQ: (await compile('pages/FAQ.jsx', 'faq', (text) => replaceLayout(text).replace(/import StructuredData from ['"][^'"]+StructuredData['"];?/, `import StructuredData from ${JSON.stringify(noOpStub)};`))).default,
@@ -122,6 +137,7 @@ const pages = {
   Careers: (await compile('pages/Careers.jsx', 'careers', replaceLayout)).default,
   CatalogPreview: (await compile('components/programs/CatalogPreview.jsx', 'catalog-preview', (text) => text
     .replace(/import useProgramCatalog from ['"][^'"]+useProgramCatalog['"];?/, `import useProgramCatalog from ${JSON.stringify(catalogHookStub)};`)
+    .replace(/import ProgramSelector from ['"]\.\/ProgramSelector['"];?/, `import ProgramSelector from ${JSON.stringify(programSelectorUrl)};`)
     .replace(/import\s+\{[^}]+\}\s+from ['"]\.\/CatalogUI['"];?/, `import { CatalogCard, CatalogState, PaymentBoundary, secondaryAction } from ${JSON.stringify(catalogUiStub)};`))).default,
   SEO: (await compile('components/SEO.jsx', 'seo', (text) => text
     .replace("import { Helmet } from 'react-helmet-async';", `import HelmetPackage from ${JSON.stringify(dependencyUrl('react-helmet-async'))}; const { Helmet } = HelmetPackage;`)

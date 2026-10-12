@@ -16,6 +16,7 @@ import {
   panelStyle,
   secondaryAction,
 } from "../components/programs/CatalogUI";
+import ProgramSelector from "../components/programs/ProgramSelector";
 
 export default function ProgramsNew() {
   const catalog = useProgramCatalog();
@@ -101,6 +102,11 @@ export default function ProgramsNew() {
           </ol>
         </aside>
       </header>
+      {!catalog.loading && !catalog.error && programs.length > 0 && (
+        <section className="mb-10" aria-label="Program chooser">
+          <ProgramSelector programs={programs} />
+        </section>
+      )}
       <section
         id="program-comparison"
         className="scroll-mt-24"
@@ -118,22 +124,27 @@ export default function ProgramsNew() {
           </div>
         </div>
         {!catalog.loading && !catalog.error && programs.length > 0 && (
-          <div
-            className="mb-7 flex flex-wrap gap-2"
-            role="group"
-            aria-label="Filter by program type"
-          >
-            {["all", ...types].map((type) => (
-              <button
-                type="button"
-                key={type}
-                aria-pressed={activeType === type}
-                onClick={() => setSelectedType(type)}
-                className={`${secondaryAction} ${activeType === type ? "border-cyan-400 bg-cyan-400/10 text-cyan-200" : ""}`}
-              >
-                {type === "all" ? "All programs" : typeLabel(type)}
-              </button>
-            ))}
+          <div className="mb-7">
+            <p className="mb-3 text-sm font-medium text-slate-300">
+              Filter the full comparison
+            </p>
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="Filter by program type"
+            >
+              {["all", ...types].map((type) => (
+                <button
+                  type="button"
+                  key={type}
+                  aria-pressed={activeType === type}
+                  onClick={() => setSelectedType(type)}
+                  className={`${secondaryAction} ${activeType === type ? "border-cyan-400 bg-cyan-400/10 text-cyan-200" : ""}`}
+                >
+                  {type === "all" ? "All programs" : typeLabel(type)}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {catalog.loading || catalog.error || !programs.length ? (

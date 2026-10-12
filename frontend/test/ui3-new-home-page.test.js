@@ -11,7 +11,7 @@ test('homepage retains the existing layout, metadata component, catalog source a
   assert.match(source, /import SchemaMarkup from/);
   assert.match(source, /import CatalogPreview from/);
   assert.match(source, /import Layout from/);
-  assert.match(source, /<Layout>[\s\S]*<SchemaMarkup\s*\/>[\s\S]*<CatalogPreview\s*\/>[\s\S]*<\/Layout>/);
+  assert.match(source, /<Layout>[\s\S]*<SchemaMarkup\s*\/>[\s\S]*<CatalogPreview\s+interactive\s*\/>[\s\S]*<\/Layout>/);
   for (const route of ['/programs', '/how-it-works', '/faq', '/support']) {
     assert.ok(source.includes(`to="${route}"`), `expected supported navigation to ${route}`);
   }
