@@ -20,9 +20,18 @@ users_bp = Blueprint('users', __name__)
 @token_required
 def get_user_dashboard():
     """Return a bounded view of the caller's locally recorded legacy rows."""
-    try:
-        user = g.current_user
+    user = g.current_user
+    tenant_id = user.tenant_id
+    # Do not infer a brand from a challenge or its program.  Refuse before any
+    # dashboard-resource SQL when the authenticated principal lacks a tenant.
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
 
+    owner_context = {'user_id': user.id, 'tenant_id': tenant_id}
+    try:
         def decimal_string(value):
             """Preserve finite legacy Numeric values without float conversion."""
             if value is None or isinstance(value, bool):
@@ -50,7 +59,7 @@ def get_user_dashboard():
                 .join(TradingProgram, Challenge.program_id == TradingProgram.id)
                 .filter(
                     Challenge.user_id == user.id,
-                    TradingProgram.tenant_id == user.tenant_id,
+                    TradingProgram.tenant_id == tenant_id,
                 )
                 .one()
             )
@@ -69,7 +78,7 @@ def get_user_dashboard():
                 .options(joinedload(Challenge.program))
                 .filter(
                     Challenge.user_id == user.id,
-                    TradingProgram.tenant_id == user.tenant_id,
+                    TradingProgram.tenant_id == tenant_id,
                 )
                 .order_by(desc(Challenge.created_at), desc(Challenge.id))
                 .limit(5)
@@ -87,6 +96,7 @@ def get_user_dashboard():
                 profit = decimal_string(Decimal(current_balance) - Decimal(initial_balance))
             recent_rows.append({
                 'id': challenge.id,
+                'user_id': user.id,
                 'program_name': challenge.program.name if challenge.program else None,
                 'status': challenge.status,
                 'status_data_status': 'recorded_not_verified',
@@ -100,21 +110,21 @@ def get_user_dashboard():
                     'recorded_not_verified'
                     if profit is not None else 'unavailable_missing_recorded_balance'
                 ),
+                # Challenge records have no source currency column.
+                'currency': None,
                 # There is no approved dashboard target/provenance contract.
                 'progress': None,
                 'progress_data_status': 'unavailable_no_approved_rule_source',
                 'created_at': challenge.created_at.isoformat() if challenge.created_at else None,
             })
-        
+
         return jsonify({
+            'owner_context': owner_context,
             'user': {
                 'id': user.id,
-                'email': user.email,
+                'tenant_id': tenant_id,
                 'first_name': user.first_name,
-                'last_name': user.last_name,
                 'role': user.role,
-                'kyc_status': user.kyc_status,
-                'is_verified': user.is_verified
             },
             'statistics': {
                 'status_counts': status_counts,
@@ -139,7 +149,7 @@ def get_user_dashboard():
                 'provider_verification': 'not_available',
             },
         }), 200
-        
+
     except Exception:
         try:
             db.session.rollback()

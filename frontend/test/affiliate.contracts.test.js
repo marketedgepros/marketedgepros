@@ -22,6 +22,8 @@ function adapterResponse(config, data) {
   };
 }
 
+const dashboardOwner = { user_id: 7, tenant_id: 3 };
+
 test('affiliate pages use only current-account API URLs and map their supported mock responses', async () => {
   const originalAdapter = api.defaults.adapter;
   const requests = [];
@@ -60,17 +62,22 @@ test('affiliate pages use only current-account API URLs and map their supported 
     }
     if (config.url === AFFILIATE_VIEW_ENDPOINTS.dashboard) {
       return adapterResponse(config, {
+        owner_context: dashboardOwner,
         stats: {
           total_clicks: 120,
           total_conversions: 8,
-          total_revenue: 1200,
-          total_commission: 360,
-          conversion_rate: 6.67,
-          pending_commission: 30,
-          approved_commission: 90,
-          paid_commission: 240,
+          total_revenue: '1200.00',
+          total_commission: '360.00',
+          pending_commission: '30.00',
+          approved_commission: '90.00',
+          paid_commission: '240.00',
+          available_for_payout: null,
+          payouts_enabled: false,
+          commission_verification: 'unverified_legacy',
+          currency: null,
         },
         links: [],
+        link_pagination: { total: 0, limit: 50, truncated: false },
         recent_referrals: [],
       });
     }
@@ -81,7 +88,7 @@ test('affiliate pages use only current-account API URLs and map their supported 
     const [referrals, commissions, dashboard] = await Promise.all([
       loadAffiliateReferrals(),
       loadAffiliateCommissions(),
-      loadAffiliateDashboard(),
+      loadAffiliateDashboard({ expectedOwner: dashboardOwner }),
     ]);
 
     assert.deepEqual(requests, [
@@ -112,45 +119,55 @@ test('affiliate pages use only current-account API URLs and map their supported 
     assert.deepEqual(dashboard.stats, {
       totalClicks: 120,
       totalConversions: 8,
-      totalRevenue: 1200,
-      totalCommission: 360,
-      conversionRate: 6.67,
-      pendingCommission: 30,
-      approvedCommission: 90,
-      paidCommission: 240,
+      totalRevenue: '1200.00',
+      totalCommission: '360.00',
+      pendingCommission: '30.00',
+      approvedCommission: '90.00',
+      paidCommission: '240.00',
+      availableForPayout: null,
+      payoutsEnabled: false,
+      commissionVerification: 'unverified_legacy',
+      currency: null,
     });
+    assert.deepEqual(dashboard.ownerContext, dashboardOwner);
   } finally {
     api.defaults.adapter = originalAdapter;
   }
 });
 
-test('affiliate view contracts reject malformed payloads and preserve unavailable scalar values', () => {
+test('affiliate dashboard contracts reject missing owner, malformed amounts, and unsupported flags', () => {
   assert.throws(
     () => mapAffiliateDashboard({ stats: null, links: [], recent_referrals: [] }),
     AffiliateViewContractError,
   );
 
-  const dashboard = mapAffiliateDashboard({
+  const dashboardPayload = {
+    owner_context: dashboardOwner,
     stats: {
-      total_clicks: null,
-      total_conversions: '',
-      total_revenue: undefined,
-      total_commission: false,
-      conversion_rate: 0,
+      total_clicks: 0,
+      total_conversions: 0,
+      total_revenue: null,
+      total_commission: null,
       pending_commission: null,
-      approved_commission: '',
-      paid_commission: undefined,
+      approved_commission: null,
+      paid_commission: null,
+      available_for_payout: null,
+      payouts_enabled: false,
+      commission_verification: 'unverified_legacy',
+      currency: null,
     },
     links: [],
+    link_pagination: { total: 0, limit: 50, truncated: false },
     recent_referrals: [],
-  });
+  };
 
-  assert.equal(dashboard.stats.totalClicks, null);
-  assert.equal(dashboard.stats.totalConversions, null);
-  assert.equal(dashboard.stats.totalRevenue, null);
-  assert.equal(dashboard.stats.totalCommission, null);
-  assert.equal(dashboard.stats.conversionRate, 0);
-  assert.equal(dashboard.stats.pendingCommission, null);
-  assert.equal(dashboard.stats.approvedCommission, null);
-  assert.equal(dashboard.stats.paidCommission, null);
+  assert.throws(() => mapAffiliateDashboard({ ...dashboardPayload, owner_context: undefined }), AffiliateViewContractError);
+  assert.throws(() => mapAffiliateDashboard({
+    ...dashboardPayload,
+    stats: { ...dashboardPayload.stats, total_commission: 0 },
+  }, { expectedOwner: dashboardOwner }), AffiliateViewContractError);
+  assert.throws(() => mapAffiliateDashboard({
+    ...dashboardPayload,
+    stats: { ...dashboardPayload.stats, payouts_enabled: true },
+  }, { expectedOwner: dashboardOwner }), AffiliateViewContractError);
 });

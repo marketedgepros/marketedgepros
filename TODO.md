@@ -47,6 +47,12 @@
 
 גבולות: `backend/docs/SUPPORT_NOTIFICATIONS_UI4_HE.md`. UI-3 החלטות ותוכן דינמי, יתר UI-4 ו־UI-5/6 נשארים פתוחים.
 
+## חבילת דשבורדים בתוך UI-4 — 12.10.2026
+
+- [x] **דשבורד אישי:** זהות משתמש/מותג/תפקיד מול owner_context בשרת ו־user_id בכל challenge; tenant חסר אינו מקור ברירת מחדל. קריאה bounded עם מידע legacy בלבד, בלי מטבע דולר/רווח כולל/יעד או תשלום מאומת מומצאים. החלפת context מסירה מידע ו־pending מיד; רענון session באותה זהות אינו מתחיל טעינה מחדש; refresh מפורש, AbortSignal ויעדי פרטי אתגר/רשימה/מסמכים/תמיכה קיימים.
+- [x] **דשבורד אפיליאט:** aggregates בשרת ולא all של עמלות, שיוך עקבי לבעלים/מותג/הורים, סכומי Decimal strings ו־null חסר; אין email/IP/פרטי אדם אחר. links <=50 ו־recent <=10 עם סדר יציב וסימון total/truncated. כל קטגוריות העמלה legacy בלתי־מאומתות, payouts_enabled=false/available=null/currency=null. אין create/approve/pay; URL קנוני מהשרת בלבד ו־clipboard אינו מצג תשלום; copy/GET ישן אינם מציגים הצלחה לאחר מעבר context או רענון הנתונים.
+- [x] **עיצוב וקבלה בחבילה:** navy/cyan, היררכיה ומעטפת אחת, אין overflow או כיסוי תוכן, סכומים/טקסט ארוכים קריאים, focus/status/alert ו־reduced-motion; parity מ־HTTP סינתטי ובדיקות בעלות/כשל/ריק/מעבר זהות. רגרסיה וביקורת לפני commit, CI לפי SHA מדויק. אין שינוי ייצור, ספק חי, merge/deploy או השלמת UI-4 כולו.
+
 ## תלות אפיליאט — מצב בתוך שלב 4 ו־UI-4
 
 - [x] חבילת חסימה ראשונה: מסלולי יצירה/אישור/פדיון של עמלות legacy מסרבים ללא מקור מאומת; אין סכום זמין לפדיון; עריכת תוכנית גלובלית מוגבלת לבעל הפלטפורמה; אין הפעלת auto-approval. תיעוד: `backend/docs/AFFILIATE_FINANCIAL_BOUNDARY_HE.md`.

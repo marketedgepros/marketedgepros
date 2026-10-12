@@ -3,13 +3,15 @@ import test from 'node:test';
 
 const {
   USER_DASHBOARD_ENDPOINT,
+  UserDashboardContractError,
   loadUserDashboard,
   normalizeUserDashboard,
   recordedDecimalOrNull,
 } = await import('../src/services/userDashboardViewService.js');
 
 const recordedDashboard = {
-  user: { first_name: 'Recorded User' },
+  owner_context: { user_id: 1, tenant_id: 10 },
+  user: { id: 1, tenant_id: 10, role: 'user', first_name: 'Recorded User' },
   statistics: {
     status_counts: { total: 2, pending: 0, active: 0, passed: 1, failed: 1, funded: 0 },
     status_counts_data_status: 'recorded_legacy_statuses',
@@ -23,14 +25,16 @@ const recordedDashboard = {
   },
   recent_challenges: [
     {
-      id: 10, program_name: 'Recorded Zero', status: 'passed', phase: 1, total_phases: 1,
+      id: 10, user_id: 1, program_name: 'Recorded Zero', status: 'passed', status_data_status: 'recorded_not_verified', phase: 1, total_phases: 1,
       initial_balance: '1000.00', current_balance: '1000.00', profit: '0.00',
-      progress: null, created_at: '2026-10-01T12:00:00',
+      balance_data_quality: 'legacy_unverified', profit_data_status: 'recorded_not_verified',
+      progress: null, progress_data_status: 'unavailable_no_approved_rule_source', currency: null, created_at: '2026-10-01T12:00:00Z',
     },
     {
-      id: 11, program_name: 'Recorded Loss', status: 'failed', phase: 1, total_phases: 1,
+      id: 11, user_id: 1, program_name: 'Recorded Loss', status: 'failed', status_data_status: 'recorded_not_verified', phase: 1, total_phases: 1,
       initial_balance: '1000.00', current_balance: '900.00', profit: '-100.00',
-      progress: null, created_at: '2026-10-02T12:00:00',
+      balance_data_quality: 'legacy_unverified', profit_data_status: 'recorded_not_verified',
+      progress: null, progress_data_status: 'unavailable_no_approved_rule_source', currency: null, created_at: '2026-10-02T12:00:00+00:00',
     },
   ],
   data_quality: {
@@ -51,7 +55,11 @@ test('dashboard service performs one cancelable request and preserves recorded z
     },
   };
 
-  const view = await loadUserDashboard(fakeApi, { signal: controller.signal });
+  const view = await loadUserDashboard(fakeApi, {
+    signal: controller.signal,
+    expectedOwner: { userId: 1, tenantId: 10 },
+    role: 'user',
+  });
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], USER_DASHBOARD_ENDPOINT);
@@ -65,48 +73,28 @@ test('dashboard service performs one cancelable request and preserves recorded z
   assert.equal(view.recentChallenges[0].profit, '0.00');
   assert.equal(view.recentChallenges[1].profit, '-100.00');
   assert.equal(view.recentChallenges[0].progress, null);
+  assert.equal(view.recentChallenges[0].currency, null);
+  assert.equal(view.owner.userId, 1);
+  assert.equal(view.user.tenantId, 10);
   assert.equal(JSON.stringify(view).includes('NaN'), false);
 });
 
-test('dashboard service marks malformed fields unavailable rather than coercing them to zero or NaN', () => {
-  const view = normalizeUserDashboard({
-    user: { first_name: 7 },
-    statistics: {
-      status_counts: { total: '2', pending: -1, active: Number.NaN, passed: 1.5, failed: null },
-      success_rate: '50',
-      total_profit: 1234,
-      total_spent: '0.00',
-    },
-    recent_challenges: [{
-      id: '10', program_name: 8, status: null, phase: -1, total_phases: '1',
-      initial_balance: '1e3', current_balance: 'Infinity', profit: '0/0', progress: 100,
-      created_at: 'not-a-date',
-    }],
-  });
+test('dashboard service rejects malformed identity and response fields rather than coercing them to empty account data', () => {
+  const wrongRowOwner = structuredClone(recordedDashboard);
+  wrongRowOwner.recent_challenges[0].user_id = 2;
+  assert.throws(
+    () => normalizeUserDashboard(wrongRowOwner, { expectedOwner: { userId: 1, tenantId: 10 }, role: 'user' }),
+    UserDashboardContractError,
+  );
 
-  assert.deepEqual(view.statistics.statusCounts, {
-    total: null, pending: null, active: null, passed: null, failed: null, funded: null,
-  });
-  assert.equal(view.statistics.successRate, null);
-  assert.equal(view.statistics.totalProfit, null);
-  assert.equal(view.statistics.totalSpent, null);
-  assert.equal(view.user.firstName, null);
-  assert.deepEqual(view.recentChallenges[0], {
-    id: null,
-    programName: null,
-    status: null,
-    statusDataStatus: null,
-    phase: null,
-    totalPhases: null,
-    initialBalance: null,
-    currentBalance: null,
-    balanceDataQuality: null,
-    profit: null,
-    profitDataStatus: null,
-    progress: null,
-    progressDataStatus: null,
-    createdAt: 'not-a-date',
-  });
+  const malformed = structuredClone(recordedDashboard);
+  malformed.user.id = '1';
+  malformed.recent_challenges[0].initial_balance = '1e3';
+  assert.throws(
+    () => normalizeUserDashboard(malformed, { expectedOwner: { userId: 1, tenantId: 10 }, role: 'user' }),
+    UserDashboardContractError,
+  );
+
   assert.equal(recordedDecimalOrNull('0.00'), '0.00');
   assert.equal(recordedDecimalOrNull('-100.00'), '-100.00');
   assert.equal(recordedDecimalOrNull('NaN'), null);
@@ -119,7 +107,9 @@ test('dashboard service propagates API errors and rejects a structurally absent 
     (error) => error === failure,
   );
   await assert.rejects(
-    () => loadUserDashboard({ get: async () => ({ data: null }) }),
-    /Dashboard response is unavailable/,
+    () => loadUserDashboard({ get: async () => ({ data: null }) }, {
+      expectedOwner: { userId: 1, tenantId: 10 }, role: 'user',
+    }),
+    UserDashboardContractError,
   );
 });

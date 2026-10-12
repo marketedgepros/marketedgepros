@@ -192,7 +192,9 @@ def test_program_and_history_are_explicitly_not_payout_authority(affiliate_bound
     dashboard = app.test_client().get('/api/v1/affiliate/dashboard', headers=headers(app))
     assert dashboard.status_code == 200
     stats = dashboard.get_json()['stats']
-    assert stats['approved_commission'] == 15 and stats['available_for_payout'] is None
+    # This fixture refers owner 2 to a different same-tenant user (3). Its two
+    # stored commissions remain exact legacy categories, never payout authority.
+    assert stats['approved_commission'] == '15.00' and stats['available_for_payout'] is None
     assert stats['payouts_enabled'] is False and stats['commission_verification'] == 'unverified_legacy'
     for endpoint, field in [('commissions', 'commissions'), ('payouts', 'payouts')]:
         response = app.test_client().get('/api/v1/affiliate/' + endpoint, headers=headers(app))

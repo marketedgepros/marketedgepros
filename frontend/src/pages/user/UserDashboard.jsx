@@ -1,220 +1,336 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp, DollarSign, Trophy, Clock } from 'lucide-react';
-import StatsCard from '../../components/common/StatsCard';
+import { ArrowRight, BarChart3, BookOpen, FileText, RefreshCw, ShieldAlert, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import useAuthStore from '../../store/authStore';
 import {
   isDashboardRequestCanceled,
   loadUserDashboard,
 } from '../../services/userDashboardViewService';
 
-const countLabel = (value) => (value === null ? '—' : String(value));
+const countLabel = (value) => new Intl.NumberFormat('en-US').format(value);
 
-const formatRecordedAmount = (value) => {
-  if (typeof value !== 'string') return 'Not recorded';
+const positiveIntegerOrNull = (value) => (
+  Number.isSafeInteger(value) && value > 0 ? value : null
+);
+
+const strictRoleOrNull = (value) => (
+  typeof value === 'string' && value.trim() && value === value.trim() ? value : null
+);
+
+export const formatRecordedAmount = (value) => {
+  if (typeof value !== 'string') return 'Unavailable';
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
-  if (!match) return 'Not recorded';
+  if (!match) return 'Unavailable';
   const [, sign, whole, fraction] = match;
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${sign}$${grouped}${fraction === undefined ? '' : `.${fraction}`}`;
+  return `${sign}${grouped}${fraction === undefined ? '' : `.${fraction}`}`;
 };
 
-const formatRecordedDate = (value) => {
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return 'Not recorded';
-  return new Date(value).toLocaleDateString();
-};
+export const formatRecordedDate = (value) => (
+  typeof value === 'string' ? value.slice(0, 10) : 'Unavailable'
+);
 
-const statusClass = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'active': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-    case 'passed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-    case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-    case 'funded': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-    case 'pending': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-  }
-};
+const humanizeStatus = (value) => (
+  typeof value === 'string' && value
+    ? value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : 'Status unavailable'
+);
 
-const statusLabel = (status) => (typeof status === 'string' ? status.toUpperCase() : 'NOT RECORDED');
-
-export default function UserDashboard() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [requestVersion, setRequestVersion] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let disposed = false;
-
-    const fetchDashboard = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await loadUserDashboard(undefined, { signal: controller.signal });
-        if (!disposed) setDashboardData(data);
-      } catch (requestError) {
-        if (!disposed && !isDashboardRequestCanceled(requestError)) {
-          setError('Unable to load your dashboard. Please try again.');
-        }
-      } finally {
-        if (!disposed) setLoading(false);
-      }
-    };
-
-    fetchDashboard();
-    return () => {
-      disposed = true;
-      controller.abort();
-    };
-  }, [requestVersion]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]" aria-label="Loading dashboard">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mb-4" role="alert">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded dark:bg-red-950 dark:text-red-200">
-          <span>{error}</span>
-          <button
-            type="button"
-            className="ml-4 underline font-semibold"
-            onClick={() => setRequestVersion((version) => version + 1)}
-          >
-            Retry
-          </button>
+function MetricCard({ label, value, description, icon: Icon }) {
+  return (
+    <article className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-lg shadow-slate-950/20">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-300">{label}</p>
+          <p className="mt-2 break-words text-2xl font-semibold tracking-tight text-white">{value}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">{description}</p>
         </div>
+        <span className="shrink-0 rounded-xl border border-cyan-300/15 bg-cyan-300/10 p-2.5 text-cyan-200">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
       </div>
-    );
-  }
+    </article>
+  );
+}
 
-  if (!dashboardData) {
+function DashboardLink({ to, children, primary = false }) {
+  return (
+    <Link
+      to={to}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${primary
+        ? 'bg-cyan-300 text-slate-950 hover:bg-cyan-200'
+        : 'border border-white/15 bg-slate-900/60 text-slate-100 hover:border-cyan-300/50 hover:text-cyan-100'}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+export function DashboardReadState({ state, onRetry }) {
+  if (state === 'loading') {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <p className="text-center text-gray-600 dark:text-gray-400 py-8">
-          Dashboard data is not available yet.
-        </p>
-      </div>
+      <section className="flex min-h-72 items-center justify-center rounded-2xl border border-white/10 bg-slate-900/70" role="status" aria-live="polite" aria-busy="true">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-cyan-300/20 border-t-cyan-300 motion-reduce:animate-none" aria-hidden="true" />
+          <p className="mt-4 text-sm text-slate-300">Loading your recorded account data…</p>
+        </div>
+      </section>
     );
   }
 
-  const { user, statistics, recentChallenges } = dashboardData;
+  if (state === 'error') {
+    return (
+      <section className="rounded-2xl border border-rose-300/30 bg-rose-950/30 p-5 text-rose-50" role="alert" aria-live="assertive">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-200" aria-hidden="true" />
+          <div>
+            <h2 className="font-semibold">Your dashboard could not be verified</h2>
+            <p className="mt-1 text-sm leading-6 text-rose-100/85">
+              No account records are shown until a complete response matches your signed-in account.
+            </p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-rose-200/40 bg-rose-100/10 px-3 py-2 text-sm font-semibold text-rose-50 transition hover:bg-rose-100/20 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+              Retry dashboard
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return null;
+}
+
+export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) {
+  const { user, statistics, recentChallenges } = dashboard;
   const { statusCounts } = statistics;
-  const userStats = [
+  const recordedRatio = statistics.successRate === null ? 'Unavailable' : `${statistics.successRate}%`;
+  const metrics = [
     {
-      title: 'Active Challenges',
+      label: 'Recorded challenges',
+      value: countLabel(statusCounts.total),
+      description: 'Count from locally recorded challenge statuses.',
+      icon: BookOpen,
+    },
+    {
+      label: 'Active records',
       value: countLabel(statusCounts.active),
-      subtitle: 'Recorded status count',
-      icon: Clock,
-      color: 'primary',
+      description: 'Recorded status only; provider activity is not verified.',
+      icon: BarChart3,
     },
     {
-      title: 'Total Profit',
-      value: 'Unavailable',
-      subtitle: 'Verified provenance unavailable',
-      icon: DollarSign,
-      color: 'success',
+      label: 'Recorded outcome ratio',
+      value: recordedRatio,
+      description: `Based only on ${countLabel(statusCounts.passed)} passed and ${countLabel(statusCounts.failed)} failed recorded statuses.`,
+      icon: FileText,
     },
     {
-      title: 'Success Rate',
-      value: statistics.successRate === null ? 'Unavailable' : `${statistics.successRate}%`,
-      subtitle: `Recorded: ${countLabel(statusCounts.passed)} passed / ${countLabel(statusCounts.failed)} failed`,
-      icon: TrendingUp,
-      color: 'info',
-    },
-    {
-      title: 'Funded Accounts',
+      label: 'Funded records',
       value: countLabel(statusCounts.funded),
-      subtitle: 'Recorded status count',
-      icon: Trophy,
-      color: 'warning',
+      description: 'A recorded status, not a verified funding confirmation.',
+      icon: UserRound,
     },
   ];
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Welcome back, {user.firstName || 'Trader'}
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">Here&apos;s your trading overview</p>
-      </div>
-
-      <div className="mb-6 rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-100">
-        Statuses and balances are <strong>locally recorded legacy data</strong>; provider verification is not available.
-        Financial totals and targets remain unavailable rather than inferred.
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {userStats.map((stat) => <StatsCard key={stat.title} {...stat} />)}
-      </div>
-
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Recent Challenges</h2>
-
-      {recentChallenges.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <p className="text-center text-gray-600 dark:text-gray-400 py-8">
-            No recorded challenges are available yet.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {recentChallenges.map((challenge, index) => (
-            <div key={`${challenge.id ?? 'record'}-${index}`} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4 gap-3">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {challenge.programName || 'Program not recorded'}
-                </h3>
-                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusClass(challenge.status)}`}>
-                  {statusLabel(challenge.status)}
-                </span>
-              </div>
-
-              <div className="mb-4 rounded bg-gray-50 dark:bg-gray-700 px-3 py-2">
-                <div className="flex justify-between gap-4">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Progress</span>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Target unavailable</span>
-                </div>
-              </div>
-
-              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-                Balances and profit are recorded values, not provider-verified.
+    <>
+      <section className="border-b border-cyan-300/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-slate-950 to-slate-950">
+        <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Account records</p>
+          <div className="mt-3 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div className="min-w-0">
+              <h1 className="break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                {user.firstName ? `${user.firstName}’s challenge overview` : 'Challenge overview'}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                Review the latest locally recorded challenge statuses for this account. This page does not verify provider activity or financial outcomes.
               </p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Balance</p>
-                  <p className="text-lg font-semibold text-cyan-700 dark:text-cyan-300">
-                    {formatRecordedAmount(challenge.currentBalance)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Recorded Profit/Loss</p>
-                  <p className={`text-lg font-semibold ${challenge.profit?.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                    {formatRecordedAmount(challenge.profit)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Phase</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {challenge.phase === null ? 'Not recorded' : `${challenge.phase}${challenge.totalPhases === null ? '' : ` of ${challenge.totalPhases}`}`}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Started</p>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {formatRecordedDate(challenge.createdAt)}
-                  </p>
-                </div>
-              </div>
             </div>
-          ))}
+            <div className="flex flex-wrap gap-2">
+              <DashboardLink to="/challenges" primary>All challenges <ArrowRight className="h-4 w-4" aria-hidden="true" /></DashboardLink>
+              <DashboardLink to="/programs">Programs</DashboardLink>
+              <DashboardLink to="/documents">Documents</DashboardLink>
+              <DashboardLink to="/support/my-tickets">Support</DashboardLink>
+              <DashboardLink to="/profile">Profile</DashboardLink>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
+      </section>
+
+      <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-9">
+        <section className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-amber-50" aria-label="Recorded data status">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-semibold">Recorded legacy status — not provider verified</p>
+              <p className="mt-1 text-sm leading-6 text-amber-100/85">
+                Balances and recorded changes are displayed without an authoritative currency. Financial totals and progress remain unavailable rather than inferred.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-100/35 bg-slate-950/20 px-3 py-2 text-sm font-semibold text-amber-50 transition hover:bg-slate-950/35 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden="true" />
+              {refreshing ? 'Refreshing records' : 'Refresh records'}
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-6" aria-label="Recorded challenge metrics">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-400">
+            Financial totals: unavailable. No verified financial provenance was returned for this account.
+          </p>
+        </section>
+
+        <section className="mt-7 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
+          <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
+              <h2 id="latest-records-heading" className="text-xl font-semibold tracking-tight text-white">Latest recorded challenges</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-400">Up to five most recent records returned for your account.</p>
+            </div>
+            <span className="text-sm font-medium text-cyan-200">{recentChallenges.length} of 5 records</span>
+          </div>
+
+          {recentChallenges.length === 0 ? (
+            <div className="px-5 py-12 text-center sm:px-6">
+              <p className="font-medium text-slate-200">No recent challenge records were returned for this account.</p>
+              <p className="mt-2 text-sm text-slate-400">You can review available programs or contact support if you expected a record here.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300" tabIndex="0" aria-label="Latest recorded challenges table">
+              <table className="w-full min-w-[920px] text-left text-sm">
+                <caption className="sr-only">Latest recorded challenges for the signed-in account</caption>
+                <thead className="bg-slate-950/45 text-xs uppercase tracking-[0.14em] text-slate-400">
+                  <tr>
+                    <th scope="col" className="px-5 py-3 font-medium sm:px-6">Challenge</th>
+                    <th scope="col" className="px-5 py-3 font-medium">Recorded status</th>
+                    <th scope="col" className="px-5 py-3 font-medium">Recorded balance</th>
+                    <th scope="col" className="px-5 py-3 font-medium">Recorded change</th>
+                    <th scope="col" className="px-5 py-3 font-medium">Progress</th>
+                    <th scope="col" className="px-5 py-3 font-medium sm:px-6">Started</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {recentChallenges.map((challenge) => (
+                    <tr key={challenge.id} className="align-top transition-colors hover:bg-white/[0.025] motion-reduce:transition-none">
+                      <td className="min-w-[190px] px-5 py-4 sm:px-6">
+                        <Link to={`/challenges/${challenge.id}`} className="break-words font-semibold text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">
+                          {challenge.programName || 'Program name unavailable'}
+                        </Link>
+                        <p className="mt-1 text-xs leading-5 text-slate-400">Phase {challenge.phase === null ? 'unavailable' : challenge.phase}{challenge.totalPhases === null ? '' : ` of ${challenge.totalPhases}`}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-xs font-semibold text-amber-100">
+                          {humanizeStatus(challenge.status)}
+                        </span>
+                        <p className="mt-1 max-w-[180px] break-words text-xs text-slate-400">{humanizeStatus(challenge.statusDataStatus)}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="break-all font-mono text-sm font-semibold tabular-nums text-slate-100">{formatRecordedAmount(challenge.currentBalance)}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-400">Currency unavailable</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="break-all font-mono text-sm font-semibold tabular-nums text-slate-100">{formatRecordedAmount(challenge.profit)}</p>
+                        <p className="mt-1 max-w-[180px] break-words text-xs leading-5 text-slate-400">{humanizeStatus(challenge.profitDataStatus)}</p>
+                      </td>
+                      <td className="px-5 py-4 text-slate-300">
+                        <p>Unavailable</p>
+                        <p className="mt-1 max-w-[180px] break-words text-xs leading-5 text-slate-400">{humanizeStatus(challenge.progressDataStatus)}</p>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 font-mono text-sm tabular-nums text-slate-300 sm:px-6">{formatRecordedDate(challenge.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
+    </>
   );
+}
+
+export function UserDashboardData({ userId, tenantId, role, apiClient }) {
+  const [dashboard, setDashboard] = useState(null);
+  const [state, setState] = useState('loading');
+  const [refreshVersion, setRefreshVersion] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let current = true;
+
+    setDashboard(null);
+    setState('loading');
+    loadUserDashboard(apiClient, {
+      signal: controller.signal,
+      expectedOwner: { userId, tenantId },
+      role,
+    }).then((nextDashboard) => {
+      if (!current) return;
+      setDashboard(nextDashboard);
+      setState('ready');
+    }).catch((error) => {
+      if (!current || isDashboardRequestCanceled(error)) return;
+      setDashboard(null);
+      setState('error');
+    });
+
+    return () => {
+      current = false;
+      controller.abort();
+    };
+  }, [apiClient, refreshVersion, role, tenantId, userId]);
+
+  const refresh = () => {
+    if (state === 'loading') return;
+    // Clear the ready state before scheduling the next one-shot request so a
+    // second click cannot leave concurrent requests or stale account data.
+    setDashboard(null);
+    setState('loading');
+    setRefreshVersion((version) => version + 1);
+  };
+
+  if (state !== 'ready' || !dashboard) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <DashboardReadState state={state} onRetry={refresh} />
+      </div>
+    );
+  }
+
+  return <DashboardOverview dashboard={dashboard} onRefresh={refresh} refreshing={false} />;
+}
+
+export default function UserDashboard() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const rawUserId = useAuthStore((state) => state.user?.id);
+  const rawTenantId = useAuthStore((state) => state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id);
+  const rawRole = useAuthStore((state) => state.user?.role);
+  const userId = positiveIntegerOrNull(rawUserId);
+  const tenantId = positiveIntegerOrNull(rawTenantId);
+  const role = strictRoleOrNull(rawRole);
+  const identityKey = JSON.stringify([isAuthenticated, userId, tenantId, role]);
+
+  if (!isAuthenticated || userId === null || tenantId === null || role === null) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="rounded-2xl border border-rose-300/30 bg-rose-950/30 p-5 text-rose-50" role="alert">
+          <h1 className="font-semibold">Your account context is unavailable</h1>
+          <p className="mt-1 text-sm leading-6 text-rose-100/85">Sign in again before viewing account records.</p>
+        </section>
+      </div>
+    );
+  }
+
+  // A new auth/id/tenant/role context unmounts the old request and its data immediately.
+  return <UserDashboardData key={identityKey} userId={userId} tenantId={tenantId} role={role} />;
 }

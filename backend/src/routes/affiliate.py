@@ -2,9 +2,13 @@
 Affiliate Program Routes
 Handles affiliate registration, tracking, commissions, and payouts
 """
+from decimal import Decimal, InvalidOperation
+import re
+
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import case, desc, func, or_
+from sqlalchemy.orm import aliased
 import secrets
 import string
 
@@ -14,6 +18,7 @@ from src.models.affiliate import (
     AffiliatePayout, AffiliateSettings
 )
 from src.models.user import User
+from src.models.trading_program import TradingProgram
 from src.utils.decorators import token_required, admin_required
 from src.services.affiliate_financial_boundary import affiliate_mutation_unavailable_response
 from src.utils.hierarchy_scoping import platform_root_scope
@@ -116,52 +121,213 @@ def register_affiliate(current_user):
 @affiliate_bp.route('/dashboard', methods=['GET'])
 @token_required
 def get_dashboard(current_user):
-    """Get affiliate dashboard statistics"""
+    """Return bounded, tenant-scoped legacy affiliate records without authority."""
+    tenant_id = current_user.tenant_id
+    # Never infer a tenant from a legacy link, referral, or program record.
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    owner_context = {'user_id': current_user.id, 'tenant_id': tenant_id}
+
+    def decimal_string(value):
+        """Serialize finite stored Numeric values without float coercion or zero-fill."""
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            result = value if isinstance(value, Decimal) else Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+        return format(result, 'f') if result.is_finite() else None
+
+    def nonnegative_count(value):
+        """Expose only recorded non-negative integer counters; unknown stays null."""
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        return value
+
+    def public_link_url(code):
+        """Keep received codes inside the sole approved public HTTPS URL shape."""
+        if not isinstance(code, str) or not re.fullmatch(r'[A-Z0-9]{1,50}', code):
+            return None
+        return f'https://marketedgepros.com/?ref={code}'
+
     try:
-        # Get all affiliate links for user
-        links = AffiliateLink.query.filter_by(user_id=current_user.id).all()
-        
+        # A referral must name this owner, use this owner's link, refer either no
+        # user or a different user in the same tenant, and never use a current
+        # program from another tenant. A non-null program reference must resolve
+        # to a current program in this tenant; an absent historic program is not
+        # guessed into the dashboard.
+        referred_user = User.__table__.alias('dashboard_referred_user')
+        referral_program = aliased(TradingProgram)
+        valid_referral_filters = (
+            AffiliateReferral.affiliate_user_id == current_user.id,
+            AffiliateLink.user_id == current_user.id,
+            or_(
+                AffiliateReferral.referred_user_id.is_(None),
+                (referred_user.c.id.is_not(None)
+                 & (referred_user.c.id != current_user.id)
+                 & (referred_user.c.tenant_id == tenant_id)),
+            ),
+            or_(
+                AffiliateReferral.program_id.is_(None),
+                referral_program.tenant_id == tenant_id,
+            ),
+        )
+
+        with db.session.no_autoflush:
+            link_totals = (
+                db.session.query(
+                    func.count(AffiliateLink.id).label('total'),
+                    func.sum(AffiliateLink.clicks).label('clicks'),
+                    func.count(AffiliateLink.clicks).label('clicks_count'),
+                    func.sum(case((AffiliateLink.clicks < 0, 1), else_=0)).label('negative_clicks'),
+                    func.sum(AffiliateLink.conversions).label('conversions'),
+                    func.count(AffiliateLink.conversions).label('conversions_count'),
+                    func.sum(case((AffiliateLink.conversions < 0, 1), else_=0)).label('negative_conversions'),
+                    func.sum(AffiliateLink.total_revenue).label('revenue'),
+                    func.count(AffiliateLink.total_revenue).label('revenue_count'),
+                )
+                .filter(AffiliateLink.user_id == current_user.id)
+                .one()
+            )
+            # COUNT(id) is the authoritative pagination total and must never be
+            # replaced with a guessed zero for a malformed storage response.
+            total_links = nonnegative_count(link_totals.total)
+            if total_links is None:
+                raise RuntimeError('affiliate link count was not a non-negative integer')
+            # Preserve the existing endpoint's registration signal without
+            # loading all links into application memory.
+            if total_links == 0:
+                return jsonify({'error': 'Not registered as affiliate'}), 404
+
+            commission_totals = (
+                db.session.query(
+                    func.sum(AffiliateCommission.amount).label('total'),
+                    func.sum(case(
+                        (AffiliateCommission.status == 'pending', AffiliateCommission.amount),
+                        else_=None,
+                    )).label('pending'),
+                    func.sum(case(
+                        (AffiliateCommission.status == 'approved', AffiliateCommission.amount),
+                        else_=None,
+                    )).label('approved'),
+                    func.sum(case(
+                        (AffiliateCommission.status == 'paid', AffiliateCommission.amount),
+                        else_=None,
+                    )).label('paid'),
+                )
+                .select_from(AffiliateCommission)
+                .join(AffiliateReferral, AffiliateCommission.referral_id == AffiliateReferral.id)
+                .join(AffiliateLink, AffiliateReferral.affiliate_link_id == AffiliateLink.id)
+                .outerjoin(referred_user, AffiliateReferral.referred_user_id == referred_user.c.id)
+                .outerjoin(referral_program, AffiliateReferral.program_id == referral_program.id)
+                .filter(
+                    AffiliateCommission.affiliate_user_id == current_user.id,
+                    *valid_referral_filters,
+                )
+                .one()
+            )
+            links = (
+                AffiliateLink.query.execution_options(autoflush=False)
+                .filter(AffiliateLink.user_id == current_user.id)
+                .order_by(desc(AffiliateLink.created_at), desc(AffiliateLink.id))
+                .limit(50)
+                .all()
+            )
+            recent_referrals = (
+                db.session.query(AffiliateReferral)
+                .execution_options(autoflush=False)
+                .join(AffiliateLink, AffiliateReferral.affiliate_link_id == AffiliateLink.id)
+                .outerjoin(referred_user, AffiliateReferral.referred_user_id == referred_user.c.id)
+                .outerjoin(referral_program, AffiliateReferral.program_id == referral_program.id)
+                .filter(*valid_referral_filters)
+                .order_by(desc(AffiliateReferral.click_date), desc(AffiliateReferral.id))
+                .limit(10)
+                .all()
+            )
+
+        # A sum is displayable only if each owned link supplied that field. This
+        # prevents a partial legacy aggregate from looking complete. Negative
+        # counters are likewise unavailable, not normalized to zero.
+        total_clicks = (
+            nonnegative_count(link_totals.clicks)
+            if link_totals.clicks_count == total_links and link_totals.negative_clicks == 0
+            else None
+        )
+        total_conversions = (
+            nonnegative_count(link_totals.conversions)
+            if (
+                link_totals.conversions_count == total_links
+                and link_totals.negative_conversions == 0
+            )
+            else None
+        )
+        total_revenue = (
+            decimal_string(link_totals.revenue)
+            if link_totals.revenue_count == total_links
+            else None
+        )
+        conversion_rate = None
+        if total_clicks is not None and total_conversions is not None and total_clicks > 0:
+            conversion_rate = decimal_string(
+                (Decimal(total_conversions) * Decimal('100')) / Decimal(total_clicks)
+            )
+
+        # A concurrent delete after the aggregate remains a closed 404 rather
+        # than a widened or stale ownership response.
         if not links:
             return jsonify({'error': 'Not registered as affiliate'}), 404
-        
-        # Calculate totals
-        total_clicks = sum(link.clicks for link in links)
-        total_conversions = sum(link.conversions for link in links)
-        total_revenue = sum(link.total_revenue for link in links)
-        total_commission = sum(link.total_commission for link in links)
-        
-        # Get commission breakdown
-        commissions = AffiliateCommission.query.filter_by(affiliate_user_id=current_user.id).all()
-        pending_commission = sum(c.amount for c in commissions if c.status == 'pending')
-        approved_commission = sum(c.amount for c in commissions if c.status == 'approved')
-        paid_commission = sum(c.amount for c in commissions if c.status == 'paid')
-        
-        # Get recent referrals
-        recent_referrals = AffiliateReferral.query.filter_by(
-            affiliate_user_id=current_user.id
-        ).order_by(AffiliateReferral.click_date.desc()).limit(10).all()
-        
+
         return jsonify({
+            'owner_context': owner_context,
             'stats': {
                 'total_clicks': total_clicks,
                 'total_conversions': total_conversions,
-                'total_revenue': float(total_revenue),
-                'total_commission': float(total_commission),
-                'conversion_rate': round((total_conversions / total_clicks * 100) if total_clicks > 0 else 0, 2),
-                'pending_commission': float(pending_commission),
-                'approved_commission': float(approved_commission),
-                'paid_commission': float(paid_commission),
+                'total_revenue': total_revenue,
+                'total_commission': decimal_string(commission_totals.total),
+                'conversion_rate': conversion_rate,
+                'pending_commission': decimal_string(commission_totals.pending),
+                'approved_commission': decimal_string(commission_totals.approved),
+                'paid_commission': decimal_string(commission_totals.paid),
+                'currency': None,
                 'available_for_payout': None,
                 'payouts_enabled': False,
-                'commission_verification': 'unverified_legacy'
+                'commission_verification': 'unverified_legacy',
             },
-            'links': [link.to_dict() for link in links],
-            'recent_referrals': [ref.to_dict() for ref in recent_referrals]
+            'link_pagination': {
+                'total': total_links,
+                'limit': 50,
+                'truncated': total_links > 50,
+            },
+            'links': [{
+                'id': link.id,
+                'name': link.name,
+                'url': public_link_url(link.code),
+                'clicks': nonnegative_count(link.clicks),
+                'conversions': nonnegative_count(link.conversions),
+            } for link in links],
+            'recent_referrals': [{
+                'id': referral.id,
+                'status': referral.status,
+                'click_date': referral.click_date.isoformat() if referral.click_date else None,
+                'commission_amount': decimal_string(referral.commission_amount),
+                'currency': None,
+            } for referral in recent_referrals],
         }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'Get affiliate dashboard error: {str(e)}')
-        return jsonify({'error': 'Failed to get dashboard'}), 500
+
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('Affiliate dashboard read failed')
+        return jsonify({
+            'error': 'Dashboard is temporarily unavailable',
+            'code': 'AFFILIATE_DASHBOARD_UNAVAILABLE',
+        }), 503
 
 
 @affiliate_bp.route('/links', methods=['GET'])

@@ -10,6 +10,10 @@ const dashboardSource = fs.readFileSync(
   path.join(frontendDirectory, 'src', 'pages', 'affiliate', 'AffiliateDashboard.jsx'),
   'utf8',
 );
+const dashboardServiceSource = fs.readFileSync(
+  path.join(frontendDirectory, 'src', 'services', 'affiliateViewService.js'),
+  'utf8',
+);
 const payoutSource = fs.readFileSync(
   path.join(frontendDirectory, 'src', 'pages', 'affiliate', 'AffiliatePayout.jsx'),
   'utf8',
@@ -20,7 +24,7 @@ test('affiliate dashboard uses the account view service, current auth identity, 
   assert.match(dashboardSource, /loadAffiliateDashboard/);
   assert.match(dashboardSource, /affiliateViewError/);
   assert.match(dashboardSource, /loadGenerationRef/);
-  assert.match(dashboardSource, /generation === loadGenerationRef\.current/);
+  assert.match(dashboardSource, /generation !== loadGenerationRef\.current/);
 
   for (const route of [
     '/affiliate/traders',
@@ -42,9 +46,9 @@ test('affiliate dashboard uses the account view service, current auth identity, 
 });
 
 test('affiliate dashboard copies only safe server links with a single in-flight clipboard request', () => {
-  assert.match(dashboardSource, /getSafeServerReferralUrl/);
-  assert.match(dashboardSource, /url\.protocol !== 'https:'/);
-  assert.match(dashboardSource, /url\.hostname !== 'marketedgepros\.com'/);
+  assert.match(dashboardSource, /getSafeAffiliateReferralUrl/);
+  assert.match(dashboardServiceSource, /url\.protocol !== 'https:'/);
+  assert.match(dashboardServiceSource, /url\.hostname !== 'marketedgepros\.com'/);
   assert.match(dashboardSource, /copyInFlightRef\.current/);
   assert.match(dashboardSource, /navigator\.clipboard\?\.writeText/);
   assert.match(dashboardSource, /status: 'copied'/);
