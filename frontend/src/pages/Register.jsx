@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useToast } from '../contexts/ToastContext';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import useAuthStore from '../store/authStore';
@@ -76,27 +75,27 @@ export default function Register() {
           <div className="relative bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-full mb-4 shadow-lg shadow-cyan-500/30">
-                <UserPlus className="w-8 h-8 text-white" />
+                <UserPlus className="w-8 h-8 text-white" aria-hidden="true" />
               </div>
-              <h2 className="text-3xl font-bold text-white">Create Account</h2>
+              <h1 className="text-3xl font-bold text-white">Create Account</h1>
               <p className="text-gray-400 mt-2">Start your trading journey with MarketEdgePros</p>
             </div>
 
             {(validationError || error) && (
               <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-sm text-red-300" role="alert">{validationError || error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="min-w-0">
                   <label htmlFor="first_name" className="block text-sm font-medium text-gray-300 mb-2">
                     First Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                     <input
                       id="first_name"
                       type="text"
@@ -110,12 +109,12 @@ export default function Register() {
                   </div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <label htmlFor="last_name" className="block text-sm font-medium text-gray-300 mb-2">
                     Last Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                     <input
                       id="last_name"
                       type="text"

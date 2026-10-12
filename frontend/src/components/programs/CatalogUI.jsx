@@ -147,7 +147,7 @@ export function CatalogCard({ program }) {
     <article
       className={`${panelStyle} flex flex-col hover:border-cyan-400/40 transition-colors motion-reduce:transition-none`}
     >
-      <span className="text-xs uppercase tracking-widest text-cyan-300">
+      <span className="break-words [overflow-wrap:anywhere] text-xs uppercase tracking-widest text-cyan-300">
         {typeLabel(program.terms.type)}
       </span>
       <h2 className="mt-4 break-words text-xl font-semibold">
@@ -191,7 +191,7 @@ export function ConfiguredRules({ terms }) {
         <dl className="mt-5 space-y-4">
           {entries.map(([key, value]) => (
             <div key={key} className="min-w-0">
-              <dt className="break-words text-sm font-medium text-cyan-200">
+              <dt className="break-words [overflow-wrap:anywhere] text-sm font-medium text-cyan-200">
                 {key.replaceAll("_", " ")}
               </dt>
               <dd className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm text-slate-300">

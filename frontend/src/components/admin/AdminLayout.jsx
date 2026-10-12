@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import {
@@ -21,6 +21,8 @@ import NotificationBell from '../notifications/NotificationBell';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuButtonRef = useRef(null);
+  const closeMobileMenuButtonRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -48,10 +50,37 @@ export default function AdminLayout({ children }) {
     navigate('/login');
   };
 
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+    mobileMenuButtonRef.current?.focus();
+  };
+
   // A route change closes the navigation rather than leaving it over new content.
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return undefined;
+
+    // The previous effect could run while the formerly invisible sidebar was
+    // still hidden by the browser. Focus after its visibility has been painted.
+    let paintedFocusFrame;
+    const focusFrame = window.requestAnimationFrame(() => {
+      paintedFocusFrame = window.requestAnimationFrame(() => closeMobileMenuButtonRef.current?.focus());
+    });
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeMobileMenu();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      if (paintedFocusFrame !== undefined) window.cancelAnimationFrame(paintedFocusFrame);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isMobileMenuOpen]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
@@ -81,9 +110,12 @@ export default function AdminLayout({ children }) {
             </div>
           </Link>
           <button
-            onClick={() => setIsMobileMenuOpen(false)}
+            ref={closeMobileMenuButtonRef}
+            type="button"
+            onClick={closeMobileMenu}
             aria-label="Close administration menu"
-            className="lg:hidden p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
+            aria-controls="admin-navigation"
+            className="lg:hidden p-2 rounded-lg hover:bg-slate-700/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             <X className="w-5 h-5" />
           </button>
@@ -117,7 +149,7 @@ export default function AdminLayout({ children }) {
                 <li key={item.path}>
                   <Link
                     to={item.path}
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={closeMobileMenu}
                     aria-current={active ? 'page' : undefined}
                     className={`
                       group flex items-center gap-3 px-4 py-3 rounded-xl
@@ -148,8 +180,9 @@ export default function AdminLayout({ children }) {
         {/* Logout */}
         <div className="p-4 border-t border-white/10">
           <button
+            type="button"
             onClick={handleLogout}
-            className="group flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 w-full border border-transparent hover:border-red-500/30"
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 w-full border border-transparent hover:border-red-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             <LogOut className="w-5 h-5" />
             <span className="font-medium">Logout</span>
@@ -159,7 +192,7 @@ export default function AdminLayout({ children }) {
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
-          onClick={() => setIsMobileMenuOpen(false)}
+          onClick={closeMobileMenu}
           className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
         ></div>
       )}
@@ -170,6 +203,8 @@ export default function AdminLayout({ children }) {
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex items-center gap-2 sm:gap-4">
               <button
+                ref={mobileMenuButtonRef}
+                type="button"
                 onClick={() => setIsMobileMenuOpen(true)}
                 aria-label="Open administration menu"
                 aria-controls="admin-navigation"

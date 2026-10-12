@@ -71,18 +71,20 @@ export default function Notification() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed top-4 inset-x-4 sm:left-auto sm:w-96 z-50 space-y-2 pointer-events-none" aria-label="Notifications">
       {notifications.map((notification) => (
         <div
           key={notification.id}
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg animate-slide-in ${getBackgroundColor(notification.type)}`}
-          style={{ minWidth: '300px', maxWidth: '400px' }}
+          role={notification.type === 'error' ? 'alert' : 'status'}
+          className={`flex min-w-0 items-center gap-3 px-4 py-3 rounded-lg border shadow-lg pointer-events-auto ${getBackgroundColor(notification.type)}`}
         >
           {getIcon(notification.type)}
-          <p className="flex-1 text-sm text-gray-800">{notification.message}</p>
+          <p className="min-w-0 flex-1 break-words text-sm text-gray-800">{notification.message}</p>
           <button
+            type="button"
+            aria-label="Dismiss notification"
             onClick={() => removeNotification(notification.id)}
-            className="text-gray-500 hover:text-gray-700"
+            className="shrink-0 rounded-lg p-2 text-gray-500 hover:text-gray-700"
           >
             <X size={16} />
           </button>
@@ -91,4 +93,3 @@ export default function Notification() {
     </div>
   );
 }
-

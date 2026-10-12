@@ -14,7 +14,7 @@ export default function CatalogPreview({ type = null }) {
     (program) => type === null || program.terms.type === type,
   );
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {catalog.loading || catalog.error || !programs.length ? (
         <CatalogState {...catalog} empty={!catalog.loading && !catalog.error} />
       ) : (

@@ -98,10 +98,10 @@ function ProtectedRoute({ children, adminOnly = false, userOnly = false }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+        <div className="text-center" role="status">
+          <div aria-hidden="true" className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+          <p className="text-slate-300 mt-4">Loading...</p>
         </div>
       </div>
     );
@@ -128,10 +128,10 @@ function PublicRoute({ children }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+        <div className="text-center" role="status">
+          <div aria-hidden="true" className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+          <p className="text-slate-300 mt-4">Loading...</p>
         </div>
       </div>
     );
@@ -182,8 +182,8 @@ function App() {
         <AccountChatWidget />
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center bg-slate-900">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="text-center" role="status">
+            <div aria-hidden="true" className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
             <p className="text-gray-300 mt-4">Loading...</p>
           </div>
         </div>
@@ -616,15 +616,15 @@ function App() {
         <Route
           path="*"
           element={
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <main className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
               <div className="text-center">
-                <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>
-                <p className="text-xl text-gray-600 mb-8">Page not found</p>
+                <h1 className="text-6xl font-bold text-slate-100 mb-4">404</h1>
+                <p className="text-xl text-slate-300 mb-8">Page not found</p>
                 <a href="/" className="btn btn-primary">
                   Go to Home
                 </a>
               </div>
-            </div>
+            </main>
           }
         />
         </Routes>

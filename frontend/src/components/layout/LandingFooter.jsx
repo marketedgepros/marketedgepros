@@ -55,29 +55,29 @@ export default function LandingFooter() {
   ];
 
   return (
-    <footer className="bg-black border-t border-white/10">
+    <footer className="min-w-0 bg-slate-950 border-t border-white/10">
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand Column */}
           <div className="lg:col-span-1">
-            <Link to="/" className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg"></div>
-              <span className="text-xl font-bold text-white">MarketEdgePros</span>
+            <Link to="/" className="mb-4 flex items-center space-x-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+              <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg"></div>
+              <span className="break-words text-xl font-bold text-white">MarketEdgePros</span>
             </Link>
             <p className="text-gray-400 text-sm mb-6">
               Explore program settings, compare options and manage your account in one place.
             </p>
             
             {/* Social Links */}
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-2">
               {socialLinks.map((social) => (
                 <a
                   key={social.name}
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-cyan-500 transition-colors"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-400 hover:text-cyan-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                   aria-label={social.name}
                 >
                   <social.icon size={20} />
@@ -95,7 +95,7 @@ export default function LandingFooter() {
                   <li key={link.name}>
                     <Link
                       to={link.to}
-                      className="text-gray-400 hover:text-white transition-colors text-sm"
+                      className="rounded px-1 py-1 text-sm text-gray-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                     >
                       {link.name}
                     </Link>
@@ -113,7 +113,7 @@ export default function LandingFooter() {
               <h3 className="text-white font-semibold mb-2">Stay Updated</h3>
               <p className="text-gray-400 text-sm">Newsletter subscriptions are not available. Contact us for current information.</p>
             </div>
-            <Link to="/contact" className="inline-flex max-w-full items-center rounded-lg bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
+            <Link to="/contact" className="inline-flex max-w-full items-center rounded-lg bg-cyan-400 px-5 py-3 text-center text-sm font-semibold text-slate-950 hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
                 <Mail size={18} className="mr-2" />
                 Contact us
             </Link>
@@ -126,10 +126,10 @@ export default function LandingFooter() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
             <p>© {currentYear} MarketEdgePros. All rights reserved.</p>
-            <div className="flex items-center space-x-6">
-              <Link to="/terms-of-service" className="hover:text-white transition-colors">Terms</Link>
-              <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy</Link>
-              <Link to="/risk-disclosure" className="hover:text-white transition-colors">Risk Disclosure</Link>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+              <Link to="/terms-of-service" className="rounded px-1 py-1 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Terms</Link>
+              <Link to="/privacy-policy" className="rounded px-1 py-1 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Privacy</Link>
+              <Link to="/risk-disclosure" className="rounded px-1 py-1 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Risk Disclosure</Link>
             </div>
           </div>
         </div>
