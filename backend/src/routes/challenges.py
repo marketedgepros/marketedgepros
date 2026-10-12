@@ -9,25 +9,24 @@ from functools import wraps
 import logging
 
 from flask import Blueprint, g, jsonify, request
-from sqlalchemy import desc, select
-from sqlalchemy.orm import aliased
+from sqlalchemy import desc
 
 from src.database import db
 from src.models.mt5_models import MT5Account
 from src.models.trading_program import Challenge, TradingProgram
-from src.models.user import User
-from src.services.mt5_challenge_service import mt5_challenge_service
-from src.services.mt5_service import MT5ProviderNotConfigured, mt5_service
-from src.utils import crm_scope
+from src.services.admin_closure_challenges import (
+    AdminClosureChallengeNotFound,
+    AdminClosureChallengesPaginationInvalid,
+    AdminClosureChallengesQueryInvalid,
+    AdminClosureChallengesScopeRequired,
+    AdminClosureChallengesService,
+)
 from src.utils.decorators import admin_required, token_required
-from src.utils.hierarchy_scoping import platform_root_scope
 
 
 logger = logging.getLogger(__name__)
 challenges_bp = Blueprint('challenges', __name__)
 
-_PROVIDER_CODE = MT5ProviderNotConfigured.code
-_TRADING_EVIDENCE_CODE = 'TRADING_EVIDENCE_NOT_CONFIGURED'
 _AMBIGUOUS_BINDING_CODE = 'MT5_ACCOUNT_BINDING_AMBIGUOUS'
 _UNVERIFIED_LEGACY = 'unverified_legacy'
 
@@ -47,17 +46,18 @@ def _error(message, status, code):
 
 def _provider_not_configured():
     """Return the provider boundary without inspecting request data or rows."""
-    error = MT5ProviderNotConfigured()
-    return _error(str(error), error.status, error.code)
+    return _unavailable_mutation('provider')
 
 
 def _trading_evidence_not_configured():
     """Refuse local rows as evidence before any resource lookup or mutation."""
-    return _error(
-        'Verified trading evidence integration is not configured',
-        503,
-        _TRADING_EVIDENCE_CODE,
-    )
+    return _unavailable_mutation('trading_evidence')
+
+
+def _unavailable_mutation(kind):
+    """Refuse unverified legacy mutations before body parsing or resource SQL."""
+    refusal = AdminClosureChallengesService.refuse_unverified_mutation(kind)
+    return _error(refusal.message, refusal.status, refusal.code)
 
 
 def _ambiguous_mt5_binding():
@@ -189,34 +189,6 @@ def _strict_positive_query_integer(name, default, maximum):
     return parsed
 
 
-def _admin_list_arguments():
-    """Accept a deliberately small, duplicate-free query surface."""
-    allowed = {'page', 'per_page', 'status', 'include_mt5'}
-    if any(key not in allowed for key in request.args):
-        return None, _error('Invalid query parameters', 400, 'QUERY_INVALID')
-    if any(len(request.args.getlist(key)) > 1 for key in allowed):
-        return None, _error('Duplicate query parameters are not allowed', 400, 'QUERY_INVALID')
-
-    page = _strict_positive_query_integer('page', '1', 1000)
-    per_page = _strict_positive_query_integer('per_page', '20', 100)
-    if page is None or per_page is None:
-        return None, _error('Invalid pagination', 400, 'PAGINATION_INVALID')
-
-    include_mt5 = request.args.get('include_mt5', 'true')
-    if include_mt5 not in {'true', 'false'}:
-        return None, _error('include_mt5 must be true or false', 400, 'QUERY_INVALID')
-
-    status = request.args.get('status')
-    if status is not None and (not status or len(status) > 20):
-        return None, _error('Invalid status', 400, 'QUERY_INVALID')
-    return {
-        'page': page,
-        'per_page': per_page,
-        'status': status,
-        'include_mt5': include_mt5 == 'true',
-    }, None
-
-
 def _my_challenge_list_arguments():
     """Accept only bounded owner-list filters, without MT5 lookup controls."""
     allowed = {'page', 'per_page', 'status'}
@@ -240,44 +212,11 @@ def _my_challenge_list_arguments():
     }, None
 
 
-def _admin_challenge_query(actor):
-    """Build the explicit root-or-CRM scope and require a matching program tenant."""
-    query = db.session.query(Challenge, User, TradingProgram).join(
-        User, Challenge.user_id == User.id
-    ).join(
-        TradingProgram, Challenge.program_id == TradingProgram.id
-    ).filter(
-        User.tenant_id == TradingProgram.tenant_id,
-    )
-
-    # A corrupted account binding is not an authorization proof.  Use an alias
-    # in the subquery so its Challenge columns cannot self-correlate away.
-    # Hide that challenge rather than attaching another user's account to it.
-    bound_challenge = aliased(Challenge)
-    foreign_binding_ids = select(MT5Account.challenge_id).join(
-        bound_challenge, MT5Account.challenge_id == bound_challenge.id
-    ).filter(
-        MT5Account.user_id != bound_challenge.user_id,
-    )
-    query = query.filter(~Challenge.id.in_(foreign_binding_ids))
-
-    if not platform_root_scope(actor):
-        # CRM's current tenant/downline predicate is the non-root authority.
-        # It returns no rows when the actor lacks a valid tenant scope.
-        scoped_user_ids = crm_scope.scoped_users(actor).with_entities(User.id)
-        query = query.filter(Challenge.user_id.in_(scoped_user_ids))
-    return query
-
-
 @challenges_bp.route('/', methods=['POST'])
 @token_required
 def create_challenge(current_user):
     """Legacy direct creation remains disabled pending canonical settlement."""
-    return _error(
-        'Order settlement is not configured',
-        503,
-        'ORDER_SETTLEMENT_NOT_CONFIGURED',
-    )
+    return _unavailable_mutation('order_settlement')
 
 
 @challenges_bp.route('/my-challenges', methods=['GET'])
@@ -333,11 +272,7 @@ def get_my_challenges(current_user):
 @token_required
 def start_challenge(current_user, challenge_id):
     """Legacy activation remains disabled pending canonical settlement."""
-    return _error(
-        'Order settlement is not configured',
-        503,
-        'ORDER_SETTLEMENT_NOT_CONFIGURED',
-    )
+    return _unavailable_mutation('order_settlement')
 
 
 @challenges_bp.route('/<int:challenge_id>/evaluate', methods=['POST'])
@@ -368,80 +303,41 @@ def add_trade(current_user, challenge_id):
 @admin_required
 @_read_only
 def get_all_challenges():
-    """List bounded, explicitly scoped legacy snapshots without provider I/O."""
-    arguments, argument_error = _admin_list_arguments()
-    if argument_error:
-        return argument_error
-
+    """List one bounded root-or-downline snapshot without provider I/O."""
     try:
-        query = _admin_challenge_query(g.current_user)
-        if arguments['status'] is not None:
-            query = query.filter(Challenge.status == arguments['status'])
-
-        total = query.order_by(None).count()
-        offset = (arguments['page'] - 1) * arguments['per_page']
-        rows = query.order_by(desc(Challenge.created_at), desc(Challenge.id)).offset(offset).limit(
-            arguments['per_page']
-        ).all()
-
-        accounts_by_challenge = {}
-        if arguments['include_mt5'] and rows:
-            challenge_ids = [challenge.id for challenge, _user, _program in rows]
-            # At most one account is expected per challenge.  Reading 201 rather
-            # than silently truncating detects an unbounded corrupt legacy set.
-            accounts = db.session.query(MT5Account).join(
-                Challenge, MT5Account.challenge_id == Challenge.id
-            ).filter(
-                MT5Account.challenge_id.in_(challenge_ids),
-                MT5Account.user_id == Challenge.user_id,
-            ).order_by(MT5Account.id).limit(201).all()
-            if len(accounts) >= 201:
-                return _ambiguous_mt5_binding()
-            for account in accounts:
-                accounts_by_challenge.setdefault(account.challenge_id, []).append(account)
-
-        challenges = []
-        for challenge, user, program in rows:
-            item = _legacy_challenge_projection(challenge, program, user=user)
-            accounts = accounts_by_challenge.get(challenge.id, [])
-            if not arguments['include_mt5']:
-                item['mt5_account'] = None
-                item['mt5_account_binding'] = 'not_requested'
-            elif len(accounts) == 1:
-                item['mt5_account'] = _legacy_mt5_projection(accounts[0])
-                item['mt5_account_binding'] = 'single_unverified_legacy'
-            elif len(accounts) > 1:
-                # Never select the first row from a corrupted one-to-many link.
-                item['mt5_account'] = None
-                item['mt5_account_binding'] = 'ambiguous'
-            else:
-                item['mt5_account'] = None
-                item['mt5_account_binding'] = 'not_linked'
-            challenges.append(item)
-
-        pages = (total + arguments['per_page'] - 1) // arguments['per_page']
-        return jsonify({
-            'challenges': challenges,
-            'pagination': {
-                'page': arguments['page'],
-                'per_page': arguments['per_page'],
-                'total': total,
-                'pages': pages,
-            },
-            'data_status': _UNVERIFIED_LEGACY,
-            'provider_authenticated': False,
-        }), 200
+        arguments = AdminClosureChallengesService.parse_list_query(request.args)
+        return jsonify(AdminClosureChallengesService.list(g.current_user, arguments)), 200
+    except AdminClosureChallengesPaginationInvalid:
+        return _error('Invalid pagination', 400, 'PAGINATION_INVALID')
+    except AdminClosureChallengesQueryInvalid:
+        return _error('Invalid query parameters', 400, 'QUERY_INVALID')
+    except AdminClosureChallengesScopeRequired:
+        return _error('Administrator scope is required', 403, 'ADMIN_CHALLENGE_SCOPE_REQUIRED')
     except Exception:
         logger.exception('Scoped challenge listing failed')
         return _error('Unable to retrieve challenges', 500, 'CHALLENGE_READ_FAILED')
 
 
-@challenges_bp.route('/admin/<int:challenge_id>', methods=['DELETE'])
+@challenges_bp.route('/admin/<int:challenge_id>', methods=['GET', 'DELETE'])
 @token_required
 @admin_required
-def delete_challenge(challenge_id):
-    """Keep challenge and trade history immutable until an evidence policy exists."""
-    return _trading_evidence_not_configured()
+@_read_only
+def admin_challenge_detail(challenge_id):
+    """Read an admin-scoped legacy detail or refuse the legacy delete mutation."""
+    if request.method == 'DELETE':
+        return _trading_evidence_not_configured()
+    try:
+        arguments = AdminClosureChallengesService.parse_detail_query(request.args)
+        return jsonify(AdminClosureChallengesService.detail(g.current_user, challenge_id, arguments)), 200
+    except AdminClosureChallengesQueryInvalid:
+        return _error('Invalid query parameters', 400, 'QUERY_INVALID')
+    except AdminClosureChallengesScopeRequired:
+        return _error('Administrator scope is required', 403, 'ADMIN_CHALLENGE_SCOPE_REQUIRED')
+    except AdminClosureChallengeNotFound:
+        return _error('Challenge not found', 404, 'ADMIN_CHALLENGE_NOT_FOUND')
+    except Exception:
+        logger.exception('Scoped challenge detail failed')
+        return _error('Unable to retrieve challenge', 500, 'CHALLENGE_READ_FAILED')
 
 
 @challenges_bp.route('/<int:challenge_id>/mt5-credentials', methods=['GET'])

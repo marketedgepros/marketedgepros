@@ -180,10 +180,19 @@ def test_legacy_admin_kyc_links_do_not_expose_storage_references(kyc_app):
         db.session.commit()
     response=kyc_app.test_client().get('/api/v1/admin/kyc/pending',headers=headers(kyc_app,2))
     assert response.status_code==200
-    assert response.get_json()['pending_kyc'][0]['kyc_id_url']==download_url()
+    payload=response.get_json()
+    assert payload['owner_context']=={'user_id':2,'tenant_id':10}
+    assert payload['review_scope']=='recorded_document_only'
+    assert payload['submissions'][0]['user_id']==1
+    assert 'kyc_id_url' not in response.get_data(as_text=True)
     assert 'local-kyc:' not in response.get_data(as_text=True)
+    detail=kyc_app.test_client().get('/api/v1/kyc/admin/submissions/1',headers=headers(kyc_app,2))
+    assert detail.status_code==200
+    assert next(d for d in detail.get_json()['documents'] if d['type']=='id_proof')['url']==download_url()
+    assert 'local-kyc:' not in detail.get_data(as_text=True)
     foreign=kyc_app.test_client().get('/api/v1/admin/kyc/pending',headers=headers(kyc_app,4))
-    assert foreign.status_code==200 and foreign.get_json()['pending_kyc']==[]
+    assert foreign.status_code==200 and foreign.get_json()['submissions']==[]
+    assert kyc_app.test_client().get('/api/v1/kyc/admin/submissions/1',headers=headers(kyc_app,4)).status_code==404
 
 
 def test_spaces_upload_acl_and_authenticated_download(kyc_app,monkeypatch):

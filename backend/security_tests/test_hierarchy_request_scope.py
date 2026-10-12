@@ -225,9 +225,15 @@ def test_hierarchy_admin_invalid_parent_cannot_leave_committed_account(scope_app
 
 def test_hierarchy_admin_creation_is_owned_canonical_and_has_no_new_capability(scope_app):
     _mvp_owner(scope_app)
-    response=scope_app.test_client().post('/api/v1/admin/users',headers=_signed_headers(scope_app,1),json={
-        'email':'atomic-child@example.com','password':'ValidPassword!2026','first_name':'Atomic','last_name':'Child','role':'trader',
-        'can_create_same_role':True})
+    payload={'email':'atomic-child@example.com','password':'ValidPassword!2026',
+        'first_name':'Atomic','last_name':'Child','role':'trader'}
+    rejected=scope_app.test_client().post('/api/v1/admin/users',headers=_signed_headers(scope_app,1),
+        json={**payload,'can_create_same_role':True})
+    assert rejected.status_code==400
+    with scope_app.app_context():
+        assert User.query.count()==15
+        assert User.query.filter_by(email=payload['email']).first() is None
+    response=scope_app.test_client().post('/api/v1/admin/users',headers=_signed_headers(scope_app,1),json=payload)
     assert response.status_code==201
     with scope_app.app_context():
         child=User.query.filter_by(email='atomic-child@example.com').one()

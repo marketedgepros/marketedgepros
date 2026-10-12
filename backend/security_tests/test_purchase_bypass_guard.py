@@ -249,7 +249,8 @@ def test_purchase_bypass_guard_blocks_direct_challenge_creation_and_start_withou
             raise AssertionError("legacy settlement gate must run before MT5 use")
 
     import src.routes.challenges as challenge_routes
-    monkeypatch.setattr(challenge_routes, "mt5_challenge_service", _NoMT5Calls())
+    # The provider import is gone; a canary still proves no legacy use occurs.
+    monkeypatch.setattr(challenge_routes, "mt5_challenge_service", _NoMT5Calls(), raising=False)
     before = _snapshot(app)
     malicious_direct_payload = {
         "program_id": _PROGRAM_ID,

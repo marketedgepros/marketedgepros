@@ -295,8 +295,9 @@ def test_my_challenge_list_is_no_autoflush_no_dml_and_never_touches_provider(app
     from src.models.trading_program import Challenge
     from src.routes import challenges as challenge_routes
 
-    monkeypatch.setattr(challenge_routes, 'mt5_service', _ForbiddenProvider())
-    monkeypatch.setattr(challenge_routes, 'mt5_challenge_service', _ForbiddenProvider())
+    # Provider globals were removed; retain canaries without re-importing a provider.
+    monkeypatch.setattr(challenge_routes, 'mt5_service', _ForbiddenProvider(), raising=False)
+    monkeypatch.setattr(challenge_routes, 'mt5_challenge_service', _ForbiddenProvider(), raising=False)
     writes = []
 
     def observe_write(_conn, _cursor, statement, _parameters, _context, _executemany):
