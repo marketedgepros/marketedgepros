@@ -1,9 +1,14 @@
 """Analytics routes for advanced dashboard data."""
 from datetime import datetime
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from src.services.analytics_service import AnalyticsService
+from src.services.admin_insights_read import (
+    AdminInsightsQueryInvalid,
+    AdminInsightsScopeRequired,
+    AdminInsightsReadService,
+)
 from src.utils.analytics_cache import (
     analytics_cached,
     bounded_days_filter,
@@ -143,23 +148,19 @@ def get_payment_statistics(current_user):
 @token_required
 @admin_required
 @tenant_required
-@analytics_cached(filters=bounded_days_filter)
 def get_comprehensive_analytics(current_user):
-    """Get comprehensive analytics data for dashboard"""
+    """Return the bounded, uncached UI-4 insight analytics projection."""
     try:
-        days = bounded_days_filter()['days']
-        data = AnalyticsService.get_comprehensive_analytics(
-            days,
-            tenant_id=current_user.tenant_id,
-            current_user=current_user,
-        )
-        
-        return jsonify({
-            'data': data,
-            'period': f'Last {days} days',
-            'generated_at': datetime.utcnow().isoformat()
-        }), 200
-        
-    except Exception as e:
-        logger.error(f'Error in comprehensive-analytics endpoint: {str(e)}')
-        return jsonify({'error': 'Failed to fetch comprehensive analytics'}), 500
+        # Validate query syntax before constructing any resource CTEs.  This one
+        # route deliberately bypasses the shared analytics cache.
+        days = AdminInsightsReadService.parse_comprehensive_query(request.args)
+        return jsonify(AdminInsightsReadService.comprehensive(current_user, days)), 200
+    except AdminInsightsQueryInvalid:
+        return jsonify({'error': 'Invalid admin insights query', 'code': 'INVALID_ADMIN_INSIGHTS_QUERY'}), 400
+    except AdminInsightsScopeRequired:
+        return jsonify({'error': 'Admin insights scope is required', 'code': 'ADMIN_INSIGHTS_SCOPE_REQUIRED'}), 403
+    except Exception:
+        from src.database import db
+        db.session.rollback()
+        return jsonify({'error': 'Admin insights are temporarily unavailable',
+                        'code': 'ADMIN_INSIGHTS_READ_FAILED'}), 503

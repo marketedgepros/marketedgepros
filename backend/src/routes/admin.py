@@ -19,6 +19,11 @@ from src.services.admin_payment_records_read import (
     AdminPaymentScopeRequired,
     AdminPaymentRecordsReadService,
 )
+from src.services.admin_insights_read import (
+    AdminInsightsQueryInvalid,
+    AdminInsightsScopeRequired,
+    AdminInsightsReadService,
+)
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_
 
@@ -29,79 +34,20 @@ admin_bp = Blueprint('admin', __name__)
 @token_required
 @admin_required
 def get_dashboard_stats(current_user):
-    """Get admin dashboard statistics"""
+    """Return the bounded, hierarchy-scoped UI-4 dashboard insight projection."""
     try:
-        # User statistics
-        total_users = User.query.count()
-        active_users = User.query.filter_by(is_active=True).count()
-        pending_kyc = User.query.filter_by(kyc_status='pending').count()
-        
-        # Revenue statistics
-        total_revenue = db.session.query(func.sum(Payment.amount)).filter(
-            Payment.status == 'completed'
-        ).scalar() or 0
-        
-        # Monthly revenue (last 30 days)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        monthly_revenue = db.session.query(func.sum(Payment.amount)).filter(
-            and_(
-                Payment.status == 'completed',
-                Payment.created_at >= thirty_days_ago
-            )
-        ).scalar() or 0
-        
-        # Challenge statistics
-        total_challenges = Challenge.query.count()
-        active_challenges = Challenge.query.filter_by(status='active').count()
-        completed_challenges = Challenge.query.filter_by(status='completed').count()
-        failed_challenges = Challenge.query.filter_by(status='failed').count()
-        funded_challenges = Challenge.query.filter_by(status='funded').count()
-        
-        # Recent users (last 5) - automatically filtered by hierarchy!
-        recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
-        
-        # Recent payments (last 5)
-        recent_payments = Payment.query.order_by(Payment.created_at.desc()).limit(5).all()
-        
-        return jsonify({
-            'users': {
-                'total': total_users,
-                'active': active_users,
-                'pending_kyc': pending_kyc,
-                'suspended': User.query.filter_by(is_active=False).count()
-            },
-            'revenue': {
-                'total': float(total_revenue),
-                'monthly': float(monthly_revenue),
-                'average_per_user': float(total_revenue / total_users) if total_users > 0 else 0
-            },
-            'challenges': {
-                'total': total_challenges,
-                'active': active_challenges,
-                'completed': completed_challenges,
-                'failed': failed_challenges,
-                'funded': funded_challenges
-            },
-            'recent_users': [{
-                'id': user.id,
-                'name': f"{user.first_name} {user.last_name}",
-                'email': user.email,
-                'role': user.role,
-                'status': 'active' if user.is_active else 'inactive',
-                'created_at': user.created_at.isoformat()
-            } for user in recent_users],
-            'recent_payments': [{
-                'id': payment.id,
-                'user_id': payment.user_id,
-                'amount': float(payment.amount),
-                'type': payment.purpose,
-                'status': payment.status,
-                'created_at': payment.created_at.isoformat()
-            } for payment in recent_payments]
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Syntax is checked before the service constructs any users/challenges/
+        # payments SQL.  Authentication and the existing admin gate are above.
+        AdminInsightsReadService.parse_dashboard_query(request.args)
+        return jsonify(AdminInsightsReadService.dashboard(current_user)), 200
+    except AdminInsightsQueryInvalid:
+        return jsonify({'error': 'Invalid admin insights query', 'code': 'INVALID_ADMIN_INSIGHTS_QUERY'}), 400
+    except AdminInsightsScopeRequired:
+        return jsonify({'error': 'Admin insights scope is required', 'code': 'ADMIN_INSIGHTS_SCOPE_REQUIRED'}), 403
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'Admin insights are temporarily unavailable',
+                        'code': 'ADMIN_INSIGHTS_READ_FAILED'}), 503
 
 
 @admin_bp.route('/users', methods=['GET'])

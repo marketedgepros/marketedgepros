@@ -14,16 +14,13 @@ import {
   X,
   Shield,
   ChevronRight,
-  Search,
-  FileText,
-  Mail,
+  LifeBuoy,
   Award,
 } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -51,27 +48,22 @@ export default function AdminLayout({ children }) {
     navigate('/login');
   };
 
-  // Close dropdowns when clicking outside
+  // A route change closes the navigation rather than leaving it over new content.
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (isSearchOpen && !e.target.closest('.search-dropdown')) {
-        setIsSearchOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isSearchOpen]);
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
       {/* Sidebar */}
       <aside
+        id="admin-navigation"
+        aria-label="Administration navigation"
         className={`
           fixed lg:static inset-y-0 left-0 z-40
           w-72 bg-slate-800/30 backdrop-blur-xl border-r border-white/10
-          transform transition-transform duration-300 ease-in-out
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          transform transition-transform duration-200 ease-in-out motion-reduce:transition-none
+          ${isMobileMenuOpen ? 'visible translate-x-0' : 'invisible lg:visible -translate-x-full lg:translate-x-0'}
           flex flex-col
         `}
       >
@@ -90,6 +82,7 @@ export default function AdminLayout({ children }) {
           </Link>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Close administration menu"
             className="lg:hidden p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -125,9 +118,10 @@ export default function AdminLayout({ children }) {
                   <Link
                     to={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
+                    aria-current={active ? 'page' : undefined}
                     className={`
                       group flex items-center gap-3 px-4 py-3 rounded-xl
-                      transition-all duration-200 relative overflow-hidden
+                      transition-all duration-200 motion-reduce:transition-none relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400
                       ${
                         active
                           ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg shadow-cyan-500/30'
@@ -140,10 +134,10 @@ export default function AdminLayout({ children }) {
                       <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     )}
                     
-                    <Icon className={`w-5 h-5 relative z-10 ${active ? 'animate-pulse' : ''}`} />
+                    <Icon className="w-5 h-5 relative z-10" />
                     <span className="font-medium relative z-10">{item.title}</span>
                     {active && (
-                      <ChevronRight className="w-4 h-4 ml-auto relative z-10 animate-pulse" />
+                      <ChevronRight className="w-4 h-4 ml-auto relative z-10" />
                     )}
                   </Link>
                 </li>
@@ -157,7 +151,7 @@ export default function AdminLayout({ children }) {
             onClick={handleLogout}
             className="group flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 w-full border border-transparent hover:border-red-500/30"
           >
-            <LogOut className="w-5 h-5 group-hover:animate-pulse" />
+            <LogOut className="w-5 h-5" />
             <span className="font-medium">Logout</span>
           </button>
         </div>
@@ -170,47 +164,30 @@ export default function AdminLayout({ children }) {
         ></div>
       )}
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative">
+      <main className="min-w-0 flex-1 overflow-y-auto relative">
         {/* Top Bar */}
-        <div className="sticky top-0 z-20 bg-slate-800/50 backdrop-blur-xl border-b border-white/10 px-8 py-4">
+        <div className="sticky top-0 z-20 bg-slate-800/50 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="min-w-0 flex items-center gap-2 sm:gap-4">
               <button
                 onClick={() => setIsMobileMenuOpen(true)}
+                aria-label="Open administration menu"
+                aria-controls="admin-navigation"
+                aria-expanded={isMobileMenuOpen}
                 className="lg:hidden p-2 rounded-xl bg-slate-700/30 hover:bg-slate-700/50 transition-all duration-200"
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="truncate text-base sm:text-2xl font-bold text-white">
                 {menuItems.find(item => isActive(item.path))?.title || 'Dashboard'}
               </h2>
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative search-dropdown">
-                <button 
-                  onClick={() => {
-                    setIsSearchOpen(!isSearchOpen);
-                  }}
-                  className="p-2 rounded-xl bg-slate-700/30 hover:bg-slate-700/50 text-gray-300 hover:text-white transition-all duration-200"
-                >
-                  <Search className="w-5 h-5" />
-                </button>
-                
-                {/* Search Dropdown */}
-                {isSearchOpen && (
-                  <div className="absolute top-full right-0 mt-2 w-96 bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-4 z-30">
-                    <input
-                      type="text"
-                      placeholder="Search users, transactions, data..."
-                      autoFocus
-                      className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                    <p className="text-sm text-gray-400 mt-3">Press Enter to search</p>
-                  </div>
-                )}
-              </div>
+              <Link to="/support/my-tickets" aria-label="My support tickets"
+                className="p-2 rounded-xl text-gray-300 hover:bg-slate-700/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+                <LifeBuoy className="h-5 w-5" aria-hidden="true" />
+              </Link>
               
               {/* Notifications */}
               <NotificationBell />
