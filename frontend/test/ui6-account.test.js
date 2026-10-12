@@ -334,6 +334,14 @@ test('UI6 account: live App Router redirects protected account entries and mount
     { entry: '/profile', state: { isAuthenticated: true, isLoading: false, user: admin }, expected: '/admin' },
     { entry: '/documents', state: { isAuthenticated: true, isLoading: false, user: admin }, expected: '/admin' },
     { entry: '/settings', state: { isAuthenticated: true, isLoading: false, user: admin }, expected: '/admin' },
+    { entry: '/agent', state: { isAuthenticated: false, isLoading: false, user: null }, expected: '/login' },
+    { entry: '/agent/traders', state: { isAuthenticated: false, isLoading: false, user: null }, expected: '/login' },
+    { entry: '/agent/commissions', state: { isAuthenticated: false, isLoading: false, user: null }, expected: '/login' },
+    { entry: '/agent/reports', state: { isAuthenticated: false, isLoading: false, user: null }, expected: '/login' },
+    { entry: '/agent', state: { isAuthenticated: true, isLoading: false, user: { id: 43, tenant_id: 7, role: 'affiliate' } }, expected: '/affiliate/dashboard' },
+    { entry: '/agent/traders', state: { isAuthenticated: true, isLoading: false, user: { id: 43, tenant_id: 7, role: 'affiliate' } }, expected: '/affiliate/traders' },
+    { entry: '/agent/commissions', state: { isAuthenticated: true, isLoading: false, user: { id: 43, tenant_id: 7, role: 'affiliate' } }, expected: '/affiliate/commissions' },
+    { entry: '/agent/reports', state: { isAuthenticated: true, isLoading: false, user: { id: 43, tenant_id: 7, role: 'affiliate' } }, expected: '/affiliate/reports' },
   ];
 
   try {

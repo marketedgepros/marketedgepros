@@ -1,0 +1,17 @@
+# Dedicated instance; never reuse the existing Redis at 6379.
+bind 127.0.0.1
+protected-mode yes
+port 6380
+requirepass @REDIS_PASSWORD@
+databases 3
+dir /var/lib/marketedgepros-demo/redis
+appendonly yes
+appendfilename appendonly.aof
+appendfsync everysec
+save 900 1
+maxmemory 128mb
+maxmemory-policy noeviction
+logfile ""
+daemonize no
+supervised no
+tcp-keepalive 60

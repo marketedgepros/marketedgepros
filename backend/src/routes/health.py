@@ -2,14 +2,21 @@
 Health Check Endpoint
 Monitors system health: database, Redis, Celery, disk space
 """
-from flask import Blueprint, jsonify
-from src.database import db
+import re
 from datetime import datetime
+
+from flask import Blueprint, current_app, jsonify
+from sqlalchemy import text
+
+from src import database
+from src.database import db
 import redis
-import os
 import psutil
 
 health_bp = Blueprint('health', __name__)
+
+_RELEASE_SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
+_DEPENDENCY_FAILURE = {'status': 'not_ready', 'reason': 'dependency_unavailable'}
 
 
 @health_bp.route('/health', methods=['GET'])
@@ -31,11 +38,11 @@ def health_check():
             'status': 'healthy',
             'message': 'Database connection OK'
         }
-    except Exception as e:
+    except Exception:
         health_status['status'] = 'unhealthy'
         health_status['checks']['database'] = {
             'status': 'unhealthy',
-            'message': f'Database error: {str(e)}'
+            'message': 'Database check failed'
         }
     
     # Check Redis
@@ -46,11 +53,11 @@ def health_check():
             'status': 'healthy',
             'message': 'Redis connection OK'
         }
-    except Exception as e:
+    except Exception:
         health_status['status'] = 'degraded'
         health_status['checks']['redis'] = {
             'status': 'unhealthy',
-            'message': f'Redis error: {str(e)}'
+            'message': 'Redis check failed'
         }
     
     # Check Disk Space
@@ -72,10 +79,10 @@ def health_check():
             'free_gb': round(disk.free / (1024**3), 2),
             'total_gb': round(disk.total / (1024**3), 2)
         }
-    except Exception as e:
+    except Exception:
         health_status['checks']['disk'] = {
             'status': 'unknown',
-            'message': f'Disk check error: {str(e)}'
+            'message': 'Disk check unavailable'
         }
     
     # Check Memory
@@ -97,10 +104,10 @@ def health_check():
             'available_gb': round(memory.available / (1024**3), 2),
             'total_gb': round(memory.total / (1024**3), 2)
         }
-    except Exception as e:
+    except Exception:
         health_status['checks']['memory'] = {
             'status': 'unknown',
-            'message': f'Memory check error: {str(e)}'
+            'message': 'Memory check unavailable'
         }
     
     # Check CPU
@@ -119,10 +126,10 @@ def health_check():
             'usage_percent': cpu_percent,
             'cores': psutil.cpu_count()
         }
-    except Exception as e:
+    except Exception:
         health_status['checks']['cpu'] = {
             'status': 'unknown',
-            'message': f'CPU check error: {str(e)}'
+            'message': 'CPU check unavailable'
         }
     
     # Determine HTTP status code
@@ -138,19 +145,48 @@ def health_check():
 
 @health_bp.route('/health/live', methods=['GET'])
 def liveness():
-    """Simple liveness probe - is the app running?"""
-    return jsonify({'status': 'alive'}), 200
+    """Return a minimal process-liveness response without dependency access."""
+    response = {'status': 'alive'}
+    release_sha = current_app.config.get('DEPLOYMENT_SHA')
+    if isinstance(release_sha, str) and _RELEASE_SHA.fullmatch(release_sha):
+        response['release_sha'] = release_sha
+    return jsonify(response), 200
 
 
 @health_bp.route('/health/ready', methods=['GET'])
 def readiness():
-    """Readiness probe - is the app ready to serve traffic?"""
+    """Check configured dependencies with read-only probes only."""
     try:
-        # Check database
-        db.session.execute(db.text('SELECT 1'))
-        return jsonify({'status': 'ready'}), 200
-    except Exception as e:
-        return jsonify({
-            'status': 'not_ready',
-            'reason': str(e)
-        }), 503
+        db.session.execute(text('SELECT 1'))
+
+        expected_revision = current_app.config.get('EXPECTED_SCHEMA_REVISION')
+        if expected_revision is not None:
+            revision = db.session.execute(
+                text('SELECT version_num FROM public.alembic_version')
+            ).scalar_one_or_none()
+            if revision != expected_revision:
+                return jsonify(_DEPENDENCY_FAILURE), 503
+
+        if current_app.config.get('REDIS_URL'):
+            redis_client = database.get_redis()
+            if redis_client is None or not redis_client.ping():
+                return jsonify(_DEPENDENCY_FAILURE), 503
+    except Exception:
+        return jsonify(_DEPENDENCY_FAILURE), 503
+
+    return jsonify({'status': 'ready'}), 200
+
+
+def _register_root_probe_routes(state):
+    """Expose unauthenticated probes outside the versioned API prefix."""
+    state.app.add_url_rule(
+        '/health/live', endpoint='health_live', view_func=liveness, methods=['GET']
+    )
+    state.app.add_url_rule(
+        '/health/ready', endpoint='health_ready', view_func=readiness, methods=['GET']
+    )
+
+
+# The application mounts this blueprint under /api/v1. Register root probes as
+# well so orchestration can use the stable, versionless health contract.
+health_bp.record_once(_register_root_probe_routes)

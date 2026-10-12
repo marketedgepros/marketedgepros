@@ -177,6 +177,11 @@ function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
+        {import.meta.env?.VITE_DEMO_RELEASE === 'true' && (
+          <aside aria-label="Demo release status" className="bg-slate-900 px-4 py-2 text-center text-sm text-cyan-200 border-b border-cyan-400/20">
+            Demo release — live trading, payments, payouts, registration and email delivery are disabled.
+          </aside>
+        )}
         <Notification />
         <AccountChatWidget />
       <Suspense fallback={
@@ -506,6 +511,12 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Compatibility URLs point only to the protected canonical affiliate pages. */}
+        <Route path="/agent" element={<Navigate to="/affiliate/dashboard" replace />} />
+        <Route path="/agent/traders" element={<Navigate to="/affiliate/traders" replace />} />
+        <Route path="/agent/commissions" element={<Navigate to="/affiliate/commissions" replace />} />
+        <Route path="/agent/reports" element={<Navigate to="/affiliate/reports" replace />} />
 
         {/* Affiliate Routes */}
         <Route

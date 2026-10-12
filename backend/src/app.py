@@ -13,7 +13,7 @@ if os.environ.get('FLASK_TESTING', '').lower() != 'true':
     from psycogreen.gevent import patch_psycopg
     patch_psycopg()
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -22,6 +22,10 @@ from flask_talisman import Talisman
 from src.extensions import limiter
 from src.config import get_config
 from src.database import db, init_db
+from src.production_safety import (
+    validate_demo_release_configuration,
+    validate_production_configuration,
+)
 from src.middleware.tenant_middleware import init_tenant_middleware
 import logging
 from prometheus_flask_exporter import PrometheusMetrics
@@ -48,6 +52,37 @@ def create_app(config_name=None, *, config_overrides=None):
         app.config.update(config_overrides)
     from src.testing_safety import validate_testing_resources
     validate_testing_resources(app.config)
+    # Validate the final application config, including controlled test overrides,
+    # before an extension can construct a database or Redis client.
+    validate_production_configuration(app.config)
+    validate_demo_release_configuration(app.config)
+
+    # This must precede tenant middleware and route decorators.  In particular,
+    # a blocked request cannot deserialize its body, resolve a tenant, touch SQL,
+    # invoke an auth service, or contact an email/provider service.
+    if app.config.get('DEMO_RELEASE_ENABLED') is True:
+        @app.before_request
+        def enforce_demo_release_boundary():
+            path = request.path
+            blocked_auth_action = (
+                path in {
+                    '/api/v1/auth/register',
+                    '/api/v1/auth/resend-verification',
+                    '/api/v1/auth/password/reset-request',
+                }
+                or path == '/api/v1/auth/verify-email'
+                or path.startswith('/api/v1/auth/verify-email/')
+            )
+            if blocked_auth_action:
+                return jsonify({
+                    'error': 'Registration and email actions are unavailable in this demo release.',
+                    'code': 'DEMO_ACTION_UNAVAILABLE',
+                }), 503
+            if path == '/api/v1/chat' or path.startswith('/api/v1/chat/'):
+                return jsonify({
+                    'error': 'Chat provider is unavailable in this demo release.',
+                    'code': 'DEMO_ACTION_UNAVAILABLE',
+                }), 503
 
     # Initialize extensions
     # Initialize Prometheus metrics
@@ -62,11 +97,7 @@ def create_app(config_name=None, *, config_overrides=None):
     
     # Initialize caching
     from src import cache
-    if app.testing:
-        cache.init_app(app)
-    else:
-        # Keep production cache behavior unchanged in this containment batch.
-        cache.init_app(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': 'redis://localhost:6379/0', 'CACHE_DEFAULT_TIMEOUT': 300})
+    cache.init_app(app)
     
     # Initialize tenant middleware
     init_tenant_middleware(app)

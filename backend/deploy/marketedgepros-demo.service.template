@@ -1,0 +1,33 @@
+[Unit]
+Description=MarketEdgePros isolated demo release
+After=network.target postgresql.service marketedgepros-demo-redis.service
+Requires=marketedgepros-demo-redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=@RELEASE_PATH@/backend
+EnvironmentFile=/etc/marketedgepros-demo/runtime.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+UnsetEnvironment=OPENAI_API_KEY OPENAI_API_BASE STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET SENDGRID_API_KEY NOWPAYMENTS_API_KEY NOWPAYMENTS_IPN_SECRET MT_SERVER MT_LOGIN MT_PASSWORD
+ExecStart=@RELEASE_PATH@/.venv/bin/gunicorn -c deploy/gunicorn.conf.py deploy.wsgi:app
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=40
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/marketedgepros-demo
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077
+LimitNOFILE=1024
+MemoryMax=1G
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

@@ -17,14 +17,22 @@ import secrets
 class Config:
     WTF_CSRF_ENABLED = True
     """Base configuration"""
-    
+
+    # Production-only deployment checks key off this explicit profile marker.
+    PRODUCTION = False
+
     # Application
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     DEBUG = False
     TESTING = False
+    # Demo mode is an explicit, deployment-scoped feature flag.  It defaults
+    # closed so a normal release retains its established route behavior.
+    DEMO_RELEASE_ENABLED = os.getenv('DEMO_RELEASE_ENABLED', 'false').lower() == 'true'
     # Single-brand ownership is pinned by a reviewed stable DB ID, not email.
     PLATFORM_ROOT_USER_ID = os.getenv('PLATFORM_ROOT_USER_ID')
     EXPANDED_HIERARCHY_ENABLED = False
+    DEPLOYMENT_SHA = os.getenv('DEPLOYMENT_SHA')
+    EXPECTED_SCHEMA_REVISION = os.getenv('EXPECTED_SCHEMA_REVISION')
     # Quote-only foundation: explicit opt-in and no implied merchant currency.
     ORDER_QUOTES_ENABLED = os.getenv('ORDER_QUOTES_ENABLED', 'false').lower() == 'true'
     ORDER_QUOTE_CURRENCY = os.getenv('ORDER_QUOTE_CURRENCY')
@@ -44,7 +52,9 @@ class Config:
     
     # Flask-Caching configuration
     CACHE_TYPE = 'RedisCache'
-    CACHE_REDIS_URL = REDIS_URL
+    # Cache and limiter may be routed independently in deployment. They retain
+    # the shared Redis default unless their dedicated environment variables are set.
+    CACHE_REDIS_URL = os.getenv('CACHE_REDIS_URL', REDIS_URL)
     CACHE_DEFAULT_TIMEOUT = 600  # 10 minutes
     CACHE_KEY_PREFIX = 'marketedgepros_'
     
@@ -85,7 +95,7 @@ class Config:
     
     # Rate Limiting
     RATELIMIT_ENABLED = True
-    RATELIMIT_STORAGE_URL = REDIS_URL
+    RATELIMIT_STORAGE_URL = os.getenv('RATELIMIT_STORAGE_URL', REDIS_URL)
 
 
 class DevelopmentConfig(Config):
@@ -102,6 +112,9 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     """Isolated defaults; PostgreSQL requires an explicit per-run test URL."""
     TESTING = True
+    # Tests must opt into the boundary explicitly; do not inherit a parent
+    # deployment's demo flag when constructing an in-process application.
+    DEMO_RELEASE_ENABLED = False
     # Existing legacy-feature suites remain explicit future-mode regressions.
     EXPANDED_HIERARCHY_ENABLED = True
     ORDER_QUOTES_ENABLED = False
@@ -119,6 +132,7 @@ class TestingConfig(Config):
     MAIL_SUPPRESS_SEND = True
     SENDGRID_API_KEY = None
     STRIPE_SECRET_KEY = None
+    STRIPE_PUBLISHABLE_KEY = None
     STRIPE_WEBHOOK_SECRET = None
     NOWPAYMENTS_API_KEY = None
     NOWPAYMENTS_IPN_SECRET = None
@@ -130,17 +144,21 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     """Production configuration"""
+    PRODUCTION = True
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
-    
-    # Override to ensure SECRET_KEY is set
-    SECRET_KEY = os.getenv('SECRET_KEY') or Config.SECRET_KEY
-    
-    # Database connection pooling - OPTIMIZED FOR PGBOUNCER
-    # PgBouncer handles the real DB connections (20 max)
-    # We can have many more app-level connections
+
+    # Missing values remain missing so production validation can fail closed.
+    SECRET_KEY = os.getenv('SECRET_KEY')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
+    REDIS_URL = os.getenv('REDIS_URL')
+    CACHE_REDIS_URL = os.getenv('CACHE_REDIS_URL', REDIS_URL)
+    RATELIMIT_STORAGE_URL = os.getenv('RATELIMIT_STORAGE_URL', REDIS_URL)
+
+    # Direct PostgreSQL deployment: bound the application pool to at most ten
+    # checked-out/overflow connections while preserving connection/query deadlines.
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 100,  # Large pool (PgBouncer will manage real DB connections)
-        'max_overflow': 200,  # Allow bursts (PgBouncer handles it)
+        'pool_size': 5,
+        'max_overflow': 5,
         'pool_timeout': 30,  # Shorter timeout (fail fast)
         'pool_recycle': 1800,  # Recycle every 30 min
         'pool_pre_ping': True,  # Test connections before use
@@ -150,26 +168,6 @@ class ProductionConfig(Config):
             'options': '-c statement_timeout=30000'  # 30s query timeout
         }
     }
-    
-    # Ensure critical settings are set in production
-    @classmethod
-    def init_app(cls, app):
-        Config.init_app(app)
-        
-        # Check for required environment variables
-        required_vars = [
-            'SECRET_KEY',
-            'DATABASE_URL',
-            'REDIS_URL',
-            'STRIPE_SECRET_KEY',
-            'SENDGRID_API_KEY'
-        ]
-        
-        missing_vars = [var for var in required_vars if not os.getenv(var)]
-        if missing_vars:
-            raise ValueError(
-                f"Missing required environment variables: {', '.join(missing_vars)}"
-            )
 
 
 # Configuration dictionary

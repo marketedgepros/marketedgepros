@@ -175,6 +175,18 @@
       "path": "/admin/settings"
     },
     {
+      "path": "/agent"
+    },
+    {
+      "path": "/agent/traders"
+    },
+    {
+      "path": "/agent/commissions"
+    },
+    {
+      "path": "/agent/reports"
+    },
+    {
       "path": "/affiliate/dashboard"
     },
     {

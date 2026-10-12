@@ -1,9 +1,9 @@
 {
   "source": "reachable imports from frontend/src/main.jsx",
   "router": "frontend/src/App.jsx",
-  "routeCount": 67,
+  "routeCount": 71,
   "reachableJsFiles": 126,
-  "actionCount": 403,
+  "actionCount": 407,
   "missingImports": [],
   "routeDeclarations": [
     {
@@ -181,6 +181,18 @@
       "path": "/admin/settings"
     },
     {
+      "path": "/agent"
+    },
+    {
+      "path": "/agent/traders"
+    },
+    {
+      "path": "/agent/commissions"
+    },
+    {
+      "path": "/agent/reports"
+    },
+    {
       "path": "/affiliate/dashboard"
     },
     {
@@ -238,7 +250,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 214,
+      "line": 219,
       "kind": "to",
       "destination": "/terms-of-service",
       "expression": null,
@@ -247,7 +259,7 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 216,
+      "line": 221,
       "kind": "to",
       "destination": "/privacy-policy",
       "expression": null,
@@ -256,7 +268,43 @@
     },
     {
       "file": "frontend/src/App.jsx",
-      "line": 622,
+      "line": 516,
+      "kind": "to",
+      "destination": "/affiliate/dashboard",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 517,
+      "kind": "to",
+      "destination": "/affiliate/traders",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 518,
+      "kind": "to",
+      "destination": "/affiliate/commissions",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 519,
+      "kind": "to",
+      "destination": "/affiliate/reports",
+      "expression": null,
+      "phase": "UI-3/UI-4",
+      "status": "route-exists-static-only"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "line": 633,
       "kind": "href",
       "destination": "/",
       "expression": null,
