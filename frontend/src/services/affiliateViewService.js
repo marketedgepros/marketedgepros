@@ -1,5 +1,10 @@
 import api from './api.js';
 import { recordedTimestampOrNull } from './userDashboardViewService.js';
+import {
+  createAffiliateRecordViewService,
+  mapAffiliateReferral as mapAffiliateReferralRecord,
+  mapAffiliateCommission as mapAffiliateCommissionRecord,
+} from './affiliateRecordViewService.js';
 
 export const AFFILIATE_VIEW_ENDPOINTS = Object.freeze({
   referrals: '/affiliate/referrals',
@@ -45,38 +50,9 @@ const asNumberOrNull = (value) => {
 };
 const asTextOrNull = (value) => (typeof value === 'string' && value.trim() ? value : null);
 
-export const mapAffiliateReferral = (referral) => {
-  const source = requireRecord(referral, 'Affiliate referral');
-  const referredUser = source.referred_user === null || source.referred_user === undefined
-    ? {}
-    : requireRecord(source.referred_user, 'Affiliate referral user');
-
-  return {
-    id: source.id,
-    name: asTextOrNull(referredUser.name),
-    email: asTextOrNull(referredUser.email),
-    status: asTextOrNull(source.status),
-    clickDate: asTextOrNull(source.click_date),
-    conversionDate: asTextOrNull(source.conversion_date),
-    purchaseAmount: asNumberOrNull(source.purchase_amount),
-    commissionAmount: asNumberOrNull(source.commission_amount),
-  };
-};
-
-export const mapAffiliateCommission = (commission) => {
-  const source = requireRecord(commission, 'Affiliate commission');
-
-  return {
-    id: source.id,
-    amount: asNumberOrNull(source.amount),
-    type: asTextOrNull(source.type),
-    status: asTextOrNull(source.status),
-    description: asTextOrNull(source.description),
-    createdAt: asTextOrNull(source.created_at),
-    approvedAt: asTextOrNull(source.approved_at),
-    paidAt: asTextOrNull(source.paid_at),
-  };
-};
+// Compatibility row mappers now enforce the dedicated PII-free record contract.
+export const mapAffiliateReferral = (referral) => mapAffiliateReferralRecord(referral);
+export const mapAffiliateCommission = (commission) => mapAffiliateCommissionRecord(commission);
 
 const requireBoundedPositiveInteger = (value, label) => {
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_AFFILIATE_ID) {
@@ -294,34 +270,15 @@ export const mapAffiliateDashboard = (payload, options = {}) => {
   };
 };
 
-const paginationParams = ({ page = 1, perPage = 100, status } = {}) => ({
-  page,
-  per_page: perPage,
-  ...(status ? { status } : {}),
-});
-
-export async function loadAffiliateReferrals(options) {
-  const response = await api.get(AFFILIATE_VIEW_ENDPOINTS.referrals, {
-    params: paginationParams(options),
-  });
-  const data = requireRecord(response.data, 'Affiliate referrals');
-
-  return {
-    referrals: requireList(data.referrals, 'Affiliate referrals list').map(mapAffiliateReferral),
-    pagination: requireRecord(data.pagination, 'Affiliate referrals pagination'),
-  };
+/** Legacy loader names remain exported but require a verified affiliate principal before GET. */
+export async function loadAffiliateReferrals(options = {}) {
+  const client = options.apiClient || api;
+  return createAffiliateRecordViewService(client).referrals(options);
 }
 
-export async function loadAffiliateCommissions(options) {
-  const response = await api.get(AFFILIATE_VIEW_ENDPOINTS.commissions, {
-    params: paginationParams(options),
-  });
-  const data = requireRecord(response.data, 'Affiliate commissions');
-
-  return {
-    commissions: requireList(data.commissions, 'Affiliate commissions list').map(mapAffiliateCommission),
-    pagination: requireRecord(data.pagination, 'Affiliate commissions pagination'),
-  };
+export async function loadAffiliateCommissions(options = {}) {
+  const client = options.apiClient || api;
+  return createAffiliateRecordViewService(client).commissions(options);
 }
 
 const throwIfAborted = (signal) => {

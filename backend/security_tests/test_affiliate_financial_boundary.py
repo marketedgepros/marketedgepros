@@ -37,6 +37,8 @@ def affiliate_boundary_app():
         db.session.add_all([
             Tenant(id=1, name='Synthetic affiliate brand', subdomain='affiliate-boundary', status='active'),
             Tenant(id=2, name='Foreign brand', subdomain='affiliate-foreign', status='active'),
+            TradingProgram(id=1, tenant_id=1, name='Synthetic affiliate program', type='one_phase',
+                           account_size=Decimal('1000.00'), price=Decimal('99.00'), is_active=True),
         ])
         for identity, role, tenant in [(1, 'supermaster', 1), (2, 'affiliate', 1), (3, 'trader', 1), (4, 'affiliate', 2)]:
             db.session.add(User(id=identity, email=f'affiliate-{identity}@example.invalid', password_hash='not-a-credential',
@@ -51,7 +53,9 @@ def affiliate_boundary_app():
         db.session.add(AffiliateLink(id=10, user_id=2, code='SYNTH_AFFILIATE', commission_rate=Decimal('15.00'),
                                     clicks=12, conversions=1, total_revenue=Decimal('100.00'), total_commission=Decimal('15.00')))
         db.session.flush()
-        db.session.add(AffiliateReferral(id=11, affiliate_link_id=10, affiliate_user_id=2, referred_user_id=3, status='converted'))
+        db.session.execute(programs.insert().values(id=1))
+        db.session.add(AffiliateReferral(id=11, affiliate_link_id=10, affiliate_user_id=2, referred_user_id=3,
+                                         program_id=1, status='converted'))
         db.session.add(AffiliatePayout(id=12, affiliate_user_id=2, amount=Decimal('7.50'), method='synthetic', status='pending'))
         db.session.flush()
         db.session.add_all([

@@ -7,8 +7,7 @@ import re
 
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta
-from sqlalchemy import case, desc, func, or_
-from sqlalchemy.orm import aliased
+from sqlalchemy import case, desc, func
 import secrets
 import string
 
@@ -18,9 +17,12 @@ from src.models.affiliate import (
     AffiliatePayout, AffiliateSettings
 )
 from src.models.user import User
-from src.models.trading_program import TradingProgram
 from src.utils.decorators import token_required, admin_required
 from src.services.affiliate_financial_boundary import affiliate_mutation_unavailable_response
+from src.services.affiliate_records_read import (
+    AffiliateRecordsArgumentError,
+    AffiliateRecordsReadService,
+)
 from src.utils.hierarchy_scoping import platform_root_scope
 
 affiliate_bp = Blueprint('affiliate', __name__)
@@ -155,29 +157,10 @@ def get_dashboard(current_user):
         return f'https://marketedgepros.com/?ref={code}'
 
     try:
-        # A referral must name this owner, use this owner's link, refer either no
-        # user or a different user in the same tenant, and never use a current
-        # program from another tenant. A non-null program reference must resolve
-        # to a current program in this tenant; an absent historic program is not
-        # guessed into the dashboard.
-        referred_user = User.__table__.alias('dashboard_referred_user')
-        referral_program = aliased(TradingProgram)
-        valid_referral_filters = (
-            AffiliateReferral.affiliate_user_id == current_user.id,
-            AffiliateLink.user_id == current_user.id,
-            or_(
-                AffiliateReferral.referred_user_id.is_(None),
-                (referred_user.c.id.is_not(None)
-                 & (referred_user.c.id != current_user.id)
-                 & (referred_user.c.tenant_id == tenant_id)),
-            ),
-            or_(
-                AffiliateReferral.program_id.is_(None),
-                referral_program.tenant_id == tenant_id,
-            ),
-        )
-
         with db.session.no_autoflush:
+            # Keep the dashboard's fixed bounded query plan while applying the
+            # same local PostgreSQL timeout as the two record-list projections.
+            AffiliateRecordsReadService._set_postgresql_statement_timeout()
             link_totals = (
                 db.session.query(
                     func.count(AffiliateLink.id).label('total'),
@@ -204,7 +187,8 @@ def get_dashboard(current_user):
                 return jsonify({'error': 'Not registered as affiliate'}), 404
 
             commission_totals = (
-                db.session.query(
+                AffiliateRecordsReadService._coherent_commissions_query(current_user)
+                .with_entities(
                     func.sum(AffiliateCommission.amount).label('total'),
                     func.sum(case(
                         (AffiliateCommission.status == 'pending', AffiliateCommission.amount),
@@ -219,15 +203,6 @@ def get_dashboard(current_user):
                         else_=None,
                     )).label('paid'),
                 )
-                .select_from(AffiliateCommission)
-                .join(AffiliateReferral, AffiliateCommission.referral_id == AffiliateReferral.id)
-                .join(AffiliateLink, AffiliateReferral.affiliate_link_id == AffiliateLink.id)
-                .outerjoin(referred_user, AffiliateReferral.referred_user_id == referred_user.c.id)
-                .outerjoin(referral_program, AffiliateReferral.program_id == referral_program.id)
-                .filter(
-                    AffiliateCommission.affiliate_user_id == current_user.id,
-                    *valid_referral_filters,
-                )
                 .one()
             )
             links = (
@@ -238,12 +213,8 @@ def get_dashboard(current_user):
                 .all()
             )
             recent_referrals = (
-                db.session.query(AffiliateReferral)
+                AffiliateRecordsReadService._coherent_referrals_query(current_user)
                 .execution_options(autoflush=False)
-                .join(AffiliateLink, AffiliateReferral.affiliate_link_id == AffiliateLink.id)
-                .outerjoin(referred_user, AffiliateReferral.referred_user_id == referred_user.c.id)
-                .outerjoin(referral_program, AffiliateReferral.program_id == referral_program.id)
-                .filter(*valid_referral_filters)
                 .order_by(desc(AffiliateReferral.click_date), desc(AffiliateReferral.id))
                 .limit(10)
                 .all()
@@ -381,69 +352,69 @@ def create_affiliate_link(current_user):
 @affiliate_bp.route('/referrals', methods=['GET'])
 @token_required
 def get_referrals(current_user):
-    """Get all referrals for current user"""
+    """Return a bounded, coherent legacy referral page without PII."""
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        status = request.args.get('status')
-        
-        query = AffiliateReferral.query.filter_by(affiliate_user_id=current_user.id)
-        
-        if status:
-            query = query.filter_by(status=status)
-        
-        referrals = query.order_by(AffiliateReferral.click_date.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
+        arguments = AffiliateRecordsReadService.parse_referral_arguments(request.args)
+    except AffiliateRecordsArgumentError:
         return jsonify({
-            'referrals': [ref.to_dict() for ref in referrals.items],
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': referrals.total,
-                'pages': referrals.pages
-            }
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'Get referrals error: {str(e)}')
-        return jsonify({'error': 'Failed to get referrals'}), 500
+            'error': 'Invalid affiliate records query',
+            'code': 'AFFILIATE_RECORDS_QUERY_INVALID',
+        }), 400
+
+    # This gate intentionally follows query validation but precedes every
+    # affiliate resource query. Tenant identity is never inferred from a row.
+    if not AffiliateRecordsReadService.has_positive_tenant(current_user):
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    try:
+        return jsonify(AffiliateRecordsReadService.get_referrals(current_user, arguments)), 200
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('Affiliate referrals read failed')
+        return jsonify({
+            'error': 'Affiliate records are temporarily unavailable',
+            'code': 'AFFILIATE_RECORDS_UNAVAILABLE',
+        }), 503
 
 
 @affiliate_bp.route('/commissions', methods=['GET'])
 @token_required
 def get_commissions(current_user):
-    """Get all commissions for current user"""
+    """Return a bounded, coherent legacy commission page without payout authority."""
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        status = request.args.get('status')
-        
-        query = AffiliateCommission.query.filter_by(affiliate_user_id=current_user.id)
-        
-        if status:
-            query = query.filter_by(status=status)
-        
-        commissions = query.order_by(AffiliateCommission.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
+        arguments = AffiliateRecordsReadService.parse_commission_arguments(request.args)
+    except AffiliateRecordsArgumentError:
         return jsonify({
-            'commissions': [comm.to_dict() for comm in commissions.items],
-            'payouts_enabled': False,
-            'verification': 'unverified_legacy',
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': commissions.total,
-                'pages': commissions.pages
-            }
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'Get commissions error: {str(e)}')
-        return jsonify({'error': 'Failed to get commissions'}), 500
+            'error': 'Invalid affiliate records query',
+            'code': 'AFFILIATE_RECORDS_QUERY_INVALID',
+        }), 400
+
+    # Keep the same closed tenant boundary as referrals; authentication itself
+    # remains handled by token_required before this request reaches the handler.
+    if not AffiliateRecordsReadService.has_positive_tenant(current_user):
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    try:
+        return jsonify(AffiliateRecordsReadService.get_commissions(current_user, arguments)), 200
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('Affiliate commissions read failed')
+        return jsonify({
+            'error': 'Affiliate records are temporarily unavailable',
+            'code': 'AFFILIATE_RECORDS_UNAVAILABLE',
+        }), 503
 
 
 @affiliate_bp.route('/payout', methods=['POST'])

@@ -5,7 +5,7 @@ import json
 
 import pytest
 from flask import Flask
-from sqlalchemy import Column, Integer, Table, event, select
+from sqlalchemy import Column, Integer, Table, event, select, text
 
 
 @pytest.fixture
@@ -55,6 +55,12 @@ def ui4_dashboard_reads_pg_app(staging_resources):
     instant = datetime(2026, 10, 12, 10, 0, 0)
     with app.app_context():
         db.metadata.create_all(bind=db.engine, tables=tables)
+        # Temporary staging-only corruption proves that a non-null payout must
+        # resolve to the current affiliate owner before any dashboard aggregate.
+        db.session.execute(text(
+            "ALTER TABLE affiliate_commissions "
+            "DROP CONSTRAINT affiliate_commissions_payout_id_fkey"
+        ))
         # ``AffiliateReferral.program_id`` targets this fixture-only historic
         # table, not ``trading_programs``.  Its rows make the explicit foreign
         # key valid while the dashboard separately checks current program tenant.
@@ -103,16 +109,48 @@ def ui4_dashboard_reads_pg_app(staging_resources):
             # Satisfies the legacy FK but cannot resolve to a current tenant program.
             AffiliateReferral(id=6, affiliate_link_id=1, affiliate_user_id=2, referred_user_id=3, program_id=999,
                               status="converted", commission_amount=Decimal("90.00"), click_date=instant + timedelta(minutes=5)),
+            # Nullable historical parents are retained as incomplete source data.
+            AffiliateReferral(id=7, affiliate_link_id=1, affiliate_user_id=2, referred_user_id=None, program_id=None,
+                              status="pending", commission_amount=Decimal("2.00"), click_date=instant + timedelta(minutes=6)),
+            AffiliateReferral(id=8, affiliate_link_id=1, affiliate_user_id=2, referred_user_id=3, program_id=1,
+                              status="unknown", commission_amount=Decimal("100.00"), click_date=instant + timedelta(minutes=7)),
         ])
         db.session.flush()
         db.session.add_all([
-            AffiliateCommission(id=1, affiliate_user_id=2, referral_id=1, amount=Decimal("6.00"), status="approved"),
-            AffiliateCommission(id=2, affiliate_user_id=2, referral_id=2, amount=Decimal("50.00"), status="paid"),
-            AffiliateCommission(id=3, affiliate_user_id=2, referral_id=3, amount=Decimal("60.00"), status="approved"),
-            AffiliateCommission(id=4, affiliate_user_id=2, referral_id=4, amount=Decimal("70.00"), status="approved"),
-            AffiliateCommission(id=5, affiliate_user_id=2, referral_id=5, amount=Decimal("80.00"), status="approved"),
-            AffiliateCommission(id=6, affiliate_user_id=2, referral_id=None, amount=Decimal("90.00"), status="approved"),
-            AffiliateCommission(id=7, affiliate_user_id=2, referral_id=6, amount=Decimal("90.00"), status="approved"),
+            AffiliatePayout(id=1, affiliate_user_id=2, amount=Decimal("1.00"), method="hidden", status="pending"),
+            AffiliatePayout(id=2, affiliate_user_id=1, amount=Decimal("1.00"), method="hidden", status="pending"),
+            AffiliateCommission(id=1, affiliate_user_id=2, referral_id=1, amount=Decimal("6.00"),
+                                type="one_time", status="approved", created_at=instant),
+            AffiliateCommission(id=2, affiliate_user_id=2, referral_id=2, amount=Decimal("50.00"),
+                                type="one_time", status="paid", created_at=instant),
+            AffiliateCommission(id=3, affiliate_user_id=2, referral_id=3, amount=Decimal("60.00"),
+                                type="one_time", status="approved", created_at=instant),
+            AffiliateCommission(id=4, affiliate_user_id=2, referral_id=4, amount=Decimal("70.00"),
+                                type="one_time", status="approved", created_at=instant),
+            AffiliateCommission(id=5, affiliate_user_id=2, referral_id=5, amount=Decimal("80.00"),
+                                type="one_time", status="approved", created_at=instant),
+            AffiliateCommission(id=6, affiliate_user_id=2, referral_id=None, amount=Decimal("90.00"),
+                                type="one_time", status="approved", created_at=instant),
+            AffiliateCommission(id=7, affiliate_user_id=2, referral_id=6, amount=Decimal("90.00"),
+                                type="one_time", status="approved", created_at=instant),
+            AffiliateCommission(id=8, affiliate_user_id=2, referral_id=7, amount=Decimal("2.00"),
+                                type="one_time", status="pending", payout_id=1, created_at=instant),
+            AffiliateCommission(id=9, affiliate_user_id=2, referral_id=7, amount=Decimal("3.00"),
+                                type="one_time", status="approved", payout_id=1, created_at=instant),
+            AffiliateCommission(id=10, affiliate_user_id=2, referral_id=1, amount=Decimal("4.00"),
+                                type="one_time", status="paid", payout_id=1, created_at=instant),
+            AffiliateCommission(id=11, affiliate_user_id=2, referral_id=1, amount=Decimal("50.00"),
+                                type="one_time", status="pending", payout_id=2, created_at=instant),
+            AffiliateCommission(id=12, affiliate_user_id=2, referral_id=1, amount=Decimal("60.00"),
+                                type="one_time", status="approved", payout_id=999, created_at=instant),
+            AffiliateCommission(id=13, affiliate_user_id=2, referral_id=1, amount=Decimal("70.00"),
+                                type="one_time", status="paid", payout_id=2, created_at=instant),
+            AffiliateCommission(id=14, affiliate_user_id=2, referral_id=1, amount=Decimal("80.00"),
+                                type="one_time", status="paid", payout_id=999, created_at=instant),
+            AffiliateCommission(id=15, affiliate_user_id=2, referral_id=1, amount=Decimal("90.00"),
+                                type="legacy_unknown", status="approved", created_at=instant),
+            AffiliateCommission(id=16, affiliate_user_id=2, referral_id=8, amount=Decimal("100.00"),
+                                type="one_time", status="approved", created_at=instant),
         ])
         db.session.commit()
         app.tokens = {identity: db.session.get(User, identity).generate_access_token() for identity in (1, 2)}
@@ -156,9 +194,22 @@ def test_ui4_dashboard_reads_postgresql_owner_scope_decimals_and_no_writes(
         try:
             user_response = app.test_client().get("/api/v1/users/dashboard", headers=_headers(app, 1))
             affiliate_response = app.test_client().get("/api/v1/affiliate/dashboard", headers=_headers(app, 2))
+            referrals_response = app.test_client().get("/api/v1/affiliate/referrals", headers=_headers(app, 2))
+            pending_response = app.test_client().get(
+                "/api/v1/affiliate/commissions?status=pending", headers=_headers(app, 2),
+            )
+            approved_response = app.test_client().get(
+                "/api/v1/affiliate/commissions?status=approved", headers=_headers(app, 2),
+            )
+            paid_response = app.test_client().get(
+                "/api/v1/affiliate/commissions?status=paid", headers=_headers(app, 2),
+            )
         finally:
             event.remove(db.engine, "before_cursor_execute", observe)
-        assert user_response.status_code == affiliate_response.status_code == 200
+        assert (
+            user_response.status_code == affiliate_response.status_code == referrals_response.status_code
+            == pending_response.status_code == approved_response.status_code == paid_response.status_code == 200
+        )
         user_payload = user_response.get_json()
         affiliate_payload = affiliate_response.get_json()
         assert user_payload["owner_context"] == {"user_id": 1, "tenant_id": 1}
@@ -171,11 +222,11 @@ def test_ui4_dashboard_reads_postgresql_owner_scope_decimals_and_no_writes(
             "total_clicks": 4,
             "total_conversions": 1,
             "total_revenue": "40.00",
-            "total_commission": "6.00",
+            "total_commission": "15.00",
             "conversion_rate": "25",
-            "pending_commission": None,
-            "approved_commission": "6.00",
-            "paid_commission": None,
+            "pending_commission": "2.00",
+            "approved_commission": "9.00",
+            "paid_commission": "4.00",
             "currency": None,
             "available_for_payout": None,
             "payouts_enabled": False,
@@ -186,10 +237,11 @@ def test_ui4_dashboard_reads_postgresql_owner_scope_decimals_and_no_writes(
             "id": 1, "name": "Staging canonical root", "url": "https://marketedgepros.com/?ref=SAFEPGCOPY",
             "clicks": 4, "conversions": 1,
         }]
-        assert affiliate_payload["recent_referrals"] == [{
-            "id": 1, "status": "converted", "click_date": "2026-10-12T10:00:00",
-            "commission_amount": "6.00", "currency": None,
-        }]
+        assert [row["id"] for row in referrals_response.get_json()["referrals"]] == [7, 1]
+        assert [row["id"] for row in affiliate_payload["recent_referrals"]] == [7, 1]
+        assert [row["id"] for row in pending_response.get_json()["commissions"]] == [8]
+        assert [row["id"] for row in approved_response.get_json()["commissions"]] == [9, 1]
+        assert [row["id"] for row in paid_response.get_json()["commissions"]] == [10]
         assert writes == []
         db.session.expire_all()
         after = {

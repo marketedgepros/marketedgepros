@@ -33,31 +33,16 @@ test('affiliate pages use only current-account API URLs and map their supported 
 
     if (config.url === AFFILIATE_VIEW_ENDPOINTS.referrals) {
       return adapterResponse(config, {
-        referrals: [{
-          id: 17,
-          referred_user: { id: 44, name: 'Dana Trader', email: 'dana@example.test' },
-          status: 'converted',
-          purchase_amount: 150,
-          commission_amount: 45,
-          click_date: '2026-10-01T08:00:00Z',
-          conversion_date: '2026-10-02T08:00:00Z',
-        }],
-        pagination: { page: 1, per_page: 100, total: 1, pages: 1 },
+        owner_context: dashboardOwner, verification: 'unverified_legacy', payouts_enabled: false, available_for_payout: null, currency: null,
+        referrals: [{ id: 17, status: 'converted', purchase_amount: '150', commission_amount: '45', click_date: '2026-10-01T08:00:00Z', conversion_date: '2026-10-02T08:00:00Z', currency: null }],
+        pagination: { page: 1, per_page: 20, total: 1, pages: 1 }, filters: { status: null },
       });
     }
     if (config.url === AFFILIATE_VIEW_ENDPOINTS.commissions) {
       return adapterResponse(config, {
-        commissions: [{
-          id: 9,
-          amount: 45,
-          type: 'one_time',
-          status: 'paid',
-          description: 'Referral conversion',
-          created_at: '2026-10-02T08:00:00Z',
-          approved_at: '2026-10-03T08:00:00Z',
-          paid_at: '2026-10-04T08:00:00Z',
-        }],
-        pagination: { page: 1, per_page: 100, total: 1, pages: 1 },
+        owner_context: dashboardOwner, verification: 'unverified_legacy', payouts_enabled: false, available_for_payout: null, currency: null,
+        commissions: [{ id: 9, amount: '45', type: 'one_time', status: 'paid', created_at: '2026-10-02T08:00:00Z', approved_at: '2026-10-03T08:00:00Z', paid_at: '2026-10-04T08:00:00Z', currency: null }],
+        pagination: { page: 1, per_page: 20, total: 1, pages: 1 }, filters: { status: null },
       });
     }
     if (config.url === AFFILIATE_VIEW_ENDPOINTS.dashboard) {
@@ -86,35 +71,21 @@ test('affiliate pages use only current-account API URLs and map their supported 
 
   try {
     const [referrals, commissions, dashboard] = await Promise.all([
-      loadAffiliateReferrals(),
-      loadAffiliateCommissions(),
+      loadAffiliateReferrals({ expectedOwner: dashboardOwner, role: 'affiliate' }),
+      loadAffiliateCommissions({ expectedOwner: dashboardOwner, role: 'affiliate' }),
       loadAffiliateDashboard({ expectedOwner: dashboardOwner }),
     ]);
 
     assert.deepEqual(requests, [
-      { method: 'get', uri: '/api/v1/affiliate/referrals?page=1&per_page=100' },
-      { method: 'get', uri: '/api/v1/affiliate/commissions?page=1&per_page=100' },
+      { method: 'get', uri: '/api/v1/affiliate/referrals?page=1&per_page=20' },
+      { method: 'get', uri: '/api/v1/affiliate/commissions?page=1&per_page=20' },
       { method: 'get', uri: '/api/v1/affiliate/dashboard' },
     ]);
     assert.deepEqual(referrals.referrals[0], {
-      id: 17,
-      name: 'Dana Trader',
-      email: 'dana@example.test',
-      status: 'converted',
-      clickDate: '2026-10-01T08:00:00Z',
-      conversionDate: '2026-10-02T08:00:00Z',
-      purchaseAmount: 150,
-      commissionAmount: 45,
+      id: 17, status: 'converted', clickDate: '2026-10-01T08:00:00Z', conversionDate: '2026-10-02T08:00:00Z', purchaseAmount: '150', commissionAmount: '45', currency: null,
     });
     assert.deepEqual(commissions.commissions[0], {
-      id: 9,
-      amount: 45,
-      type: 'one_time',
-      status: 'paid',
-      description: 'Referral conversion',
-      createdAt: '2026-10-02T08:00:00Z',
-      approvedAt: '2026-10-03T08:00:00Z',
-      paidAt: '2026-10-04T08:00:00Z',
+      id: 9, amount: '45', type: 'one_time', status: 'paid', createdAt: '2026-10-02T08:00:00Z', approvedAt: '2026-10-03T08:00:00Z', paidAt: '2026-10-04T08:00:00Z', currency: null,
     });
     assert.deepEqual(dashboard.stats, {
       totalClicks: 120,

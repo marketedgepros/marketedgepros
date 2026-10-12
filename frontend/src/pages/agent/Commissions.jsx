@@ -1,196 +1,149 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Clock, DollarSign, Download } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import useAuthStore from '../../store/authStore';
 import {
-  affiliateViewError,
-  loadAffiliateCommissions,
-  loadAffiliateDashboard,
-} from '../../services/affiliateViewService';
+  AFFILIATE_COMMISSION_STATUSES,
+  AFFILIATE_RECORD_PAGE_SIZE,
+  affiliateRecordError,
+  downloadAffiliateCommissionsPage,
+} from '../../services/affiliateRecordViewService.js';
+import { useAffiliateRecordRead } from '../../hooks/useAffiliateAccountRead.js';
+import {
+  AffiliateExactAmount,
+  AffiliateExportButton,
+  AffiliateRecordBoundary,
+  AffiliateRecordHeader,
+  AffiliateRecordPagination,
+  AffiliateRecordReadState,
+  AffiliateStatusPill,
+  affiliateRecordDate,
+  affiliateRecordPanel,
+} from '../../components/affiliate/AffiliateRecordUI.jsx';
 
-const formatCurrency = (value) => (
-  Number.isFinite(value)
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
-    : '—'
-);
+const tenantSelector = (state) => state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null;
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '—');
-
-const statusClass = (status) => ({
-  paid: 'bg-green-100 text-green-800',
-  approved: 'bg-blue-100 text-blue-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  cancelled: 'bg-red-100 text-red-800',
-}[status] || 'bg-slate-700/50 text-gray-100');
-
-export default function Commissions() {
-  const [commissions, setCommissions] = useState([]);
-  const [pagination, setPagination] = useState({});
-  const [stats, setStats] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    const loadCommissions = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError(null);
-        const [commissionData, dashboardData] = await Promise.all([
-          loadAffiliateCommissions(),
-          loadAffiliateDashboard(),
-        ]);
-        if (isCurrent) {
-          setCommissions(commissionData.commissions);
-          setPagination(commissionData.pagination);
-          setStats(dashboardData.stats);
-        }
-      } catch (error) {
-        if (isCurrent) {
-          setCommissions([]);
-          setPagination({});
-          setStats(null);
-          setLoadError(affiliateViewError(error));
-        }
-      } finally {
-        if (isCurrent) setIsLoading(false);
-      }
-    };
-
-    loadCommissions();
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
-
-  const statuses = useMemo(
-    () => [...new Set(commissions.map((commission) => commission.status).filter(Boolean))],
-    [commissions],
-  );
-  const filteredCommissions = useMemo(
-    () => commissions.filter((commission) => filterStatus === 'all' || commission.status === filterStatus),
-    [commissions, filterStatus],
-  );
-
-  const exportLoadedCommissions = () => {
-    const headers = ['Date', 'Description', 'Type', 'Amount', 'Status', 'Paid Date'];
-    const rows = filteredCommissions.map((commission) => [
-      formatDate(commission.createdAt),
-      commission.description || '',
-      commission.type || '',
-      Number.isFinite(commission.amount) ? commission.amount : '',
-      commission.status || '',
-      formatDate(commission.paidAt),
-    ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `affiliate-commissions-${new Date().toISOString().split('T')[0]}.csv`;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-          <p className="text-gray-300 mt-4">Loading commissions...</p>
-        </div>
-      </div>
-    );
-  }
-
+export function AffiliateCommissionsView({ view, loading, error, exportError, onRefresh, onPage, onStatus, onExport }) {
+  const commissions = view?.commissions ?? [];
+  const status = view?.filters?.status ?? null;
+  const canExport = Boolean(view && !loading && !error);
   return (
-    <div className="min-h-screen bg-slate-900">
-      <div className="bg-slate-800/50 border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-950 text-white">
+      <AffiliateRecordHeader
+        eyebrow="Affiliate records"
+        title="Commission activity"
+        summary="A server-filtered, read-only page of legacy commission records for the signed-in affiliate account."
+        onRefresh={onRefresh}
+        refreshing={loading}
+        action={<AffiliateExportButton disabled={!canExport} onClick={onExport} />}
+      />
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <AffiliateRecordBoundary />
+        {exportError && (
+          <section role="alert" className="mt-5 rounded-2xl border border-rose-300/30 bg-rose-950/30 p-4 text-sm text-rose-50">
+            <p className="font-semibold">Current-page export could not be created</p>
+            <p className="mt-1 break-words text-rose-100/85">{exportError}</p>
+          </section>
+        )}
+        <section className={`${affiliateRecordPanel} mt-6 p-4 sm:p-5`} aria-labelledby="commission-filter-heading">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-white">Commissions</h1>
-              <p className="text-gray-300 mt-2">Commission records for your current affiliate account.</p>
+              <h2 id="commission-filter-heading" className="font-semibold text-white">Server status filter</h2>
+              <p className="mt-1 text-sm text-slate-400">Changing the status starts again at page one. Export contains only the current verified page.</p>
             </div>
-            {!loadError && (
-              <button onClick={exportLoadedCommissions} className="btn btn-primary flex items-center gap-2">
-                <Download className="w-5 h-5" />
-                Export loaded records
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loadError ? (
-          <div role="alert" className="rounded-lg border border-red-500/50 bg-red-950/40 p-4 text-red-100">
-            <p className="font-semibold">Unable to load commissions</p>
-            <p className="mt-1 text-sm">{loadError}</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <StatCard label="Tracked Commissions" value={formatCurrency(stats?.totalCommission)} icon={<DollarSign className="w-6 h-6 text-green-600" />} />
-              <StatCard label="Pending" value={formatCurrency(stats?.pendingCommission)} icon={<Clock className="w-6 h-6 text-yellow-600" />} />
-              <StatCard label="Approved" value={formatCurrency(stats?.approvedCommission)} icon={<CheckCircle className="w-6 h-6 text-blue-600" />} />
-              <StatCard label="Paid" value={formatCurrency(stats?.paidCommission)} icon={<CheckCircle className="w-6 h-6 text-green-600" />} />
-            </div>
-
-            <div className="bg-slate-800/50 rounded-lg shadow-sm p-4 mb-6 flex items-center gap-4">
-              <label htmlFor="commission-status" className="text-sm text-gray-300">Status</label>
-              <select id="commission-status" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className="input">
+            <label className="flex shrink-0 items-center gap-3 text-sm text-slate-200" htmlFor="commission-status">
+              Status
+              <select id="commission-status" value={status ?? 'all'} onChange={(event) => onStatus(event.target.value)} className="rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200">
                 <option value="all">All statuses</option>
-                {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                {AFFILIATE_COMMISSION_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-              {pagination.total > commissions.length && <p className="ml-auto text-sm text-gray-400">Showing {commissions.length} of {pagination.total} records.</p>}
-            </div>
+            </label>
+          </div>
+        </section>
 
-            <div className="bg-slate-800/50 rounded-lg shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-900 border-b border-white/10">
+        <div className="mt-6"><AffiliateRecordReadState loading={loading} error={error ? affiliateRecordError(error) : null} onRetry={onRefresh} /></div>
+
+        {!loading && !error && view && (
+          <>
+            <section className={`${affiliateRecordPanel} mt-6 overflow-hidden`} aria-labelledby="commission-records-heading">
+              <div className="border-b border-white/10 px-5 py-4 sm:px-6">
+                <h2 id="commission-records-heading" className="text-xl font-semibold">Commission records</h2>
+                <p className="mt-1 text-sm text-slate-400">Exact API strings are displayed without a currency, total, or payment inference.</p>
+              </div>
+              <div role="region" aria-label="Commission records table" tabIndex="0" className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-200">
+                <table className="w-full min-w-[820px] text-left text-sm">
+                  <caption className="sr-only">Commission records for the signed-in affiliate account</caption>
+                  <thead className="bg-slate-950/50 text-xs uppercase tracking-[0.14em] text-slate-400">
                     <tr>
-                      {['Date', 'Description', 'Type', 'Amount', 'Status', 'Paid Date'].map((heading) => (
-                        <th key={heading} className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">{heading}</th>
-                      ))}
+                      <th scope="col" className="px-5 py-3 font-medium sm:px-6">Record ID</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Legacy API type</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Legacy API status</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Created</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Approved</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Paid</th>
+                      <th scope="col" className="px-5 py-3 text-right font-medium sm:px-6">Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-slate-800/50 divide-y divide-white/10">
-                    {filteredCommissions.map((commission) => (
-                      <tr key={commission.id} className="hover:bg-slate-900">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{formatDate(commission.createdAt)}</td>
-                        <td className="px-6 py-4 text-sm text-white">{commission.description || '—'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{commission.type || '—'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">{formatCurrency(commission.amount)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClass(commission.status)}`}>{commission.status || '—'}</span></td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{formatDate(commission.paidAt)}</td>
+                  <tbody className="divide-y divide-white/5">
+                    {commissions.map((commission) => (
+                      <tr key={commission.id} className="align-top transition-colors hover:bg-white/[0.025] motion-reduce:transition-none">
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300 sm:px-6">#{commission.id}</td>
+                        <td className="px-5 py-4 text-slate-300">{commission.type}</td>
+                        <td className="px-5 py-4"><AffiliateStatusPill status={commission.status} /></td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(commission.createdAt)}</td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(commission.approvedAt)}</td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(commission.paidAt)}</td>
+                        <td className="px-5 py-4 sm:px-6"><AffiliateExactAmount value={commission.amount} align="right" /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {filteredCommissions.length === 0 && <div className="text-center py-12 text-gray-300">No commissions found.</div>}
-            </div>
+              {commissions.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-400 sm:px-6">No commission records were returned for this server-filtered page.</p>}
+            </section>
+            <div className="mt-6"><AffiliateRecordPagination pagination={view.pagination} onPage={onPage} /></div>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }
 
-function StatCard({ label, value, icon }) {
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-300">{label}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
-        </div>
-        <div className="w-12 h-12 bg-slate-900 rounded-lg flex items-center justify-center">{icon}</div>
-      </div>
-    </div>
-  );
+export default function Commissions() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const tenantId = useAuthStore(tenantSelector);
+  const role = useAuthStore((state) => state.user?.role ?? null);
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState(null);
+  const [exportError, setExportError] = useState(null);
+  const read = useAffiliateRecordRead({
+    kind: 'commissions',
+    isAuthenticated,
+    userId,
+    tenantId,
+    role,
+    page,
+    perPage: AFFILIATE_RECORD_PAGE_SIZE,
+    status,
+  });
+
+  const changeStatus = (nextStatus) => {
+    setExportError(null);
+    setStatus(nextStatus === 'all' ? null : nextStatus);
+    setPage(1);
+  };
+  const changePage = (nextPage) => {
+    setExportError(null);
+    setPage(nextPage);
+  };
+  const exportCurrentPage = useCallback(() => {
+    setExportError(null);
+    try {
+      if (!read.view || read.loading || read.error) throw new Error('The current verified commissions page is not available for export.');
+      downloadAffiliateCommissionsPage(read.view);
+    } catch (error) {
+      setExportError(error?.message || 'The current verified commissions page could not be exported.');
+    }
+  }, [read.error, read.loading, read.view]);
+
+  return <AffiliateCommissionsView view={read.view} loading={read.loading} error={read.error} exportError={exportError} onRefresh={read.refresh} onPage={changePage} onStatus={changeStatus} onExport={exportCurrentPage} />;
 }
