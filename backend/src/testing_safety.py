@@ -47,7 +47,7 @@ def validate_testing_resources(config):
         if config.get('ISOLATED_STAGING_DATABASE'):
             # This opt-in is not a URL exemption: validate namespace, UUID DB,
             # UID, private directory, socket identity and the exact URL first.
-            from migrations.target_safety import validate_isolated_postgresql_target
+            from src.isolated_postgresql_target import validate_isolated_postgresql_target
             validate_isolated_postgresql_target(value)
         else:
             if url.host not in ('127.0.0.1', '::1'):

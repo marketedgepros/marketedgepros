@@ -144,6 +144,14 @@ function PublicRoute({ children }) {
   return children;
 }
 
+function AccountChatWidget() {
+  const location = useLocation();
+  // Payout availability must remain unobscured, particularly on narrow screens.
+  // The page has a supported support-ticket link instead of a floating overlay.
+  if (location.pathname === '/affiliate/payout') return null;
+  return <ChatWidget />;
+}
+
 function App() {
   const { init } = useAuthStore();
 
@@ -164,7 +172,7 @@ function App() {
     <ToastProvider>
       <BrowserRouter>
         <Notification />
-        <ChatWidget />
+        <AccountChatWidget />
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center bg-slate-900">
           <div className="text-center">

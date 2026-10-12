@@ -16,6 +16,12 @@ from src.models.payment_approval import PaymentApprovalRequest
 from src.models.wallet import Wallet, Transaction
 from src.models.notification import Notification, NotificationPreference, EmailQueue
 from src.models.support_article import SupportArticle
+from src.models.affiliate_lifecycle import (
+    AffiliateCommissionAward,
+    AffiliateIdentityEvidence,
+    AffiliateOrderAttribution,
+    AffiliatePayoutCommand,
+)
 
 __all__ = [
     'User',
@@ -44,6 +50,10 @@ __all__ = [
     'SupportArticle',
     'AccountScaling',
     'ScalingTier',
+    'AffiliateIdentityEvidence',
+    'AffiliateOrderAttribution',
+    'AffiliateCommissionAward',
+    'AffiliatePayoutCommand',
 ]
 
 # Alias for backward compatibility

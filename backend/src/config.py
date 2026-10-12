@@ -32,6 +32,8 @@ class Config:
     SYNTHETIC_SETTLEMENT_ENABLED = False
     # Rehearsal-only durable protocol; never a production dispatcher/adapter.
     TRADING_PROTOCOL_REHEARSAL_ENABLED = False
+    # Internal synthetic affiliate rehearsal only; no environment activation.
+    AFFILIATE_LIFECYCLE_REHEARSAL_ENABLED = False
     
     # Database
     SQLALCHEMY_TRACK_MODIFICATIONS = False
