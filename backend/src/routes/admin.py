@@ -14,6 +14,11 @@ from src.utils.validators import validate_required_fields, validate_email_format
 from src.utils.error_messages import format_error_response
 from src.utils.hierarchy_scoping import without_hierarchy_scope
 from src.routes.kyc import _document_url, _kyc_users_for_actor
+from src.services.admin_payment_records_read import (
+    AdminPaymentQueryInvalid,
+    AdminPaymentScopeRequired,
+    AdminPaymentRecordsReadService,
+)
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_
 
@@ -691,43 +696,21 @@ def delete_program(current_user, program_id):
 @token_required
 @admin_required
 def get_payments(current_user):
-    """Get all payments with filtering"""
+    """Return the bounded, privacy-safe UI-4 admin payment projection."""
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        status = request.args.get('status')
-        
-        query = Payment.query
-        
-        if status:
-            query = query.filter_by(status=status)
-        
-        pagination = query.order_by(Payment.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
-        return jsonify({
-            'payments': [{
-                'id': payment.id,
-                'user_id': payment.user_id,
-                'amount': float(payment.amount),
-                'currency': payment.currency,
-                'payment_type': payment.purpose,
-                'payment_method': payment.payment_method,
-                'status': payment.status,
-                'transaction_id': payment.transaction_id,
-                'created_at': payment.created_at.isoformat()
-            } for payment in pagination.items],
-            'pagination': {
-                'page': pagination.page,
-                'per_page': pagination.per_page,
-                'total': pagination.total,
-                'pages': pagination.pages
-            }
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Syntax is intentionally parsed before the read service can construct a
+        # payments/users statement.  Authentication and the existing admin role
+        # gate have already run via decorators above.
+        arguments = AdminPaymentRecordsReadService.parse_payments_query(request.args)
+        return jsonify(AdminPaymentRecordsReadService.payments(current_user, arguments)), 200
+    except AdminPaymentQueryInvalid:
+        return jsonify({'error': 'Invalid admin payment query', 'code': 'INVALID_ADMIN_PAYMENT_QUERY'}), 400
+    except AdminPaymentScopeRequired:
+        return jsonify({'error': 'Admin payment scope is required', 'code': 'ADMIN_PAYMENT_SCOPE_REQUIRED'}), 403
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'Admin payment records are temporarily unavailable',
+                        'code': 'ADMIN_PAYMENT_READ_FAILED'}), 500
 
 
 @admin_bp.route('/kyc/pending', methods=['GET'])

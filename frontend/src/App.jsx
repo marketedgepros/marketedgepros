@@ -151,6 +151,7 @@ function AccountChatWidget() {
   if (location.pathname === '/affiliate/payout') return null;
   if (['/affiliate/traders', '/affiliate/commissions', '/affiliate/reports'].includes(location.pathname)) return null;
   if (['/wallet', '/trader/withdrawals', '/admin/withdrawals'].includes(location.pathname)) return null;
+  if (['/admin/payments', '/admin/payment-approvals'].includes(location.pathname)) return null;
   if (location.pathname === '/programs' || /^\/programs\/[^/]+(?:\/checkout)?$/.test(location.pathname)) return null;
   // On narrow screens, use the normal support navigation instead of covering copy.
   return <div className="hidden md:block"><ChatWidget /></div>;

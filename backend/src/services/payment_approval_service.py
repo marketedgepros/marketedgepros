@@ -10,6 +10,10 @@ from src.services.email_service import EmailService
 from src.services.affiliate_financial_boundary import refuse_unverified_affiliate_mutation
 
 
+class PaymentApprovalSettlementNotConfigured(RuntimeError):
+    """Legacy approval operations have no verified settlement command."""
+
+
 class PaymentApprovalService:
     """Service for managing payment approvals"""
     
@@ -51,64 +55,24 @@ class PaymentApprovalService:
     
     @staticmethod
     def reject_request(approval_request_id, admin_id, rejection_reason, admin_notes=None):
+        """Refuse legacy rejection before any lookup, write, or notification.
+
+        The historical path changes a challenge/payment and sends email without a
+        verified settlement command.  It must therefore remain unavailable even
+        when this service is invoked outside its HTTP route.
         """
-        Reject a payment approval request
-        
-        Args:
-            approval_request_id: ID of the approval request
-            admin_id: ID of the Super Admin rejecting
-            rejection_reason: Reason for rejection
-            admin_notes: Optional notes from admin
-        
-        Returns:
-            Updated PaymentApprovalRequest object
-        """
-        # Validate admin permissions
-        admin = User.query.get(admin_id)
-        if not admin or admin.role != 'supermaster':
-            raise ValueError("Only Super Admin can reject payment requests")
-        
-        # Get approval request
-        approval_request = PaymentApprovalRequest.query.get(approval_request_id)
-        if not approval_request:
-            raise ValueError("Approval request not found")
-        
-        if approval_request.status != 'pending':
-            raise ValueError("Approval request is not pending")
-        
-        # Update approval request
-        approval_request.status = 'rejected'
-        approval_request.reviewed_by = admin_id
-        approval_request.reviewed_at = datetime.utcnow()
-        approval_request.rejection_reason = rejection_reason
-        approval_request.admin_notes = admin_notes
-        
-        # Update challenge
-        if approval_request.challenge_id:
-            challenge = Challenge.query.get(approval_request.challenge_id)
-            if challenge:
-                challenge.approval_status = 'rejected'
-                challenge.approved_by = admin_id
-                challenge.approved_at = datetime.utcnow()
-                challenge.rejection_reason = rejection_reason
-                challenge.status = 'failed'  # Mark as failed
-        
-        # Update payment
-        if approval_request.payment_id:
-            payment = Payment.query.get(approval_request.payment_id)
-            if payment:
-                payment.approval_status = 'rejected'
-                payment.approved_by = admin_id
-                payment.approved_at = datetime.utcnow()
-                payment.rejection_reason = rejection_reason
-                payment.status = 'failed'
-        
-        db.session.commit()
-        
-        # Send notification emails
-        PaymentApprovalService._notify_approval(approval_request, approved=False)
-        
-        return approval_request
+        raise PaymentApprovalSettlementNotConfigured(
+            'Order settlement is not configured'
+        )
+
+    @staticmethod
+    def reject_unavailable_response():
+        """HTTP boundary after JWT/role/CSRF decorators and before body parsing."""
+        from flask import jsonify
+        return jsonify({
+            'error': 'Order settlement is not configured',
+            'code': 'ORDER_SETTLEMENT_NOT_CONFIGURED',
+        }), 503
     
     @staticmethod
     def get_pending_requests():
