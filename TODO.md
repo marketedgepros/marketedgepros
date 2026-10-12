@@ -17,6 +17,13 @@
 - [ ] הכרעת בעלים ואישור מתאים לחמשת דפי policy/legal, כללי מוצר, תנאי אפיליאט ותוכן דינמי. אין שינוי מדיניות או הסכמה באמצעות ניסוח מומצא; UI-3 כולו לא מסומן הושלם לפני סגירת שערים אלה.
 - [ ] UI-4: כל הממצאים הפונקציונליים שנאספו במסכי חשבון/מנהל, כולל API פרופיל/KYC/history, אפס במקום כשל, ו־save/approve מדומים. UI-5/6: תיקוני visual/responsive וקבלה של כל פעולה, לא רק render.
 
+## חבילת חשבון בתוך UI-4 — 12.10.2026
+
+- [x] **פרופיל ופעולות חשבון:** GET שרת טרי; PUT של first_name/last_name/phone בלבד, ללא המתודה updateProfile החסרה; הצלחה רק בתגובה typed לאותו משתמש/מותג; אין החלפת user מלא באובייקט avatar חלקי; upload/delete avatar אמתיים לפי חוזה, שגיאה ללא success; שינוי סיסמה מאומת מחייב התחברות מחדש וניקוי session; שגיאות ונתונים חסרים מובחנים. אין שינוי אימייל/תפקיד/tenant במסך. JWT/CSRF/ביטול tokens נשמרים ו־validation לפני mutation.
+- [x] **KYC ומסמכים בחוזה אחד:** /kyc, /documents, /trader/documents משתמשים ב־GET מסמכים, POST קובץ יחיד לכל סוג והורדה מאומתת קנונית; אין upload/submit שלא קיימים, מידע אישי ללא endpoint או הצלחת אימות מדומה. תשובה pending נבדקת לפני refresh; כשל refresh נפרד מהעלאה. אותו משתמש במותג אחר או משתמש/תפקיד חדש לא מקבל תוצאות ישנות; abort לפני side effect של הורדה; no data/unknown אינם not_uploaded. approved הוא סטטוס מסמכים רשום, לא הוכחת זהות provider/payout/full access. labels/focus/status/alert ו־navy/cyan מותאמים לנייד כבר במימוש.
+
+זו חבילת חשבון ראשונה, לא השלמת UI-4 כולו. יתר history/scaling/wallet/withdrawals/notifications/affiliate/admin נשארים פתוחים; תיעוד גבולות: `backend/docs/ACCOUNT_UI4_HE.md`.
+
 ## תלות אפיליאט — מצב בתוך שלב 4 ו־UI-4
 
 - [x] חבילת חסימה ראשונה: מסלולי יצירה/אישור/פדיון של עמלות legacy מסרבים ללא מקור מאומת; אין סכום זמין לפדיון; עריכת תוכנית גלובלית מוגבלת לבעל הפלטפורמה; אין הפעלת auto-approval. תיעוד: `backend/docs/AFFILIATE_FINANCIAL_BOUNDARY_HE.md`.

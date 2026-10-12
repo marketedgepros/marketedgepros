@@ -232,17 +232,17 @@ export default api;
 
 // Profile API
 export const profileAPI = {
-  get: () => api.get('/profile'),
-  update: (data) => api.put('/profile', data),
-  changePassword: (data) => api.put('/profile/password', data),
-  uploadAvatar: (file) => {
+  get: (config = {}) => api.get('/profile', config),
+  update: (data, config = {}) => api.put('/profile', data, config),
+  changePassword: (data, config = {}) => api.put('/profile/password', data, { ...config, _skipAuthRefresh: true }),
+  uploadAvatar: (file, config = {}) => {
     const formData = new FormData();
     formData.append('avatar', file);
     return api.post('/profile/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      ...config, headers: { ...config.headers, 'Content-Type': undefined },
     });
   },
-  deleteAvatar: () => api.delete('/profile/avatar'),
+  deleteAvatar: (config = {}) => api.delete('/profile/avatar', config),
   getStats: () => api.get('/profile/stats'),
 };
 

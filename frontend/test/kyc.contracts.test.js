@@ -157,7 +157,7 @@ test('KYC uploads validate backend-supported extensions and leave multipart boun
     get: async () => ({ data: {} }),
     post: async (path, formData, config) => {
       postCall = { path, formData, config };
-      return { data: { message: 'synthetic only' } };
+      return { data: { document: { type: 'id_proof', name: 'ID Proof', status: 'pending', uploaded_at: '2026-10-12T08:00:00' } } };
     },
   }, createDownloadDom());
   const controller = new AbortController();
@@ -194,7 +194,7 @@ test('KYC requests compose correctly with the real configured Axios client witho
   api.defaults.adapter = async (config) => {
     calls.push(config);
     return { status: 200, statusText: 'OK', headers: {}, config,
-      data: config.method === 'get' ? new Blob(['synthetic']) : { message: 'Uploaded' } };
+      data: config.method === 'get' ? new Blob(['synthetic']) : { document: { type: 'id_proof', name: 'ID Proof', status: 'pending', uploaded_at: '2026-10-12T08:00:00' } } };
   };
   try {
     const service = createKycViewService(api, createDownloadDom());
