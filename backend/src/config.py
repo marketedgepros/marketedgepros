@@ -60,6 +60,10 @@ class Config:
     STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
     STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
     STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
+
+    # Server-only credential binding. Presence never enables checkout/settlement.
+    NOWPAYMENTS_API_KEY = os.getenv('NOWPAYMENTS_API_KEY') or None
+    NOWPAYMENTS_IPN_SECRET = os.getenv('NOWPAYMENTS_IPN_SECRET') or None
     
     # SendGrid
     SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
@@ -116,6 +120,8 @@ class TestingConfig(Config):
     SENDGRID_API_KEY = None
     STRIPE_SECRET_KEY = None
     STRIPE_WEBHOOK_SECRET = None
+    NOWPAYMENTS_API_KEY = None
+    NOWPAYMENTS_IPN_SECRET = None
     MT_SERVER = None
     MT_LOGIN = None
     MT_PASSWORD = None
