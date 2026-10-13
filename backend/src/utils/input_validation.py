@@ -16,7 +16,7 @@ class InputValidator:
     PASSWORD_REQUIRE_UPPERCASE = True
     PASSWORD_REQUIRE_LOWERCASE = True
     PASSWORD_REQUIRE_DIGIT = True
-    PASSWORD_REQUIRE_SPECIAL = True
+    PASSWORD_REQUIRE_SPECIAL = False  # Recommended, not required by the approved policy
     
     # Allowed HTML tags for rich text (if needed)
     ALLOWED_HTML_TAGS = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li']

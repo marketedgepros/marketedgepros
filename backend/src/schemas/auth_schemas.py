@@ -49,8 +49,6 @@ class RegisterSchema(Schema):
             raise ValidationError('Password must contain at least one lowercase letter')
         if not re.search(r'\d', value):
             raise ValidationError('Password must contain at least one number')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
-            raise ValidationError('Password must contain at least one special character')
 
 
 class LoginSchema(Schema):
@@ -115,5 +113,3 @@ class PasswordResetSchema(Schema):
             raise ValidationError('Password must contain at least one lowercase letter')
         if not re.search(r'\d', value):
             raise ValidationError('Password must contain at least one number')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
-            raise ValidationError('Password must contain at least one special character')

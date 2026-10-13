@@ -25,7 +25,6 @@ from src.models import EmailVerificationToken, PasswordResetToken, User
 _TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
 _CODE_PATTERN = re.compile(r"^[0-9]{6}$")
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-_PASSWORD_SPECIAL_PATTERN = re.compile(r'[!@#$%^&*(),.?":{}|<>]')
 _COOLDOWN = timedelta(minutes=2)
 
 TokenModel = Type[EmailVerificationToken] | Type[PasswordResetToken]
@@ -74,7 +73,6 @@ class AuthTokenService:
             or not re.search(r"[A-Z]", new_password)
             or not re.search(r"[a-z]", new_password)
             or not re.search(r"\d", new_password)
-            or not _PASSWORD_SPECIAL_PATTERN.search(new_password)
         ):
             raise ValueError("Invalid password")
         return new_password

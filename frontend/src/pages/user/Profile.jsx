@@ -442,7 +442,7 @@ function ProfileContent() {
                 <div>
                   <label htmlFor="profile-new-password" className="mb-2 block text-sm font-medium text-slate-200">New password</label>
                   <input id="profile-new-password" name="new_password" type="password" autoComplete="new-password" value={passwordData.new_password} onChange={(event) => setPasswordData((previous) => ({ ...previous, new_password: event.target.value }))} disabled={!profileReady || isMutationPending} required minLength={8} className={fieldClassName()} aria-describedby="new-password-help password-status" />
-                  <p id="new-password-help" className="mt-2 text-sm text-slate-400">Use at least 8 characters. The server applies the final password-strength checks.</p>
+                  <p id="new-password-help" className="mt-2 text-sm text-slate-400">Use at least 8 characters with uppercase, lowercase and a number. A special character is recommended, not required. The server applies the final password-strength checks.</p>
                 </div>
                 <div>
                   <label htmlFor="profile-confirm-password" className="mb-2 block text-sm font-medium text-slate-200">Confirm new password</label>

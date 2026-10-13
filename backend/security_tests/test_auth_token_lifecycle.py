@@ -309,3 +309,27 @@ def test_malformed_service_inputs_are_rejected_before_token_lookup(lifecycle_app
 
         assert _get(PasswordResetToken, token.id).used is False
         assert _get(User, user.id).check_password("OldPassword1!") is True
+
+
+@pytest.mark.parametrize('mode', ['url', 'code'])
+def test_symbol_optional_reset_revokes_prior_tokens_and_preserves_other_accounts(lifecycle_app, mode):
+    with lifecycle_app.app_context():
+        user = _new_user('policy-reset@example.test')
+        other = _new_user('policy-untouched@example.test')
+        before = (user.role, user.tenant_id, user.is_active, user.is_verified, user.two_factor_enabled)
+        other_hash = other.password_hash
+        prior = jwt.decode(user.generate_access_token(), lifecycle_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        chosen = _stored_token(PasswordResetToken, user, kind='reset', marker='chosen')
+        sibling = _stored_token(PasswordResetToken, user, kind='reset', marker='sibling')
+        if mode == 'url':
+            result = AuthTokenService.reset_password(chosen.token, 'SyntheticNew8')
+        else:
+            result = AuthTokenService.reset_password_with_code(user.email, chosen.code, 'SyntheticNew8')
+        assert result.check_password('SyntheticNew8')
+        assert not result.check_password('OldPassword1!')
+        assert result.token_version == prior['token_version'] + 1
+        assert (result.role, result.tenant_id, result.is_active, result.is_verified, result.two_factor_enabled) == before
+        assert _get(PasswordResetToken, chosen.id).used
+        assert _get(PasswordResetToken, sibling.id).used
+        assert _get(User, other.id).password_hash == other_hash
+        assert _get(User, other.id).token_version == 0

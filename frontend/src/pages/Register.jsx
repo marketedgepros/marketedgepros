@@ -184,6 +184,7 @@ export default function Register() {
                     required
                   />
                 </div>
+                <p className="mt-2 text-xs text-slate-400">Use at least 8 characters with uppercase, lowercase and a number. A special character is recommended, not required.</p>
               </div>
 
               <div>

@@ -198,7 +198,7 @@ export default function ResetPassword() {
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Must be at least 8 characters with uppercase, lowercase, and number
+                  Must be at least 8 characters with uppercase, lowercase, and number. A special character is recommended, not required.
                 </p>
               </div>
 
