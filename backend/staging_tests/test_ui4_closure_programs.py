@@ -41,7 +41,7 @@ def test_ui4_programs_postgresql_head_preserves_type_alias_exact_decimals_and_ca
     with quote_database(staging_resources, monkeypatch, revision='heads') as app:
         with app.app_context(), app.test_request_context('/api/v1/admin/programs'):
             assert db.session.execute(text('SELECT version_num FROM alembic_version')).scalars().all() == [
-                '20261013_000001'
+                '20261013_000002'
             ]
             root = db.session.get(User, 1)
             created = AdminClosureProgramsService.create_program(root, _body())

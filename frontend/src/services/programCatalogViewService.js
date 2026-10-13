@@ -190,7 +190,7 @@ export async function loadCatalog({
   const id = programId === null ? null : catalogId(programId);
   const response = await client.get(
     id === null ? "/programs/" : `/programs/${id}`,
-    { signal },
+    { signal, timeout: 12000 },
   );
   return id === null
     ? normalizeCatalogList(response?.data)

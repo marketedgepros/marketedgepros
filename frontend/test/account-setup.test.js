@@ -284,7 +284,9 @@ test('guide has bounded initial reads, toggle-only visibility, sanitized recorde
     assert.match(guide.textContent, /Fields recorded: First name/);
     assert.match(guide.textContent, /Upload records are present for all three document types shown in Documents/);
     assert.match(guide.textContent, /File-upload records are distinct from identity verification or a KYC provider decision/);
+    assert.match(guide.textContent, /MT5 and KYC-provider capabilities are unavailable from this account workspace\. Payment availability is checked separately in an order checkout; a stored purchase does not activate trading or payouts\./);
     assert.doesNotMatch(guide.textContent, /KYC verified|identity verified|profile complete/i);
+    assert.doesNotMatch(guide.textContent, /trading (?:account )?activated|payouts? enabled|payment enables trading/i);
     assert.equal([...guide.querySelectorAll('a')].find((node) => node.textContent.includes('Open Documents')).getAttribute('href'), '/documents');
     await click([...guide.querySelectorAll('a')].find((node) => node.textContent.includes('Open Documents')));
     assert.equal(h.host.querySelector('[data-location]').textContent, '/documents');

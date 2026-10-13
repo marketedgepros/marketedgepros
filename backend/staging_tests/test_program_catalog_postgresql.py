@@ -18,7 +18,7 @@ def test_program_catalog_postgresql_head_and_quote_parity(staging_resources, mon
             # The helper upgrades this private database to the actual Alembic head,
             # not merely the frozen purchase-order revision.
             assert db.session.execute(text("SELECT version_num FROM alembic_version")).scalars().all() == [
-                "20261013_000001"
+                "20261013_000002"
             ]
 
             # A historical merge-head label is whitelisted syntactically but lacks
@@ -36,7 +36,7 @@ def test_program_catalog_postgresql_head_and_quote_parity(staging_resources, mon
                     raise AssertionError("quote unexpectedly accepted a non-attested historical head")
                 db.session.rollback()
 
-            db.session.execute(text("UPDATE alembic_version SET version_num = '20261013_000001'"))
+            db.session.execute(text("UPDATE alembic_version SET version_num = '20261013_000002'"))
             db.session.commit()
             with app.test_request_context("/api/v1/programs/10"):
                 catalog = ProgramCatalogService.get_program(10)

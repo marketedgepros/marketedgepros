@@ -1,3 +1,4 @@
+import { compilePaymentHarness } from './paymentHarness.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -132,6 +133,9 @@ loginSource = replaceModule(loginSource, '../store/authStore', authStub);
 loginSource = replaceModule(loginSource, '../services/navigationService.js', srcUrl('services', 'navigationService.js'));
 const Login = (await compile('login-return', loginSource)).default;
 
+const paymentBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), { prefix: 'ui6-catalog-payment', overrides: { 'services/api.js': `export { default } from ${JSON.stringify(srcUrl('services', 'api.js'))};` } });
+const paymentBuildUrl = paymentBuild.targets.get(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url).pathname);
+test.after(() => paymentBuild.cleanup());
 let checkoutSource = fs.readFileSync(src('pages', 'Checkout.jsx'), 'utf8');
 checkoutSource = replaceModule(checkoutSource, '../store/authStore', authStub);
 checkoutSource = replaceModule(checkoutSource, '../hooks/useProgramCatalog', hookUrl);
@@ -139,6 +143,9 @@ checkoutSource = replaceModule(checkoutSource, '../constants/roles', srcUrl('con
 checkoutSource = replaceModule(checkoutSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
 checkoutSource = replaceModule(checkoutSource, '../services/orderQuoteViewService', srcUrl('services', 'orderQuoteViewService.js'));
 checkoutSource = replaceModule(checkoutSource, '../components/programs/CatalogUI', catalogUiUrl);
+checkoutSource = replaceModule(checkoutSource, '../components/payments/OrderPaymentPanel', paymentBuildUrl);
+checkoutSource = replaceModule(checkoutSource, '../services/orderPaymentViewService.js', srcUrl('services', 'orderPaymentViewService.js'));
+checkoutSource = replaceModule(checkoutSource, '../services/orderPaymentViewService', srcUrl('services', 'orderPaymentViewService.js'));
 const Checkout = (await compile('checkout', checkoutSource)).default;
 
 let lightningSource = fs.readFileSync(src('pages', 'LightningChallenge.jsx'), 'utf8');
@@ -183,7 +190,7 @@ function quoteFixture({ ownerId = 41 } = {}) {
   return {
     replayed: false,
     order: {
-      id: 'synthetic-order-12', program_id: 12, user_id: ownerId, tenant_id: 1,
+      id: '00000000-0000-4000-8000-000000000012', program_id: 12, user_id: ownerId, tenant_id: 1,
       amount_minor: '21999', amount: '219.99', currency: 'USD', state: 'quoted', paid: false,
       snapshot_hash: 'a'.repeat(64),
       snapshot: {
@@ -192,6 +199,31 @@ function quoteFixture({ ownerId = 41 } = {}) {
         addons: [{ id: 9, name: 'Synthetic add-on', price_type: 'percentage', catalog_price: '2.50', amount: '20.00', benefits: {} }],
       },
     },
+  };
+}
+function paymentCapabilitiesFixture({ ownerId = 41, enabled = false } = {}) {
+  return {
+    schema_version: 1,
+    owner_context: { user_id: ownerId, tenant_id: 1, role: 'user' },
+    enabled,
+    reason: enabled ? null : 'PILOT_DISABLED',
+    quote_currency: 'USD',
+    currencies: enabled ? [{ code: 'usdttrc20', label: 'USDT', network: 'TRC20', decimals: 6 }] : [],
+    fee_paid_by_user: enabled ? false : null,
+    policy_version: enabled ? 'synthetic-v1' : null,
+    live_trading_enabled: false,
+  };
+}
+function paymentProjectionFixture({ ownerId = 41 } = {}) {
+  return {
+    schema_version: 1,
+    owner_context: { user_id: ownerId, tenant_id: 1, role: 'user' },
+    order_id: '00000000-0000-4000-8000-000000000012', program_id: 12,
+    quote_amount_minor: '21999', quote_currency: 'USD', state: 'not_started',
+    paid: false, recorded_purchase: false, review_required: false,
+    creation_attempted: false, can_create: false, can_refresh: false,
+    provider_status: null, payment: null, reason: 'PILOT_DISABLED', policy_version: null,
+    updated_at: '2026-10-13T10:00:00Z', replayed: false,
   };
 }
 const response = (config, data) => ({ data, status: 200, statusText: 'OK', headers: {}, config, request: { synthetic: true } });
@@ -262,6 +294,10 @@ async function renderRouter(harness, child, initial, key = 'ui6') {
 function assertSignal(config, operation) {
   assert.ok(config.signal instanceof AbortSignal, `${operation} carries a concrete AbortSignal`);
   assert.equal(config.signal.aborted, false, `${operation} starts before cancellation`);
+}
+function assertBoundedRead(config, operation) {
+  assertSignal(config, operation);
+  assert.equal(config.timeout, 12000, `${operation} uses the bounded local-read timeout`);
 }
 
 // This is DOM behavior through the real hook and production view-service source;
@@ -522,7 +558,8 @@ test('customer detail: successful direct and 2FA sign-in returns through real Lo
       }
       await waitFor(() => harness.host.querySelector('[data-location]').textContent === '/programs/12/checkout', 'actual selected checkout return');
       await waitFor(() => button(harness.host, 'Request server quote'), 'real unpaid checkout UI');
-      assert.match(harness.host.textContent, /Quotes only\. Payments are not enabled\./);
+      assert.match(harness.host.textContent, /A quote is not a paid purchase\./);
+      assert.match(harness.host.textContent, /Payment availability is checked separately for your account\./);
     }
     assert.ok(calls.length >= 4);
   } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
@@ -567,7 +604,8 @@ test('customer detail: jump links and help destinations use current catalog with
     assert.equal(ruleLabel.nextElementSibling.textContent, 'Not specified');
     assert.match(harness.host.textContent, /does not mean zero or no restriction/);
     assert.match(harness.host.textContent, /USD 199\.99/);
-    assert.match(harness.host.textContent, /Quotes only\. Payments are not enabled\./);
+    assert.match(harness.host.textContent, /A quote is not a paid purchase\./);
+    assert.match(harness.host.textContent, /Payment availability is checked separately for your account\./);
     assert.match(harness.host.textContent, /does not confirm that a quote is available/);
     await click(anchor(harness.host, 'Browse FAQ'));
     assert.equal(harness.host.querySelector('[data-location]').textContent, '/faq');
@@ -621,28 +659,39 @@ test('customer detail: same-mount identity/route changes hide old navigation and
   } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
 });
 
-test('UI6 catalog: checkout DOM blocks guest/admin routes and reveals an unpaid quote only after matching synthetic owner acknowledgement', { concurrency: false }, async () => {
+test('UI6 catalog: checkout DOM blocks guest/admin routes and exposes a verified immutable quote before separately checking payment availability', { concurrency: false }, async () => {
   const previousAdapter = api.defaults.adapter;
   const harness = installDom('/programs/12/checkout');
   const calls = [];
   let quoteMode = 'bad-owner';
   let catalogMode = 'success';
+  let paymentReadsPermitted = false;
   let releaseCatalog;
   let catalogGate;
   api.defaults.adapter = async (config) => {
     calls.push(config);
     assertSignal(config, 'checkout request');
     if (config.method === 'get') {
-      assert.equal(config.url, '/programs/12');
-      if (catalogMode === 'held') await catalogGate;
-      if (catalogMode === 'failure') throw apiError();
-      return response(config, program());
+      if (config.url === '/programs/12') {
+        if (catalogMode === 'held') await catalogGate;
+        if (catalogMode === 'failure') throw apiError();
+        return response(config, program());
+      }
+      assert.equal(paymentReadsPermitted, true, 'payment reads begin only after a verified owner-scoped quote renders');
+      if (config.url === '/orders/payment-capabilities') {
+        assertBoundedRead(config, 'payment capabilities read');
+        return response(config, paymentCapabilitiesFixture());
+      }
+      assert.equal(config.url, '/orders/00000000-0000-4000-8000-000000000012/payment');
+      assertBoundedRead(config, 'local order payment projection read');
+      return response(config, paymentProjectionFixture());
     }
     assert.equal(config.method, 'post');
     assert.equal(config.url, '/orders/');
     const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
     assert.deepEqual(body, { program_id: 12, addon_ids: [9] }, 'mutated add-on state is the canonical quote payload');
     assert.match(config.headers['Idempotency-Key'], /^[A-Za-z0-9_-]{16,128}$/);
+    if (quoteMode === 'success') paymentReadsPermitted = true;
     return response(config, quoteFixture({ ownerId: quoteMode === 'bad-owner' ? 99 : 41 }));
   };
   const checkoutRoutes = h(Routes, null,
@@ -652,8 +701,8 @@ test('UI6 catalog: checkout DOM blocks guest/admin routes and reveals an unpaid 
   try {
     globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
     await renderRouter(harness, checkoutRoutes, '/programs/12/checkout', 'checkout-guest');
-    await waitFor(() => harness.host.querySelector('[data-location]').textContent === '/login', 'guest checkout redirect');
-    assert.deepEqual(JSON.parse(harness.host.querySelector('[data-location]').getAttribute('data-state')), { from: '/programs/12/checkout' });
+    await waitFor(() => harness.host.querySelector('[data-location]').textContent === '/login?redirect=%2Fprograms%2F12%2Fcheckout', 'guest checkout redirect');
+    assert.equal(new URL(harness.host.querySelector('[data-location]').textContent, 'https://synthetic.invalid').searchParams.get('redirect'), '/programs/12/checkout');
 
     globalThis.__ui6CatalogAuth = { user: { id: 7, tenant_id: 1, role: 'master' }, isAuthenticated: true, isLoading: false };
     await renderRouter(harness, checkoutRoutes, '/programs/12/checkout', 'checkout-admin');
@@ -673,17 +722,28 @@ test('UI6 catalog: checkout DOM blocks guest/admin routes and reveals an unpaid 
     await click(button(harness.host, 'Request server quote'));
     await waitFor(() => harness.host.querySelector('[role="alert"]'), 'owner mismatch rejection');
     assert.match(harness.host.textContent, /Quote owner and brand is unavailable or invalid/);
-    assert.equal(harness.host.textContent.includes('Quoted — not paid'), false, 'a mismatched owner acknowledgement is never shown as a quote');
+    const rejectedSummary = harness.host.querySelector('section[aria-labelledby="quote-summary"]');
+    assert.ok(harness.host.querySelector('#quote-summary'), 'the quote-summary section remains available after a rejected response');
+    assert.equal(rejectedSummary.textContent.includes('Immutable quote summary'), false, 'a mismatched owner response exposes no immutable quote summary');
+    assert.equal(rejectedSummary.textContent.includes('Quoted total'), false, 'a mismatched owner response exposes no quoted amount');
+    assert.equal(harness.host.querySelector('#payment-details'), null, 'a mismatched owner response never mounts payment cards');
     const postCalls = calls.filter((config) => config.method === 'post');
     assert.equal(postCalls.length, 1);
 
     quoteMode = 'success';
     await click(button(harness.host, 'Retry server quote'));
-    await waitFor(() => harness.host.textContent.includes('Quoted — not paid'), 'matching owner acknowledgement');
-    assert.match(harness.host.textContent, /USD 219\.99/);
+    await waitFor(() => harness.host.querySelector('section[aria-labelledby="quote-summary"]').textContent.includes('Immutable quote summary'), 'matching immutable quote');
+    assert.match(harness.host.querySelector('section[aria-labelledby="quote-summary"]').textContent, /USD 219\.99/);
     const retryCalls = calls.filter((config) => config.method === 'post');
     assert.equal(retryCalls.length, 2);
     assert.equal(retryCalls[0].headers['Idempotency-Key'], retryCalls[1].headers['Idempotency-Key'], 'unchanged selection retries with the same idempotency key');
+    await waitFor(() => calls.filter((config) => config.method === 'get' && config.url === '/orders/payment-capabilities').length === 1, 'one capability read after quote verification');
+    await waitFor(() => calls.filter((config) => config.method === 'get' && config.url.endsWith('/payment')).length === 1, 'one local payment projection read after quote verification');
+    const paymentPanel = harness.host.querySelector('#payment-details');
+    assert.ok(paymentPanel, 'verified quote mounts a distinct payment-availability panel');
+    assert.ok(paymentPanel.querySelector('[data-state="not_started"]'), 'a fresh local projection remains an explicit not-started record, not an unknown or monetary zero');
+    assert.match(paymentPanel.textContent, /Quotes only\. Payments are not enabled\./, 'the returned disabled=false capability is rendered separately from the quote');
+    assert.equal(calls.filter((config) => config.method === 'post' && config.url.includes('/payments/nowpayments')).length, 0, 'mounting or reading payment availability never creates a provider payment');
 
     const support = anchor(harness.host, 'Ask about availability');
     assert.equal(support.getAttribute('href'), '/support/create-ticket');

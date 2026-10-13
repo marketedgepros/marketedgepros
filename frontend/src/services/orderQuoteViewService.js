@@ -263,7 +263,7 @@ export async function requestOrderQuote({
   const response = await client.post(
     ORDER_QUOTE_ENDPOINT,
     { program_id: context.programId, addon_ids: context.addonIds },
-    { headers: { 'Idempotency-Key': idempotencyKey }, signal },
+    { headers: { 'Idempotency-Key': idempotencyKey }, signal, timeout: 15000 },
   );
   return mapOrderQuoteResponse(response?.data, context);
 }

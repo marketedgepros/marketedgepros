@@ -1,3 +1,4 @@
+import { compilePaymentHarness } from './paymentHarness.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -12,6 +13,9 @@ const guideTarget = new URL('../node_modules/.cache-ui4-account-setup.mjs', impo
 const profileServiceUrl = new URL('../src/services/profileViewService.js', import.meta.url).href;
 const setupServiceUrl = new URL('../src/services/accountSetupViewService.js', import.meta.url).href;
 const service = await import(serviceUrl);
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui4-userDashboard-payment' });
+const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
+test.after(() => purchaseBuild.cleanup());
 let ui;
 try {
   const guideFile = new URL('../src/components/account/AccountSetupGuide.jsx', import.meta.url);
@@ -22,6 +26,7 @@ try {
     .replace(/import useAuthStore from ['"]\.\.\/\.\.\/store\/authStore['"];/, "const useAuthStore = () => ({ isAuthenticated: true, user: { id: 1, tenant_id: 10, role: 'user' } });")
     .replace("import api, { profileAPI } from '../../services/api';", "const api = { get: () => { throw new Error('SSR must not request an API'); } }; const profileAPI = api;")
     .replace("import AccountSetupGuide from '../../components/account/AccountSetupGuide';", `import AccountSetupGuide from ${JSON.stringify(guideTarget.href)};`)
+  .replace("import ProgramPurchaseRecords from '../../components/payments/ProgramPurchaseRecords';", `import ProgramPurchaseRecords from ${JSON.stringify(purchaseBuildUrl)};`)
     .replace("import { createProfileApiTransport } from '../../services/profileViewService';", `import { createProfileApiTransport } from ${JSON.stringify(profileServiceUrl)};`)
     .replace("import { createAccountSetupViewService } from '../../services/accountSetupViewService';", `import { createAccountSetupViewService } from ${JSON.stringify(setupServiceUrl)};`)
     .replace(/['"]\.\.\/\.\.\/services\/userDashboardViewService['"]/g, JSON.stringify(serviceUrl));

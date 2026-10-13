@@ -10,6 +10,7 @@ import '../components/visual/homeMotion.css';
 
 const NewHomePage = () => {
   const ambient = useAmbientMotion();
+  const globeMotion = useAmbientMotion();
   const heroCopy = useScrollReveal();
   const heroArtwork = useScrollReveal();
   const heroDetails = useScrollReveal();
@@ -39,7 +40,7 @@ const NewHomePage = () => {
               <Link to="/programs" className="mep-primary px-6 py-3 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Explore programs</Link>
               <Link to="/how-it-works" className="rounded-lg border border-slate-500 px-6 py-3 font-semibold text-white transition-colors hover:border-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">How it works</Link>
             </div>
-            <p className="mt-6 max-w-2xl text-sm leading-6 text-slate-400">Catalog details may vary by program. A quote is not a payment, funded account, or account activation; payments are not enabled.</p>
+            <p className="mt-6 max-w-2xl text-sm leading-6 text-slate-400">Catalog details may vary by program. A quote is not a payment, funded account, or account activation. Payment availability is checked separately for your account in checkout.</p>
           </div>
           <div className="min-w-0 space-y-5">
             <figure ref={heroArtwork.ref} className={`${heroArtwork.className} home-motion__panel home-motion__image-panel premium-hero__artwork overflow-hidden rounded-2xl border border-cyan-200/15 bg-slate-950/70 shadow-2xl shadow-cyan-950/30`}>
@@ -80,11 +81,21 @@ const NewHomePage = () => {
         </div>
       </section>
 
-      <section className="border-t border-white/5 bg-[#081426] py-16">
-        <div ref={supportPanel.ref} className={`${supportPanel.className} home-motion__panel mx-auto flex max-w-7xl flex-col gap-6 px-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between lg:px-8`}>
-          <img src="/images/stats-globe-hologram.webp" alt="" width="1024" height="1024" loading="lazy" decoding="async" className="h-auto w-48 shrink-0 rounded-xl" />
-          <div><h2 className="mep-heading text-2xl font-bold">Questions before you decide?</h2><p className="mt-2 text-slate-400">Review the available help and program information.</p></div>
-          <div className="flex flex-wrap gap-5"><Link to="/faq" className="font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Read FAQs</Link><Link to="/support" className="font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Visit support</Link><Link to="/programs" className="font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Browse programs</Link></div>
+      <section id="home-help" ref={globeMotion.ref} data-motion-running={globeMotion.running && !ambient.paused ? "true" : "false"} className="home-help-globe border-t border-white/5" aria-labelledby="home-help-heading">
+        <div aria-hidden="true" className="home-help-globe__scene">
+          <div className="home-help-globe__light" />
+          <div className="home-help-globe__orbit"><img src="/images/stats-globe-hologram.webp" alt="" width="1024" height="1024" loading="lazy" decoding="async" className="home-help-globe__image" /></div>
+        </div>
+        <button type="button" onClick={ambient.togglePaused} aria-pressed={ambient.paused} disabled={ambient.reduced} className="home-help-globe__control premium-motion-control rounded-full border border-slate-500/70 bg-slate-950/80 px-3 py-2 text-xs text-slate-300 hover:border-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-60">{ambient.reduced ? "Reduced motion enabled" : ambient.paused ? "Resume visual motion" : "Pause visual motion"}</button>
+        <div ref={supportPanel.ref} className={`${supportPanel.className} home-help-globe__copy mx-auto max-w-4xl px-6 text-center lg:px-8`}>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Clarity before commitment</p>
+          <h2 id="home-help-heading" className="mep-heading mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Questions before you decide?</h2>
+          <p className="mt-4 text-base leading-relaxed text-slate-300 sm:text-lg">Review the available help and program information.</p>
+          <div className="mt-7 flex flex-wrap justify-center gap-x-6 gap-y-3">
+            <Link to="/faq" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Read FAQs</Link>
+            <Link to="/support" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Visit support</Link>
+            <Link to="/programs" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Browse programs</Link>
+          </div>
         </div>
       </section>
       </div>

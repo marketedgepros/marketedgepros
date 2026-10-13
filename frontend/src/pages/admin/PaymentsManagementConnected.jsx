@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import useAuthStore from "../../store/authStore.js";
+import ProgramPurchaseRecords from "../../components/payments/ProgramPurchaseRecords.jsx";
 import {
   createAdminPaymentRecordViewService,
 } from "../../services/adminPaymentRecordViewService.js";
@@ -15,7 +16,7 @@ import {
 
 const paymentService = createAdminPaymentRecordViewService();
 
-export function PaymentsManagementContent({ read, status, type, onStatusChange, onTypeChange, onPage }) {
+export function PaymentsManagementContent({ read, status, type, onStatusChange, onTypeChange, onPage, purchaseRecords = null }) {
   const payments = read.value?.payments || [];
   return (
     <div className="space-y-5 p-4 sm:p-6">
@@ -93,6 +94,7 @@ export function PaymentsManagementContent({ read, status, type, onStatusChange, 
       {!read.loading && !read.error && read.value && (
         <AdminPaymentPagination pagination={read.value.pagination} onPage={onPage} disabled={read.loading} />
       )}
+      {purchaseRecords}
     </div>
   );
 }
@@ -143,6 +145,7 @@ export default function PaymentsManagementConnected() {
       onStatusChange={onStatusChange}
       onTypeChange={onTypeChange}
       onPage={onPage}
+      purchaseRecords={<ProgramPurchaseRecords principal={isAuthenticated ? user : null} ownOnly={false} />}
     />
   );
 }

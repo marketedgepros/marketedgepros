@@ -96,7 +96,11 @@ test("real availability and error components distinguish load/failure/empty and 
   assert.match(empty, /No active programs available/);
   assert.doesNotMatch(empty, /Try again/);
   const boundary = render(components.PaymentBoundary);
-  assert.match(boundary, /Payments are not enabled/);
+  assert.match(boundary, /A quote is not a paid purchase\./);
+  assert.match(boundary, /Payment availability is checked separately for your account\./);
+  assert.match(boundary, /does not charge you, activate a trading account or provide funding/);
+  assert.match(boundary, /does not activate trading, payouts or KYC-provider verification/);
+  assert.doesNotMatch(boundary, /Payments are not enabled/);
   assert.doesNotMatch(boundary, /<button|<form/);
 });
 

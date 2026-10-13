@@ -130,12 +130,13 @@ export function PaymentBoundary() {
         />
         <div>
           <p className="font-semibold text-cyan-100">
-            Quotes only. Payments are not enabled.
+            A quote is not a paid purchase.
           </p>
           <p className="mt-2 leading-relaxed">
             A quote does not charge you, activate a trading account or provide
-            funding. Payment and trading connections need separate verification
-            before they can be offered.
+            funding. Payment availability is checked separately for your account.
+            An explicitly enabled purchase test does not activate trading,
+            payouts or KYC-provider verification.
           </p>
         </div>
       </div>

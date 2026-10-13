@@ -132,7 +132,9 @@ test("catalog request has only canonical path and signal with no client-selected
   assert.ok(
     calls.every(
       ([, options]) =>
-        Object.keys(options).length === 1 &&
+        Object.keys(options).length === 2 &&
+        Object.keys(options).every(key => ['signal', 'timeout'].includes(key)) &&
+        options.timeout === 12000 &&
         options.signal === controller.signal,
     ),
   );

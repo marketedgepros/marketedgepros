@@ -31,7 +31,7 @@ test('homepage public copy does not promise funding, payout, splits, platform av
 test('homepage explains catalog and quote limitations and exposes accessible focus treatment', () => {
   assert.match(source, /displayed price and terms/);
   assert.match(source, /quote is not a payment/);
-  assert.match(source, /payments are not enabled/);
+  assert.match(source, /Payment availability is checked separately for your account in checkout/);
   assert.match(source, /focus-visible:outline-none/);
   assert.match(source, /focus-visible:ring-2/);
 });

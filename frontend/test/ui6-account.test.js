@@ -1,3 +1,4 @@
+import { compilePaymentHarness } from './paymentHarness.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,10 +114,14 @@ const DocumentsModule = await compileJsx('documents', 'pages/user/Documents.jsx'
   .replace("} from '../../services/kycViewService';", `} from ${JSON.stringify(sourceUrl('services/kycViewService.js'))};`));
 const AccountSetupGuideUrl = await compileJsxDependency('account-setup-guide', 'components/account/AccountSetupGuide.jsx', (text) => text
   .replace("'../../services/accountSetupViewService.js'", JSON.stringify(sourceUrl('services/accountSetupViewService.js'))));
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui6-account-payment' });
+const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
+after(() => purchaseBuild.cleanup());
 const UserDashboardModule = await compileJsx('user-dashboard', 'pages/user/UserDashboard.jsx', (text) => text
   .replace("import useAuthStore from '../../store/authStore';", accountAuthStub)
   .replace("import api, { profileAPI } from '../../services/api';", "const api = { get: () => Promise.reject(new Error('synthetic UI6 API only')) }; const profileAPI = { get: () => Promise.reject(new Error('synthetic UI6 API only')) };")
   .replace("import AccountSetupGuide from '../../components/account/AccountSetupGuide';", `import AccountSetupGuide from ${JSON.stringify(AccountSetupGuideUrl)};`)
+  .replace("import ProgramPurchaseRecords from '../../components/payments/ProgramPurchaseRecords';", `import ProgramPurchaseRecords from ${JSON.stringify(purchaseBuildUrl)};`)
   .replace("import { createProfileApiTransport } from '../../services/profileViewService';", `import { createProfileApiTransport } from ${JSON.stringify(sourceUrl('services/profileViewService.js'))};`)
   .replace("import { createAccountSetupViewService } from '../../services/accountSetupViewService';", `import { createAccountSetupViewService } from ${JSON.stringify(sourceUrl('services/accountSetupViewService.js'))};`)
   .replace("} from '../../services/userDashboardViewService';", `} from ${JSON.stringify(sourceUrl('services/userDashboardViewService.js'))};`));

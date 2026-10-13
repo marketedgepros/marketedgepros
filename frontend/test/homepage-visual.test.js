@@ -131,7 +131,8 @@ test('homepage restored artwork keeps source paths, intrinsic dimensions, and tr
   assert.match(page, /src="\/images\/hero-trading-3d\.webp"[^>]*alt="Decorative illustration of trading charts on three screens"[^>]*width="1536"[^>]*height="1024"/);
   assert.match(page, /src="\/images\/stats-globe-hologram\.webp"[^>]*alt=""[^>]*width="1024"[^>]*height="1024"/);
   assert.match(page, /Illustrative artwork, not a live platform view or account performance\./);
-  assert.match(page, /payments are not enabled/);
+  assert.match(page, /A quote is not a payment, funded account, or account activation/);
+  assert.match(page, /Payment availability is checked separately for your account in checkout/);
   assert.match(page, /<figure[^>]*>/);
   assert.match(page, /<figcaption[^>]*>/);
 });

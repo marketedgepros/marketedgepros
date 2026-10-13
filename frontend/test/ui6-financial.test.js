@@ -1,3 +1,4 @@
+import { compilePaymentHarness } from './paymentHarness.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -96,7 +97,11 @@ const TraderWithdrawals = (await compile('trader-withdrawals', 'pages/trader/Wit
 const AdminWithdrawals = (await compile('admin-withdrawals', 'pages/admin/WithdrawalManagement.jsx', (text) => financialPageRewrite(
   text, financialUi.url, 'FINANCIAL_RECORD_PAGE_SIZE, FINANCIAL_WITHDRAWAL_STATUSES',
 ))).module.default;
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui6-financial-payment' });
+const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
+test.after(() => purchaseBuild.cleanup());
 const Payments = (await compile('payments', 'pages/admin/PaymentsManagementConnected.jsx', (text) => text
+  .replace('import ProgramPurchaseRecords from "../../components/payments/ProgramPurchaseRecords.jsx";', `import ProgramPurchaseRecords from ${JSON.stringify(purchaseBuildUrl)};`)
   .replace(/import useAuthStore from ["']\.\.\/\.\.\/store\/authStore\.js["'];/, authStub)
   .replace(/import \{\s*createAdminPaymentRecordViewService,\s*\} from "\.\.\/\.\.\/services\/adminPaymentRecordViewService\.js";/, 'const createAdminPaymentRecordViewService = () => globalThis.__ui6AdminPaymentService;')
   .replace(/import useAdminPaymentRead from ["']\.\.\/\.\.\/hooks\/useAdminPaymentRead\.js["'];/, `import useAdminPaymentRead from ${JSON.stringify(adminPaymentHookUrl)};`)

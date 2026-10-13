@@ -1,0 +1,54 @@
+# מסלול רכישה ו־NOWPayments — קבלת קוד, לא הפעלת גבייה
+
+תאריך: 13.10.2026. ענף `fix/security-foundation-20261011`, PR #1 טיוטה בלבד.
+
+## הבחירות והמצב האמיתי
+
+אושרו: מחיר ב־USD מהצעת מחיר שרת קפואה; USDT/TRC20 (`usdttrc20`, שישה decimals) למפקיד; עמלת הספק אצל העסק; חוסר/עודף/מטבע או רשת שגויים דורשים review ולא refund אוטומטי. ב־14:21 נבחרה פתיחה לכל הלקוחות, במקום משתמשי pilot בלבד.
+
+הקוד החדש סגור כברירת מחדל. טרם נמסר/אומת Primary balance/outcome currency הקיים אצל NOWPayments, ולא הועתקו מפתחות לשרת, נוצר payment בספק, נשלחו כספים, נפרסה ההגירה או הופעלה גבייה. כל הבדיקות הכספיות משתמשות בספק ונתונים סינתטיים. חבילת `69f186948013d111d3c88229a6a78d2d78f36de1` של חוויית פנים נפרסה קודם בנפרד; אין להסיק ממנה שהקוד הנוכחי כבר ציבורי.
+
+## המסלול הממומש
+
+- quote שרת קנוני לפי catalog ו־snapshot מאומת. בחירת add-ons אינה משנה מחיר בדפדפן.
+- כרטיס capabilities לבעלות החשבון; יצירת פרטי תשלום רק בלחיצה ואחרי הצגת סכום, מטבע, רשת ועמלה. quote אינו תשלום.
+- command יחיד לכל order, idempotency ושמירת אי־ודאות. אין ניסיון POST אוטומטי שני אחרי timeout. `payment-requested` בכתובת הוא סימון שמרני, לא הוכחת תשלום.
+- עסקת המסד נסגרת לפני POST/GET לספק; אין lock או ORM SQL בזמן I/O. refresh הוא פעולה מפורשת ומתוקצבת, לא polling.
+- שיוך payment ID, opaque reference, בעלים, מותג, מחיר USD, asset/network, כתובת TRON בעלת checksum, quantum ו־memo. פרטי תשלום של פקודה אחרת אינם ניתנים לשימוש.
+- חתימת IPN תואמת מיון וייצוג מספרים בסגנון JavaScript/HMAC-SHA-512, עם vectors שנוצרו בנפרד ב־Node. כל חישובי הכסף נותרים Decimal/מחרוזות; codec חתימה אינו מחשבון כסף.
+- רק IPN חתום וסופי עם סכום הפקדה מדויק ומטבע outcome מפורש תואם יכול לרשום receipt ו־recorded-purchase grant. GET סופי לבדו אינו מעניק רכישה. digest של refresh נפרד מ־IPN ולכן אינו צורך אירוע חתום מאוחר.
+- receipt, journal, שתי entries מאוזנות ו־grant נכתבים באותה עסקה עם unique/FK ו־triggers דחויים של PostgreSQL. ה־ACK נשלח אחרי commit.
+- early IPN/שגיאה/expiry אינם מחזירים מצב לאחור. signed conflict ללא binding שומר החלטת `manual_review` ברמת intent ומקבל ACK אחרי commit; אין observation מזויף ללא FK אמין, ולכן אין שם תיעוד מלא של גוף האירוע הפגום. תגובת create תקינה ואירוע תקין מאוחר אינם מוחקים החלטה זו או מעניקים אוטומטית.
+- קישורי שחזור להזמנה שמורה, רשומות רכישה לחשבון ורשומות מנהל נפרדות מ־legacy payments. source חסר אינו אפס רכישות. בעלים/מותג קודם אינם חוזרים דרך תשובות מאוחרות.
+
+**ה־journal הוא USD נומינלי לפי מחיר ההזמנה**, לא קריפטו שהתקבל נטו, יתרת NOWPayments, יתרת ארנק, הכנסות מוכרות או רווח. `actually_paid` ו־`outcome_amount/outcome_currency` מוצגים בנפרד כמחרוזות מקור ספק. המערכת אינה מסיקה שהכסף הגיע לכתובת payout חיצונית.
+
+## סכמה ותלויות
+
+הגירה תוספתית `20261013_000002` אחרי `20261013_000001`: שבע טבלאות תשלום חדשות; אין שינוי rows או חוזי legacy. preflight בודק collisions לפני DDL; helper סטטי דורש גרסת schema מדויקת ו־constraints/indexes/functions/triggers תקינים. downgrade מסרב לאחר ראיות עמידות או drift, ולפני כל DDL מסוכן.
+
+קוד מטבע הספק במסד הוא `usdttrc20`, לא תווית `USDT`. רשת ההפקדה TRC20 והדיוק 6. outcome נשאר מטבע קבלה נפרד, מפורש וקפוא ב־intent; SQL והשירות דורשים שאירוע הסיום יתאים אליו. אין בחירה או שינוי של Primary balance מהדפדפן.
+
+נוספה תלות מוצמדת `rfc8785` ל־runtime ולבדיקות עם locks/hash; לא שודרגו שאר התלויות. helper הסכמה של revision 000002 הוא סמכות קפואה לאחר קבלת הגרסה: שינוי בעתיד דורש הגירה תוספתית חדשה ולא עריכת חוזה ההגירה שנפרסה.
+
+## תצורת הפעלה — לא ערכי production מאושרים
+
+- `NOWPAYMENTS_PILOT_ENABLED=false` כברירת מחדל — שם דגל היצירה נשמר גם ב־scope לקוחות.
+- `NOWPAYMENTS_CHECKOUT_SCOPE=customers` מאפשר לכל חשבון לקוח פעיל במותג שאושר, ללא allowlist של user IDs. הוא עדיין דורש tenant IDs ותפקידי לקוח `trader/affiliate` מפורשים. root/מנהלים, brand זר, inactive ופקודה של אחרים אינם עוקפים guards. `pilot` נשאר אפשרות מפורשת ומחייב IDs.
+- `NOWPAYMENTS_ACCEPT_EXISTING_IPN=false` כברירת מחדל. שמירתו `true` בעת עצירת יצירה מאפשרת restart בטוח עם מפתחות ומדיניות מלאה כדי לא לאבד callbacks קיימים. היא **אינה** פותחת capabilities, creation או refresh לספק; חתימה, opaque reference וסכמה קיימת נשארים מחייבים.
+- מפתחות server-only, policy version, merchant context, callback origin HTTPS, revision, נכס, outcome, fixed-rate=false ו־fee-paid-by-user=false נדרשים במפורש. תצורת רשימות/booleans נקראת מ־JSON bounded בסביבה; שגיאות מציגות שמות שדות בלבד. אין VITE secret או ברירת מחדל כספית.
+- ההפעלה דורשת אישור ל־SHA המדויק, גיבוי/תרגיל/הגירה חדשה, סביבת runtime עם lock, נתיב IPN/HTTPS וסודות פרטיים בשרת. פריסת frontend בלבד אינה מספיקה למסלול הכסף.
+
+## עיצוב ומהירות המסלול
+
+Checkout, בחירה, quote, טעינה, המתנה, שגיאה וקבלה משתמשים בטוקנים ובמעברי הפנים המשותפים; reduced-motion מבטל תנועה. קריאות catalog/quote/מצב מוגבלות בזמן, רשת ספק מתוקצבת ואין status polling. הקוד lazy-loaded בנתב הקיים; לא נוספו route או SDK חזותי כבד.
+
+בקשת כדור הארץ נכללה אחרי ההשלמה הטכנית: התמונה המקורית הקיימת היא סצנה גדולה במרכז אזור העזרה, עם תאורה סטטית ותנועת transform בשלושה מחזורים מוגבלים. lazy loading, ממדים שמורים, visibility/page-hidden/pause ו־reduced-motion, קישורי FAQ/support/programs אמיתיים; ללא canvas/WebGL/feed או נתוני הצלחה מומצאים.
+
+## קבלה וגבולות
+
+שער מקומי: 500 בדיקות frontend ובנייה; 263 בדיקות PostgreSQL הכוללות חמישה תרחישי HTTP חדשים; 41 בדיקות NOWPayments ממוקדות כולל callback-only. ספירת אבטחה מלאה וקבלת CI ל־SHA המדויק נרשמות לאחר קבלת השער הסופי ב־PR ובדוח המסירה, לא מניחים הצלחה מראש. 18 מקרי App בדפדפן המקומי עברו ב־320/390/1440 וב־reduce/no-preference, עם חסימת hosts חיצוניים ו־API סינתטי. זה אינו benchmark של זמני רשת בייצור או בדיקת רכישה עם כסף אמיתי.
+
+ביקורת עצמאית מצאה ותוקנו rollback של review מוקדם ואיפוס review על ידי binding מאוחר. בדיקות SQLite ו־PostgreSQL מוכיחות מצב דביק ללא grant. ביקורת ההפעלה האחרונה מתמקדת בשמירת IPN לאחר עצירת יצירה ו־restart.
+
+נותרו בנפרד: אימות outcome/Primary, אישור payload/פריסה/הגירה והעברת סודות, קניית אמת ראשונה שהמשתמש יבצע בעצמו והצלבת מקור ספק עם קבלת האתר. פרטי החברה, Policies, program rules ו־affiliate UI-3 אינם מושלמים באמצעות מסך תשלום. רישום/אימייל, KYC provider, MT5, wallet credit, withdrawal, commission, affiliate payout, refund והפעלת מסחר אינם מופעלים במסלול זה.

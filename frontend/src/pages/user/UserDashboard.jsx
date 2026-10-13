@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import api, { profileAPI } from '../../services/api';
 import AccountSetupGuide from '../../components/account/AccountSetupGuide';
+import ProgramPurchaseRecords from '../../components/payments/ProgramPurchaseRecords';
 import { createProfileApiTransport } from '../../services/profileViewService';
 import { createAccountSetupViewService } from '../../services/accountSetupViewService';
 import {
@@ -134,7 +135,7 @@ export function DashboardReadState({ state, onRetry }) {
   return null;
 }
 
-export function DashboardOverview({ dashboard, onRefresh, refreshing = false, accountSetupService }) {
+export function DashboardOverview({ dashboard, onRefresh, refreshing = false, accountSetupService, purchaseClient = api }) {
   const { user, statistics, recentChallenges } = dashboard;
   const { statusCounts } = statistics;
   const hasRecords = statusCounts.total > 0;
@@ -225,7 +226,7 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false, ac
             {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-400">
-            Financial totals: unavailable. No verified financial provenance was returned for this account.
+            Financial totals: unavailable. No verified financial provenance was returned by this challenge-summary source.
           </p>
         </section>
 
@@ -234,6 +235,10 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false, ac
           dashboardCount={statusCounts.total}
           service={accountSetupService}
         />
+
+        <div className="mt-7">
+          <ProgramPurchaseRecords principal={{ id: dashboard.owner.userId, tenant_id: dashboard.owner.tenantId, role: user.role }} client={purchaseClient} />
+        </div>
 
         <section className="mep-interior-card mep-panel mt-7 overflow-hidden rounded-2xl border shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
           <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -360,7 +365,7 @@ export function UserDashboardData({
     );
   }
 
-  return <DashboardOverview dashboard={dashboard} onRefresh={refresh} refreshing={false} accountSetupService={accountSetupService} />;
+  return <DashboardOverview dashboard={dashboard} onRefresh={refresh} refreshing={false} accountSetupService={accountSetupService} purchaseClient={apiClient} />;
 }
 
 export default function UserDashboard() {

@@ -91,7 +91,8 @@ class OrderService:
                     (SELECT count(*) FROM public.alembic_version) = 1
                     AND (SELECT min(version_num) FROM public.alembic_version) IN (
                         '20261011_000006', '20261011_000007',
-                        '20261011_000008', '20261012_000001', '20261013_000001'
+                        '20261011_000008', '20261012_000001', '20261013_000001',
+                        '20261013_000002'
                     )
                     AND EXISTS (
                     SELECT 1 FROM pg_trigger t

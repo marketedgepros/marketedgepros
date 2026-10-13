@@ -214,7 +214,7 @@ export function AccountSetupGuideView({
             actionLabel={safeDashboardCount === null || hasChallengeRecords ? 'Review challenges' : 'Explore programs'}
           />
 
-          <GuideAction icon={AlertCircle} title="Capabilities and help" detail="Payments, MT5, and KYC-provider capabilities are unavailable from this account workspace." to="/support/create-ticket" actionLabel="Get help from Support">
+          <GuideAction icon={AlertCircle} title="Capabilities and help" detail="MT5 and KYC-provider capabilities are unavailable from this account workspace. Payment availability is checked separately in an order checkout; a stored purchase does not activate trading or payouts." to="/support/create-ticket" actionLabel="Get help from Support">
             <p className="mt-3 text-xs leading-5 text-slate-400">Use Support for account questions; this guide does not enable payment, trading-platform, or provider actions.</p>
           </GuideAction>
         </div>

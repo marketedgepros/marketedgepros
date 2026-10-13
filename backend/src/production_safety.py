@@ -8,6 +8,9 @@ from sqlalchemy.engine import make_url
 MINIMUM_SECRET_LENGTH = 32
 MAX_SIGNED_INT32 = 2**31 - 1
 _CANONICAL_POSITIVE_ID = re.compile(r"[1-9][0-9]*\Z")
+_POLICY_VERSION = re.compile(r"[A-Za-z0-9_.:-]{1,64}\Z")
+_CURRENCY_CODE = re.compile(r"[a-z0-9]{2,32}\Z")
+_NETWORK_CODE = re.compile(r"[A-Za-z0-9_.:-]{1,32}\Z")
 _KNOWN_WEAK_SECRETS = frozenset({
     "dev-secret-key-change-in-production",
     "change-me",
@@ -136,6 +139,63 @@ def _is_demo_redis_url(value, database):
     )
 
 
+def _valid_nowpayments_pilot(config):
+    """Validate activation structure only; this never logs or contacts a provider.
+
+    Empty/default policy objects and credentials by themselves are deliberately
+    insufficient. Tenant and customer-role scopes remain explicit; only pilot
+    additionally needs principal IDs. Callback retention is a separate explicit
+    switch, so stopping new creation does not prevent a safe process restart.
+    """
+    if config.get("NOWPAYMENTS_PILOT_ENABLED") is not True and config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is not True:
+        return False
+    if not _is_strong_secret(config.get("NOWPAYMENTS_API_KEY")) or not _is_strong_secret(config.get("NOWPAYMENTS_IPN_SECRET")):
+        return False
+    if not isinstance(config.get("NOWPAYMENTS_APPROVED_POLICY_VERSION"), str) or not _POLICY_VERSION.fullmatch(config["NOWPAYMENTS_APPROVED_POLICY_VERSION"]):
+        return False
+    if not isinstance(config.get("NOWPAYMENTS_MERCHANT_CONTEXT"), str) or not _POLICY_VERSION.fullmatch(config["NOWPAYMENTS_MERCHANT_CONTEXT"]):
+        return False
+    origin = config.get("NOWPAYMENTS_CALLBACK_ORIGIN")
+    try:
+        parsed = urlparse(origin)
+    except (TypeError, ValueError):
+        return False
+    if parsed.scheme != "https" or not parsed.hostname or parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment or parsed.username or parsed.password:
+        return False
+    if config.get("NOWPAYMENTS_CALLBACK_PATH") != "/api/v1/orders/webhooks/nowpayments":
+        return False
+    if config.get("NOWPAYMENTS_API_BASE") != "https://api.nowpayments.io/v1" or config.get("NOWPAYMENTS_STORAGE_REVISION") != "20261013_000002":
+        return False
+    if config.get("NOWPAYMENTS_FIXED_RATE") is not False or config.get("NOWPAYMENTS_FEE_PAID_BY_USER") is not False:
+        return False
+    scope = config.get("NOWPAYMENTS_CHECKOUT_SCOPE", "pilot")
+    if not isinstance(scope, str) or scope not in {"pilot", "customers"}:
+        return False
+    required_ids = ("NOWPAYMENTS_PILOT_TENANT_IDS",) if scope == "customers" else ("NOWPAYMENTS_PILOT_PRINCIPAL_IDS", "NOWPAYMENTS_PILOT_TENANT_IDS")
+    for name in required_ids:
+        values = config.get(name)
+        if not isinstance(values, (tuple, list)) or not values or any(not isinstance(value, int) or not _is_canonical_positive_id(value) for value in values) or len(set(values)) != len(values):
+            return False
+    roles = config.get("NOWPAYMENTS_PILOT_ROLES")
+    if not isinstance(roles, (tuple, list)) or not roles or any(not isinstance(role, str) or role not in {"trader", "affiliate"} for role in roles) or len(set(roles)) != len(roles):
+        return False
+    currencies = config.get("NOWPAYMENTS_ALLOWED_CURRENCIES")
+    if not isinstance(currencies, (tuple, list)) or not currencies:
+        return False
+    codes = set()
+    for item in currencies:
+        if not isinstance(item, dict) or set(item) != {"code", "label", "network", "decimals"}:
+            return False
+        if (not isinstance(item["code"], str) or item["code"] != "usdttrc20"
+                or not isinstance(item["label"], str) or not 1 <= len(item["label"]) <= 80
+                or item["network"] != "TRC20"
+                or not isinstance(item["decimals"], int) or isinstance(item["decimals"], bool) or item["decimals"] != 6):
+            return False
+        codes.add(item["code"])
+    outcome = config.get("NOWPAYMENTS_OUTCOME_CURRENCY")
+    return len(codes) == len(currencies) and isinstance(outcome, str) and bool(_CURRENCY_CODE.fullmatch(outcome))
+
+
 def validate_demo_release_configuration(config):
     """Fail closed for the intentionally narrow, locally isolated demo release.
 
@@ -161,9 +221,14 @@ def validate_demo_release_configuration(config):
             invalid.append(setting)
     if not _is_canonical_positive_id(config.get("PLATFORM_ROOT_USER_ID")):
         invalid.append("PLATFORM_ROOT_USER_ID")
+    nowpayments_pilot_valid = _valid_nowpayments_pilot(config)
     for setting in sorted(_DEMO_PROVIDER_SETTINGS):
+        if setting in {"NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET"} and nowpayments_pilot_valid:
+            continue
         if config.get(setting) is not None:
             invalid.append(setting)
+    if (config.get("NOWPAYMENTS_PILOT_ENABLED") is True or config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is True) and not nowpayments_pilot_valid:
+        invalid.append("NOWPAYMENTS_PILOT_POLICY")
 
     if invalid:
         raise ValueError("Invalid demo release configuration: " + ", ".join(invalid))
@@ -197,6 +262,11 @@ def validate_production_configuration(config):
             invalid.append(setting)
     if not _is_canonical_positive_id(config.get("PLATFORM_ROOT_USER_ID")):
         invalid.append("PLATFORM_ROOT_USER_ID")
+    has_nowpayments_setting = any(config.get(setting) is not None for setting in (
+        "NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET",
+    )) or config.get("NOWPAYMENTS_PILOT_ENABLED") is True or config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is True
+    if has_nowpayments_setting and not _valid_nowpayments_pilot(config):
+        invalid.append("NOWPAYMENTS_PILOT_POLICY")
 
     if invalid:
         raise ValueError(

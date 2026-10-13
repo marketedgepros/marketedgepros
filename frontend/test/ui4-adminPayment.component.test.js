@@ -1,3 +1,4 @@
+import { compilePaymentHarness } from './paymentHarness.js';
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
@@ -14,8 +15,12 @@ const paymentsTarget = new URL(`../node_modules/.ui4-admin-payments-page-${proce
 const approvalsTarget = new URL(`../node_modules/.ui4-admin-approvals-page-${process.pid}.mjs`, import.meta.url);
 const absolute = (path) => new URL(path, import.meta.url).href;
 
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui4-adminPayment-payment' });
+const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
+test.after(() => purchaseBuild.cleanup());
 const compilePage = async (file, target) => {
   let source = fs.readFileSync(file, "utf8")
+    .replace('import ProgramPurchaseRecords from "../../components/payments/ProgramPurchaseRecords.jsx";', `import ProgramPurchaseRecords from ${JSON.stringify(purchaseBuildUrl)};`)
     .replace(/["']\.\.\/\.\.\/components\/admin\/AdminPaymentRecordUI\.jsx["']/g, JSON.stringify(uiTarget.href));
   for (const path of [
     "../../store/authStore.js",

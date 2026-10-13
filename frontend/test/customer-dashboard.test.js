@@ -1,3 +1,4 @@
+import { compilePaymentHarness } from './paymentHarness.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,10 +26,14 @@ const guideCode = await transformWithEsbuild(resolve(guideSource), guideSourceUr
 const guidePath = path.join(tmp, 'account-setup-guide.mjs');
 fs.writeFileSync(guidePath, resolve(guideCode.code));
 const guideUrl = pathToFileURL(guidePath).href;
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'customer-dashboard-payment' });
+const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
+test.after(() => purchaseBuild.cleanup());
 const source = fs.readFileSync(sourceUrl, 'utf8')
   .replace(/import useAuthStore from ['"]\.\.\/\.\.\/store\/authStore['"];/, 'const useAuthStore = () => null;')
   .replace("import api, { profileAPI } from '../../services/api';", "const api = { get: () => Promise.reject(new Error('synthetic API only')) }; const profileAPI = { get: () => Promise.reject(new Error('synthetic API only')) };")
   .replace("import AccountSetupGuide from '../../components/account/AccountSetupGuide';", `import AccountSetupGuide from ${JSON.stringify(guideUrl)};`)
+  .replace("import ProgramPurchaseRecords from '../../components/payments/ProgramPurchaseRecords';", `import ProgramPurchaseRecords from ${JSON.stringify(purchaseBuildUrl)};`)
   .replace("import { createProfileApiTransport } from '../../services/profileViewService';", `import { createProfileApiTransport } from ${JSON.stringify(profileServiceUrl)};`)
   .replace("import { createAccountSetupViewService } from '../../services/accountSetupViewService';", `import { createAccountSetupViewService } from ${JSON.stringify(accountSetupServiceUrl)};`)
   .replace(/['"]\.\.\/\.\.\/services\/userDashboardViewService['"]/g, JSON.stringify(serviceUrl));
@@ -77,7 +82,7 @@ test('customer guide offers real next destinations without asserting profile com
     assert.match(guide.textContent, /Profile record is unavailable/);
     assert.match(guide.textContent, /Document records are unavailable/);
     assert.match(guide.textContent, /current catalog/);
-    assert.match(guide.textContent, /Payments, MT5, and KYC-provider capabilities are unavailable/);
+    assert.match(guide.textContent, /MT5 and KYC-provider capabilities are unavailable from this account workspace\. Payment availability is checked separately in an order checkout; a stored purchase does not activate trading or payouts\./);
     assert.deepEqual([...guide.querySelectorAll('[data-setup-step] a')].map((a) => a.getAttribute('href')), ['/profile', '/documents', '/programs', '/support/create-ticket']);
     assert.equal(guide.querySelector('[aria-labelledby="setup-next-action-heading"] a').getAttribute('href'), '/profile');
     assert.equal(guide.querySelectorAll('input,[role="progressbar"]').length, 0);
@@ -86,6 +91,7 @@ test('customer guide offers real next destinations without asserting profile com
     await click(toggle); assert.equal(guide.querySelector('#account-starting-guide'), null);
     await click(toggle); assert.ok(guide.querySelector('#account-starting-guide'));
     assert.doesNotMatch(guide.textContent, /profile complete|verified identity|approved KYC|eligible payout/i);
+    assert.doesNotMatch(guide.textContent, /trading (?:account )?activated|payouts? enabled|payment enables trading/i);
   } finally { await h.close(); }
 });
 
@@ -138,10 +144,11 @@ test('dashboard enhancement performs one owner-bound read, aborts prior identity
     assert.doesNotMatch(h.host.textContent, /Recorded owner/);
     await act(async () => reads[1].pending.resolve({ data: payload(2, { name: 'Second owner', count: 0 }) }));
     assert.match(h.host.textContent, /Second owner/); assert.ok(h.host.querySelector('[aria-labelledby="getting-started-heading"]'));
-    await click(h.host.querySelector('[aria-controls="account-starting-guide"]')); assert.equal(reads.length, 2);
+    assert.equal(reads.length, 3); assert.equal(reads[2].url, '/orders/purchases', 'one local owner-bound purchase collection read');
+    await click(h.host.querySelector('[aria-controls="account-starting-guide"]')); assert.equal(reads.length, 3);
     await click([...h.host.querySelectorAll('button')].find((button) => button.textContent.includes('Refresh records')));
-    assert.equal(reads.length, 3); assert.equal(h.host.querySelector('[aria-labelledby="getting-started-heading"]'), null);
-    await act(async () => reads[2].pending.reject(new Error('Synthetic timeout')));
+    assert.equal(reads.length, 4); assert.equal(reads[3].url, '/users/dashboard'); assert.equal(reads[2].config.signal.aborted, true); assert.equal(h.host.querySelector('[aria-labelledby="getting-started-heading"]'), null);
+    await act(async () => reads[3].pending.reject(new Error('Synthetic timeout')));
     assert.match(h.host.textContent, /could not be verified/); assert.equal(h.host.querySelector('table'), null);
   } finally { await h.close(); }
 });

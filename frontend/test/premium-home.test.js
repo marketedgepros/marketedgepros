@@ -107,3 +107,44 @@ test('premium motion is bounded, pauses by data attribute, has no feed or pollin
   assert.match(home, /CatalogPreview interactive/); assert.match(home, /Pause visual motion/); assert.match(home, /hero-trading-3d.webp/);
 });
 test.after(() => fs.rmSync(tmp, { force: true, recursive: true }));
+
+const homeSource = fs.readFileSync(new URL('pages/NewHomePage.jsx', src), 'utf8')
+  .replace(/import SchemaMarkup[^;]+;/, 'const SchemaMarkup = () => null;')
+  .replace(/import CatalogPreview[^;]+;/, 'const CatalogPreview = () => null;')
+  .replace(/import Layout[^;]+;/, 'const Layout = ({children}) => <main>{children}</main>;')
+  .replace("'../hooks/useScrollReveal'", JSON.stringify(reveal.url))
+  .replace("'../hooks/useAmbientMotion'", JSON.stringify(ambient.url))
+  .replace("'../components/visual/PlatformShowcase'", JSON.stringify(showcase.url))
+  .replace(/import '[^']+\.css';/, '');
+const homeModule = await compile('centred-globe-home', homeSource);
+test('centred globe uses real help destinations, shared pause, independent visibility and a static reduced-motion fallback', async () => {
+  for (const reduced of [false,true]) {
+    const h = dom({reduced});
+    try {
+      await act(async () => h.root.render(React.createElement(MemoryRouter,null,React.createElement(homeModule.module.default))));
+      const globe=h.host.querySelector('#home-help');
+      assert.ok(globe); assert.equal(globe.getAttribute('aria-labelledby'),'home-help-heading');
+      assert.equal(globe.querySelector('img').getAttribute('src'),'/images/stats-globe-hologram.webp');
+      assert.equal(globe.querySelector('img').getAttribute('loading'),'lazy');
+      assert.ok(globe.querySelector('[aria-hidden="true"] img'));
+      assert.deepEqual([...globe.querySelectorAll('a')].map(a=>a.getAttribute('href')),['/faq','/support','/programs']);
+      const observer=h.instances.find(o=>o.target===globe); assert.ok(observer);
+      await act(async()=>observer.visible(true));
+      assert.equal(globe.dataset.motionRunning,String(!reduced));
+      if (!reduced) {
+        await click(globe.querySelector('button'));
+        assert.equal(globe.dataset.motionRunning,'false');
+        assert.equal(h.host.querySelector('.home-motion').dataset.visualPaused,'true');
+        await click(globe.querySelector('button'));
+        assert.equal(globe.dataset.motionRunning,'true');
+        await act(async()=>observer.visible(false)); assert.equal(globe.dataset.motionRunning,'false');
+      } else assert.equal(globe.querySelector('button').disabled,true);
+      assert.equal(globe.querySelectorAll('canvas,video,iframe').length,0);
+    } finally { await h.close(); }
+  }
+  const css=fs.readFileSync(new URL('components/visual/homeMotion.css',src),'utf8');
+  assert.match(css,/homeHelpGlobeFloat 8s ease-in-out 3/);
+  assert.match(css,/width: min\(112vw, 42rem\)/);
+  assert.match(css,/\.home-help-globe\[data-motion-running="true"\]/);
+  assert.doesNotMatch(css,/infinite/);
+});

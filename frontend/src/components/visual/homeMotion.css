@@ -165,3 +165,69 @@
   }
   .premium-view-button { transition: none !important; }
 }
+
+/* Existing globe artwork becomes a centred section scene, never a data feed. */
+.home-help-globe {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 3.5rem 0;
+  background: #050c1b;
+}
+.home-help-globe__scene {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.home-help-globe__light {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 28%, rgba(8,145,178,.15), transparent 62%);
+}
+.home-help-globe__orbit {
+  position: absolute;
+  top: -5.25rem;
+  left: 50%;
+  width: min(112vw, 42rem);
+  margin-left: max(-56vw, -21rem);
+  animation: homeHelpGlobeFloat 8s ease-in-out 3;
+  animation-play-state: paused;
+  transform-origin: center;
+}
+.home-help-globe__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: .8;
+  mix-blend-mode: screen;
+  mask-image: radial-gradient(ellipse closest-side, #000 56%, transparent 98%);
+}
+.home-help-globe__copy {
+  position: relative;
+  padding-top: clamp(18rem, 38vw, 28rem);
+  text-wrap: balance;
+}
+.home-help-globe__control {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  min-height: 2.75rem;
+}
+.home-help-globe[data-motion-running="true"] .home-help-globe__orbit {
+  animation-play-state: running;
+}
+@keyframes homeHelpGlobeFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-.6deg); }
+  50% { transform: translate3d(0, -8px, 0) rotate(.6deg); }
+}
+.home-motion[data-visual-paused="true"] .home-help-globe__orbit {
+  animation-play-state: paused !important;
+}
+@media (max-width: 639px) {
+  .home-help-globe { padding-bottom: 2.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-help-globe__orbit { animation: none !important; transform: none !important; }
+}

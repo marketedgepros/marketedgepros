@@ -3,6 +3,7 @@ Configuration management for MarketEdgePros
 Supports multiple environments: development, staging, production
 """
 import os
+import json
 from datetime import timedelta
 from sqlalchemy.pool import NullPool
 from dotenv import load_dotenv
@@ -13,6 +14,18 @@ if os.environ.get('FLASK_TESTING', '').lower() != 'true':
 
 
 import secrets
+
+def _payment_policy_json(name, default=None):
+    """Bounded server-only configuration; error messages never contain values."""
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    if len(raw) > 8192:
+        raise ValueError("Invalid payment configuration field: " + name)
+    try:
+        return json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+    except (ValueError, RecursionError):
+        raise ValueError("Invalid payment configuration field: " + name) from None
 
 class Config:
     WTF_CSRF_ENABLED = True
@@ -74,6 +87,26 @@ class Config:
     # Server-only credential binding. Presence never enables checkout/settlement.
     NOWPAYMENTS_API_KEY = os.getenv('NOWPAYMENTS_API_KEY') or None
     NOWPAYMENTS_IPN_SECRET = os.getenv('NOWPAYMENTS_IPN_SECRET') or None
+    # Custom checkout remains closed until a reviewed deployment supplies every
+    # server-only policy field.  There are intentionally no monetary, asset,
+    # outcome-wallet, fee, or allowlist defaults in this source tree.
+    NOWPAYMENTS_PILOT_ENABLED = os.getenv('NOWPAYMENTS_PILOT_ENABLED', 'false').lower() == 'true'
+    NOWPAYMENTS_ACCEPT_EXISTING_IPN = os.getenv('NOWPAYMENTS_ACCEPT_EXISTING_IPN', 'false').lower() == 'true'
+    NOWPAYMENTS_CHECKOUT_SCOPE = os.getenv('NOWPAYMENTS_CHECKOUT_SCOPE', 'pilot')
+    NOWPAYMENTS_APPROVED_POLICY_VERSION = os.getenv('NOWPAYMENTS_APPROVED_POLICY_VERSION') or None
+    NOWPAYMENTS_MERCHANT_CONTEXT = os.getenv('NOWPAYMENTS_MERCHANT_CONTEXT') or None
+    NOWPAYMENTS_CALLBACK_ORIGIN = os.getenv('NOWPAYMENTS_CALLBACK_ORIGIN') or None
+    NOWPAYMENTS_CALLBACK_PATH = '/api/v1/orders/webhooks/nowpayments'
+    NOWPAYMENTS_API_BASE = 'https://api.nowpayments.io/v1'
+    NOWPAYMENTS_STORAGE_REVISION = os.getenv('NOWPAYMENTS_STORAGE_REVISION') or None
+    NOWPAYMENTS_PILOT_PRINCIPAL_IDS = _payment_policy_json('NOWPAYMENTS_PILOT_PRINCIPAL_IDS', ())
+    NOWPAYMENTS_PILOT_TENANT_IDS = _payment_policy_json('NOWPAYMENTS_PILOT_TENANT_IDS', ())
+    NOWPAYMENTS_PILOT_ROLES = _payment_policy_json('NOWPAYMENTS_PILOT_ROLES', ())
+    NOWPAYMENTS_ALLOWED_CURRENCIES = _payment_policy_json('NOWPAYMENTS_ALLOWED_CURRENCIES', ())
+    NOWPAYMENTS_OUTCOME_CURRENCY = os.getenv('NOWPAYMENTS_OUTCOME_CURRENCY') or None
+    NOWPAYMENTS_FIXED_RATE = _payment_policy_json('NOWPAYMENTS_FIXED_RATE')
+    NOWPAYMENTS_FEE_PAID_BY_USER = _payment_policy_json('NOWPAYMENTS_FEE_PAID_BY_USER')
+    NOWPAYMENTS_REFRESH_MIN_SECONDS = 30
     
     # SendGrid
     SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
@@ -136,6 +169,20 @@ class TestingConfig(Config):
     STRIPE_WEBHOOK_SECRET = None
     NOWPAYMENTS_API_KEY = None
     NOWPAYMENTS_IPN_SECRET = None
+    NOWPAYMENTS_PILOT_ENABLED = False
+    NOWPAYMENTS_ACCEPT_EXISTING_IPN = False
+    NOWPAYMENTS_CHECKOUT_SCOPE = 'pilot'
+    NOWPAYMENTS_APPROVED_POLICY_VERSION = None
+    NOWPAYMENTS_MERCHANT_CONTEXT = None
+    NOWPAYMENTS_CALLBACK_ORIGIN = None
+    NOWPAYMENTS_STORAGE_REVISION = None
+    NOWPAYMENTS_PILOT_PRINCIPAL_IDS = ()
+    NOWPAYMENTS_PILOT_TENANT_IDS = ()
+    NOWPAYMENTS_PILOT_ROLES = ()
+    NOWPAYMENTS_ALLOWED_CURRENCIES = ()
+    NOWPAYMENTS_OUTCOME_CURRENCY = None
+    NOWPAYMENTS_FIXED_RATE = None
+    NOWPAYMENTS_FEE_PAID_BY_USER = None
     MT_SERVER = None
     MT_LOGIN = None
     MT_PASSWORD = None

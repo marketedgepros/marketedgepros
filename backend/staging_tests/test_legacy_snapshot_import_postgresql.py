@@ -34,6 +34,7 @@ from sqlalchemy.engine import make_url
 
 BACKEND = Path(__file__).resolve().parents[1]
 IMPORTER_PATH = BACKEND / "scripts" / "import_legacy_snapshot.py"
+SNAPSHOT_PROTOCOL_BASELINE = "20261013_000001"
 DATABASE_RE = re.compile(r"marketedgepros_test_[0-9a-f]{32}\Z")
 ROLE_RE = re.compile(r"legacy_runtime_[0-9a-f]{16}\Z")
 @dataclass(frozen=True)
@@ -73,13 +74,13 @@ def _alembic_config(url: str) -> Config:
     return config
 
 
-def _upgrade_to_heads(engine, url: str) -> None:
-    """Upgrade through Alembic with its caller-owned, safety-validated connection."""
+def _upgrade_to_snapshot_protocol_baseline(engine, url: str) -> None:
+    """Upgrade only to the frozen importer protocol baseline over a caller-owned connection."""
     config = _alembic_config(url)
     try:
         with engine.connect() as connection:
             config.attributes["connection"] = connection
-            command.upgrade(config, "heads")
+            command.upgrade(config, SNAPSHOT_PROTOCOL_BASELINE)
             connection.commit()
     finally:
         config.attributes.pop("connection", None)
@@ -116,10 +117,10 @@ def _isolated_snapshot_databases(staging_resources):
             ))
         source_engine = create_engine(source_url)
         target_engine = create_engine(target_url)
-        # Both sides are genuine Alembic heads.  Source then adds only a synthetic
-        # snapshot-only table; target remains migration-head/public-empty.
-        _upgrade_to_heads(source_engine, source_url)
-        _upgrade_to_heads(target_engine, target_url)
+        # The snapshot protocol is intentionally frozen at 000001. Source then
+        # adds only a synthetic snapshot-only table; target remains public-empty.
+        _upgrade_to_snapshot_protocol_baseline(source_engine, source_url)
+        _upgrade_to_snapshot_protocol_baseline(target_engine, target_url)
         url = make_url(str(staging_resources["pg_url"]))
         yield SnapshotDatabases(
             source_name=source_name,

@@ -57,6 +57,9 @@ CURRENT_DECLARED_TABLES = EXPECTED_DECLARED_TABLES | {
     'trading_rule_snapshots', 'trading_provision_commands', 'trading_event_inbox',
     'affiliate_identity_evidence', 'affiliate_order_attributions',
     'affiliate_commission_awards', 'affiliate_payout_commands',
+    'checkout_intents', 'nowpayments_payment_bindings', 'nowpayments_observations',
+    'nowpayments_verified_receipts', 'nowpayments_settlement_journals',
+    'nowpayments_settlement_entries', 'order_entitlement_grants',
 }
 
 
@@ -212,7 +215,7 @@ def test_complete_active_model_inventory_imports_every_source_module(staging_res
     from src.schema_inventory import load_complete_model_inventory
 
     inventory = load_complete_model_inventory()
-    assert len(inventory.modules) == 30
+    assert len(inventory.modules) == 31
     assert set(inventory.declared_tables) == CURRENT_DECLARED_TABLES
     assert set(inventory.metadata_tables) == CURRENT_DECLARED_TABLES
     assert dict(inventory.external_foreign_key_targets) == {"affiliate_referrals": ("programs",)}
