@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowRight, Layers } from "lucide-react";
 import useAuthStore from "../store/authStore";
 import useProgramCatalog from "../hooks/useProgramCatalog";
+import { programRulesPath } from "../services/programRuleFamilies.js";
 import {
   addonPriceLabel,
   formatCatalogMoney,
@@ -172,6 +173,7 @@ export default function ProgramDetails() {
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Link to="/faq" className="rounded text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Browse FAQ</Link>
                   <Link to="/contact" className="rounded text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Contact options</Link>
+                  <Link to={programRulesPath(program.terms.type)} className="rounded text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Rules for this program category</Link>
                 </div>
               </div>
             </aside>

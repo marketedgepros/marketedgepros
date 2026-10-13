@@ -177,11 +177,11 @@ export function CatalogCard({ program }) {
     </article>
   );
 }
-export function ConfiguredRules({ terms }) {
+export function ConfiguredRules({ terms, headingId = 'additional-rules' }) {
   const entries = Object.entries(terms.rules);
   return (
-    <section className={panelStyle} aria-labelledby="additional-rules">
-      <h2 id="additional-rules" className="mep-heading text-xl font-semibold">
+    <section className={panelStyle} aria-labelledby={headingId}>
+      <h2 id={headingId} className="mep-heading text-xl font-semibold">
         Additional catalog rules
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">

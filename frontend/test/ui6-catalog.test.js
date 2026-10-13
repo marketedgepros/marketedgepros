@@ -124,8 +124,24 @@ let detailsSource = fs.readFileSync(src('pages', 'ProgramDetails.jsx'), 'utf8');
 detailsSource = replaceModule(detailsSource, '../store/authStore', authStub);
 detailsSource = replaceModule(detailsSource, '../hooks/useProgramCatalog', hookUrl);
 detailsSource = replaceModule(detailsSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
+detailsSource = replaceModule(detailsSource, '../services/programRuleFamilies.js', srcUrl('services', 'programRuleFamilies.js'));
 detailsSource = replaceModule(detailsSource, '../components/programs/CatalogUI', catalogUiUrl);
 const ProgramDetails = (await compile('program-details', detailsSource)).default;
+
+let familySource = fs.readFileSync(src('components', 'programs', 'ProgramRuleFamily.jsx'), 'utf8');
+familySource = replaceModule(familySource, '../../services/programCatalogViewService.js', srcUrl('services', 'programCatalogViewService.js'));
+familySource = replaceModule(familySource, './CatalogUI', catalogUiUrl);
+await compile('program-rule-family', familySource);
+const familyUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-rule-family-')))).href;
+let rulesSource = fs.readFileSync(src('pages', 'TradingRules.jsx'), 'utf8');
+rulesSource = rulesSource.replace(/import Layout from ['"][^'"]+['"];?/, 'const Layout = ({ children }) => <main>{children}</main>;');
+rulesSource = replaceModule(rulesSource, '../hooks/useProgramCatalog', hookUrl);
+rulesSource = replaceModule(rulesSource, '../services/standardEvaluationPolicy.js', srcUrl('services', 'standardEvaluationPolicy.js'));
+rulesSource = replaceModule(rulesSource, '../services/programRuleFamilies.js', srcUrl('services', 'programRuleFamilies.js'));
+rulesSource = replaceModule(rulesSource, '../components/programs/ProgramRuleFamily', familyUrl);
+rulesSource = replaceModule(rulesSource, '../components/programs/CatalogUI', catalogUiUrl);
+const TradingRules = (await compile('trading-rules', rulesSource)).default;
+const { PROGRAM_RULE_FAMILIES } = await import(srcUrl('services', 'programRuleFamilies.js'));
 
 let loginSource = fs.readFileSync(src('pages', 'Login.jsx'), 'utf8');
 loginSource = loginSource.replace(/import Layout from ['"]\.{2}\/components\/layout\/Layout['"];?/, 'const Layout = ({ children }) => <main>{children}</main>;');
@@ -835,4 +851,75 @@ test('UI6 catalog: Lightning DOM exposes real hash targets, static rule boundary
 
 test.after(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+function ruleFamiliesFixture() {
+  return { programs: PROGRAM_RULE_FAMILIES.flatMap((family, index) => [0, 1].map((choice) => {
+    const row = program(100 + index * 10 + choice, family.type, `${family.title} synthetic ${choice}`);
+    row.account_size = row.terms.account_size = choice ? '50000.00' : '25000.00';
+    row.profit_target = row.terms.profit_target = choice ? null : ['10.00', '8.00', '5.00', '0.00'][index];
+    row.rules = row.terms.rules = { drawdown_type: index < 2 ? 'trailing' : 'static', min_trading_days: null, ea_allowed: false };
+    return row;
+  })) };
+}
+
+test('four rule categories: one bounded catalog read, family-isolated selection, missing values and working hash/detail destinations', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/trading-rules');
+  const calls = [];
+  const fixture = ruleFamiliesFixture();
+  const before = JSON.stringify(fixture);
+  api.defaults.adapter = async (config) => {
+    calls.push(config);assert.equal(config.method, 'get');assert.equal(config.url, '/programs/');
+    assertBoundedRead(config, 'rules catalog');return response(config, fixture);
+  };
+  try {
+    globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
+    await renderRouter(harness, h(TradingRules), '/trading-rules', 'rules-families');
+    await waitFor(() => harness.host.querySelectorAll('[data-family-program]').length === 4, 'four selected family rules');
+    assert.equal(calls.length, 1);assert.equal(harness.host.querySelectorAll('select').length, 4);
+    const ids = [...harness.host.querySelectorAll('[id]')].map(node => node.id);assert.equal(new Set(ids).size, ids.length);
+    for (const [index, family] of PROGRAM_RULE_FAMILIES.entries()) {
+      const section = harness.host.querySelector('#'+family.anchor);
+      const select = section.querySelector('select');assert.equal(select.options.length, 2);
+      const target = String(101 + index * 10);
+      await act(async () => { select.value = target;select.dispatchEvent(new window.Event('change', { bubbles: true }));await settle(); });
+      assert.equal(section.querySelector('[data-family-program]').getAttribute('data-family-program'), target);
+      assert.equal(section.querySelector('a').getAttribute('href'), '/programs/'+target);
+      assert.match(section.textContent, /Not specified/);
+      const jump = harness.host.querySelector(`nav[aria-label="Program rule categories"] a[href="/trading-rules#${family.anchor}"]`);
+      await click(jump);assert.equal(harness.host.querySelector('[data-location]').textContent, '/trading-rules#'+family.anchor);
+    }
+    assert.equal(calls.length, 1, 'selection and category navigation reuse the loaded catalog');
+    assert.deepEqual([...harness.host.querySelectorAll('[data-standard-model] dd')].map(node=>node.textContent), ['1','10%','5%','10%','90%','10%']);
+    assert.equal(JSON.stringify(fixture), before, 'neither selection nor rendering writes catalog terms');
+    await click(harness.host.querySelector('#two-phase-rules a'));
+    assert.equal(harness.host.querySelector('[data-location]').textContent, '/programs/111');
+  } finally { api.defaults.adapter = previousAdapter;await harness.close(); }
+});
+
+test('four rule categories: failed read and identity change hide old rules; manual retry alone rereads the catalog', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/trading-rules');
+  let mode = 'failure';const calls=[];
+  api.defaults.adapter = async (config) => {
+    calls.push(config);assert.equal(config.method,'get');assert.equal(config.url,'/programs/');
+    if(mode==='failure')throw apiError();return response(config,ruleFamiliesFixture());
+  };
+  try {
+    globalThis.__ui6CatalogAuth = {user:null,isAuthenticated:false,isLoading:false};
+    await renderRouter(harness,h(TradingRules),'/trading-rules','rules-failure');
+    await waitFor(()=>harness.host.querySelector('[role="alert"]'),'rules failure');
+    assert.equal(harness.host.querySelectorAll('[data-family-program]').length,0);
+    assert.equal(harness.host.querySelectorAll('nav[aria-label="Program rule categories"] a').length,4);
+    assert.doesNotMatch(harness.host.textContent,/No active program is currently listed/);
+    mode='success';await click(button(harness.host,'Try again'));
+    await waitFor(()=>harness.host.querySelectorAll('[data-family-program]').length===4,'rules retry');
+    assert.equal(calls.length,2);
+    mode='failure';globalThis.__ui6CatalogAuth={user:{id:41,tenant_id:1},isAuthenticated:true,isLoading:false};
+    await renderRouter(harness,h(TradingRules),'/trading-rules','rules-failure');
+    await waitFor(()=>harness.host.querySelector('[role="alert"]'),'changed identity failure');
+    assert.equal(harness.host.querySelectorAll('[data-family-program]').length,0);
+    assert.equal(calls.length,3);
+  } finally {api.defaults.adapter=previousAdapter;await harness.close();}
 });

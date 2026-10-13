@@ -43,6 +43,7 @@ const dependencies = new Map([
 let serial = 0;
 
 function externalize(code) {
+  for (const name of ['standardEvaluationPolicy', 'programRuleFamilies']) code = code.replace(new RegExp(`from ['"][^'"]+${name}\\.js['"]`, 'g'), 'from '+JSON.stringify(pathToFileURL(source('services', name+'.js')).href));
   for (const [specifier, url] of dependencies) {
     code = code.replaceAll(`from '${specifier}'`, `from ${JSON.stringify(url)}`);
     code = code.replaceAll(`from \"${specifier}\"`, `from ${JSON.stringify(url)}`);
@@ -113,6 +114,14 @@ const ambientUrl = writeModule('premium-ambient.mjs', externalize(fs.readFileSyn
 const showcaseSource = fs.readFileSync(source('components', 'visual', 'PlatformShowcase.jsx'), 'utf8');
 const showcaseCode = await transformWithEsbuild(externalize(showcaseSource), 'PlatformShowcase.jsx', { loader: 'jsx', jsx: 'automatic', format: 'esm' });
 const showcaseUrl = writeModule('premium-showcase.mjs', externalize(showcaseCode.code));
+await compile('components/programs/CatalogUI.jsx', 'rules-catalog-ui', (text) => text
+  .replace(/import Layout from ['"][^'"]+['"];?/, 'const Layout = ({ children }) => <main>{children}</main>;')
+  .replace(/from ['"][^'"]+programCatalogViewService['"]/, `from ${JSON.stringify(pathToFileURL(source('services', 'programCatalogViewService.js')).href)}`));
+const rulesUiUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('rules-catalog-ui-')))).href;
+await compile('components/programs/ProgramRuleFamily.jsx', 'rule-family', (text) => text
+  .replace(/from ['"][^'"]+programCatalogViewService\.js['"]/, `from ${JSON.stringify(pathToFileURL(source('services', 'programCatalogViewService.js')).href)}`)
+  .replace(/from ['"]\.\/CatalogUI['"]/, `from ${JSON.stringify(rulesUiUrl)}`));
+const ruleFamilyUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('rule-family-')))).href;
 const pages = {
   Home: (await compile('pages/NewHomePage.jsx', 'home', (text) => withoutHomepageVisuals(replaceLayout(text)
     .replace(/import SchemaMarkup from ['"][^'"]+SchemaMarkup['"];?/, `import SchemaMarkup from ${JSON.stringify(noOpStub)};`)
@@ -131,7 +140,10 @@ const pages = {
   Terms: (await compile('pages/TermsOfService.jsx', 'terms', replaceLayout)).default,
   Privacy: (await compile('pages/PrivacyPolicy.jsx', 'privacy', replaceLayout)).default,
   Risk: (await compile('pages/RiskDisclosure.jsx', 'risk', replaceLayout)).default,
-  TradingRules: (await compile('pages/TradingRules.jsx', 'trading-rules', replaceLayout)).default,
+  TradingRules: (await compile('pages/TradingRules.jsx', 'trading-rules', (text) => replaceLayout(text)
+    .replace(/import useProgramCatalog from ['"][^'"]+['"];?/, 'const useProgramCatalog = () => ({ loading: false, error: "", data: [], retry() {} });')
+    .replace(/from ['"][^'"]+ProgramRuleFamily['"]/, `from ${JSON.stringify(ruleFamilyUrl)}`)
+    .replace(/from ['"][^'"]+CatalogUI['"]/, `from ${JSON.stringify(rulesUiUrl)}`))).default,
   Refund: (await compile('pages/RefundPolicy.jsx', 'refund', replaceLayout)).default,
   Cookie: (await compile('pages/CookiePolicy.jsx', 'cookie', (text) => replaceLayout(text).replace(/import AnalyticsStatus from ['"][^'"]+AnalyticsStatus['"];?/, `import AnalyticsStatus from ${JSON.stringify(noOpStub)};`))).default,
   Careers: (await compile('pages/Careers.jsx', 'careers', replaceLayout)).default,
@@ -258,7 +270,7 @@ test('UI6 public static route DOM fixtures mount, remount, and expose every reco
     ['/how-it-works', '/how-it-works', pages.How, 'How it works', [['/programs', 2]]],
     ['/contact', '/contact', pages.Contact, 'How can we help?', [['/support', 1], ['/faq', 1], ['/programs', 1]]],
     ['/free-course', '/free-course', pages.FreeCourse, 'Introductory trading topics', [['/programs', 1], ['/contact', 1]]],
-    ['/terms-of-service', '/terms-of-service', pages.Terms, 'Terms of Service', [['mailto:legal@marketedgepros.com', 1]]],
+    ['/terms-of-service', '/terms-of-service', pages.Terms, 'Terms of Service', [['/trading-rules', 1], ['/contact', 1]]],
     ['/privacy-policy', '/privacy-policy', pages.Privacy, 'Privacy Policy', [['mailto:privacy@marketedgepros.com', 1]]],
     ['/risk-disclosure', '/risk-disclosure', pages.Risk, 'Risk Disclosure', [['mailto:info@marketedgepros.com', 1]]],
     ['/trading-rules', '/trading-rules', pages.TradingRules, 'Trading rules and program terms', [['/programs', 1]]],

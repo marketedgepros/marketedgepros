@@ -6,19 +6,21 @@ const source = await readFile(new URL('../src/pages/TradingRules.jsx', import.me
 const visibleCopy = source.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ' ');
 const copyOnly = visibleCopy.replace(/className="[^"]*"/g, ' ');
 
-test('trading rules page points visitors to program-specific settings without inventing global policy', () => {
+test('trading rules distinguish owner-approved standard model from explicit catalog rollout and immutable orders', () => {
   assert.match(visibleCopy, /Program-specific settings are displayed in the catalog and on each program details page/);
-  assert.match(visibleCopy, /not a blanket set of live trading rules/);
-  assert.match(visibleCopy, /No general live trading rules are published here as approved policy/);
+  assert.match(visibleCopy, /Catalog rollout pending/);
+  assert.match(visibleCopy, /This model applies only when explicitly assigned to that program/);
+  assert.match(visibleCopy, /An existing order keeps the terms recorded with it/);
   assert.match(visibleCopy, /<Link to="\/programs"/);
+  assert.match(source, /STANDARD_EVALUATION_POLICY as policy/);
 });
 
-test('trading rules page does not state unapproved thresholds, strategies, penalties, or capabilities', () => {
-  for (const unsupported of [
-    /5\s*%/, /10\s*%/, /stop-loss/i, /martingale/i, /latency arbitrage/i,
-    /copy trading/i, /account termination/i, /profits? (?:will be )?forfeited/i,
-    /MT5/i, /SLA/i, /funding/i, /profit split/i,
-  ]) assert.doesNotMatch(copyOnly, unsupported);
+test('approved loss definitions do not invent strategy permissions, penalties, funding or payout schedule', () => {
+  for (const unsupported of [/martingale/i, /latency arbitrage/i, /copy trading/i, /account termination/i, /profits? (?:will be )?forfeited/i, /MT5/i, /SLA/i, /non-refundable/i]) assert.doesNotMatch(copyOnly, unsupported);
+  assert.match(copyOnly, /reset time and timezone still require confirmation/);
+  assert.match(copyOnly, /No live account calculation is performed by this page/);
+  assert.match(copyOnly, /eligible-profit definition.*explicit policy/);
+  assert.match(copyOnly, /not a guaranteed return/);
   assert.doesNotMatch(source, /mailto:/i);
 });
 
