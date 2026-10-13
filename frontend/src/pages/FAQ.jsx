@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronDown, HelpCircle, Search } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import StructuredData from '../components/seo/StructuredData';
@@ -44,24 +45,37 @@ const allQuestions = categories.flatMap((category, categoryIndex) =>
     index: `${categoryIndex}-${questionIndex}`,
   })),
 );
+const answerLinks = {
+  '0-1': { to: '/programs', label: 'Explore programs' },
+  '0-2': { to: '/programs', label: 'View current programs' },
+  '1-0': { to: '/programs', label: 'View current programs' },
+  '1-1': { to: '/programs', label: 'Review program listings' },
+  '3-0': { to: '/contact', label: 'View contact options' },
+  '3-1': { to: '/privacy-policy', label: 'View privacy information' },
+};
 
 export default function FAQ() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [openIndex, setOpenIndex] = useState(null);
+  const hasSearch = Boolean(searchTerm.trim());
   const filteredQuestions = useMemo(() => {
     const query = searchTerm.trim().toLocaleLowerCase();
-    if (!query) return allQuestions;
     return allQuestions.filter(({ q, a, category }) =>
-      `${q} ${a} ${category}`.toLocaleLowerCase().includes(query),
+      (selectedCategory === null || category === selectedCategory) &&
+      (!query || `${q} ${a} ${category}`.toLocaleLowerCase().includes(query)),
     );
-  }, [searchTerm]);
+  }, [searchTerm, selectedCategory]);
   const faqData = { questions: allQuestions.map(({ q, a }) => ({ question: q, answer: a })) };
+  const clearSearch = () => { setSearchTerm(''); setOpenIndex(null); };
+  const resetFilters = () => { clearSearch(); setSelectedCategory(null); };
 
   const renderQuestion = (item, showCategory = false) => {
     const expanded = openIndex === item.index;
     const answerId = `faq-answer-${item.index}`;
+    const link = answerLinks[item.index];
     return (
-      <article key={item.index} className="overflow-hidden rounded-2xl border border-cyan-900/70 bg-slate-900/80 transition-colors hover:border-cyan-700">
+      <article key={item.index} className="overflow-hidden rounded-2xl border border-cyan-900/70 bg-slate-900/80 transition-colors motion-reduce:transition-none hover:border-cyan-700">
         <button
           type="button"
           onClick={() => setOpenIndex(expanded ? null : item.index)}
@@ -77,6 +91,11 @@ export default function FAQ() {
         </button>
         <div id={answerId} hidden={!expanded}>
           <p className="border-t border-slate-700 px-6 py-5 leading-relaxed text-slate-300 sm:px-8">{item.a}</p>
+          {link && (
+            <Link to={link.to} className="mx-6 mb-5 inline-block rounded font-semibold text-cyan-200 underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:mx-8">
+              {link.label}
+            </Link>
+          )}
         </div>
       </article>
     );
@@ -103,6 +122,7 @@ export default function FAQ() {
                 placeholder="Search questions and answers…"
                 value={searchTerm}
                 onChange={(event) => { setSearchTerm(event.target.value); setOpenIndex(null); }}
+                aria-describedby="faq-results-status"
                 className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-4 pl-12 pr-4 text-white placeholder:text-slate-400 outline-none focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-400/40"
               />
             </div>
@@ -110,20 +130,43 @@ export default function FAQ() {
         </section>
         <section aria-label="Frequently asked questions" className="px-4 py-14 sm:py-20">
           <div className="mx-auto max-w-4xl">
-            {searchTerm.trim() ? (
-              <div className="space-y-4" aria-live="polite">
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
-                  <p>{filteredQuestions.length ? `${filteredQuestions.length} matching question${filteredQuestions.length === 1 ? '' : 's'}` : 'No questions match your search.'}</p>
-                  <button type="button" onClick={() => { setSearchTerm(''); setOpenIndex(null); }} className="rounded-md px-2 py-1 font-semibold text-cyan-300 underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Clear search</button>
-                </div>
-                {filteredQuestions.map((item) => renderQuestion(item, true))}
+            <div className="mb-8 flex flex-wrap gap-2" role="group" aria-label="Filter questions by topic">
+              {[null, ...categories.map(({ name }) => name)].map((name) => (
+                <button
+                  key={name ?? 'all'}
+                  type="button"
+                  aria-pressed={selectedCategory === name}
+                  onClick={() => { setSelectedCategory(name); setOpenIndex(null); }}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${selectedCategory === name ? 'border-cyan-400 bg-cyan-400 text-slate-950' : 'border-slate-600 text-slate-200 hover:border-cyan-400'}`}
+                >
+                  {name ?? 'All topics'}
+                </button>
+              ))}
+            </div>
+            <div className="mb-7 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
+              <p id="faq-results-status" role="status" aria-live="polite">
+                {filteredQuestions.length
+                  ? `${filteredQuestions.length} ${hasSearch ? 'matching' : 'available'} question${filteredQuestions.length === 1 ? '' : 's'}${selectedCategory ? ` in ${selectedCategory}` : ''}`
+                  : 'No questions match your search.'}
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {hasSearch && <button type="button" onClick={clearSearch} className="rounded-md px-2 py-1 font-semibold text-cyan-300 underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Clear search</button>}
+                {(hasSearch || selectedCategory !== null) && <button type="button" onClick={resetFilters} className="rounded-md px-2 py-1 font-semibold text-cyan-300 underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Reset filters</button>}
               </div>
+            </div>
+            {!filteredQuestions.length ? (
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-6">
+                <h2 className="text-xl font-semibold">Try another topic or search</h2>
+                <p className="mt-3 leading-relaxed text-slate-300">Clear the search to see this topic, or reset filters to browse all questions. Program-specific details are in the current program listings.</p>
+              </div>
+            ) : hasSearch ? (
+              <div className="space-y-4">{filteredQuestions.map((item) => renderQuestion(item, true))}</div>
             ) : (
               <div className="space-y-12">
-                {categories.map((category) => (
+                {categories.filter(({ name }) => selectedCategory === null || name === selectedCategory).map((category) => (
                   <section key={category.name}>
                     <h2 className="mb-5 border-l-2 border-cyan-400 pl-4 text-2xl font-bold text-white">{category.name}</h2>
-                    <div className="space-y-3">{category.questions.map((item, questionIndex) => renderQuestion({ ...item, index: `${categories.indexOf(category)}-${questionIndex}` }))}</div>
+                    <div className="space-y-3">{filteredQuestions.filter((item) => item.category === category.name).map((item) => renderQuestion(item))}</div>
                   </section>
                 ))}
               </div>

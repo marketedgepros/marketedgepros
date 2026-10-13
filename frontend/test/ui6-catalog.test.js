@@ -126,6 +126,12 @@ detailsSource = replaceModule(detailsSource, '../services/programCatalogViewServ
 detailsSource = replaceModule(detailsSource, '../components/programs/CatalogUI', catalogUiUrl);
 const ProgramDetails = (await compile('program-details', detailsSource)).default;
 
+let loginSource = fs.readFileSync(src('pages', 'Login.jsx'), 'utf8');
+loginSource = loginSource.replace(/import Layout from ['"]\.{2}\/components\/layout\/Layout['"];?/, 'const Layout = ({ children }) => <main>{children}</main>;');
+loginSource = replaceModule(loginSource, '../store/authStore', authStub);
+loginSource = replaceModule(loginSource, '../services/navigationService.js', srcUrl('services', 'navigationService.js'));
+const Login = (await compile('login-return', loginSource)).default;
+
 let checkoutSource = fs.readFileSync(src('pages', 'Checkout.jsx'), 'utf8');
 checkoutSource = replaceModule(checkoutSource, '../store/authStore', authStub);
 checkoutSource = replaceModule(checkoutSource, '../hooks/useProgramCatalog', hookUrl);
@@ -427,7 +433,7 @@ test('UI6 catalog: detail DOM handles public guest/permitted destinations and Ba
     await renderRouter(harness, routes, '/programs/12', 'detail-guest');
     await waitFor(() => harness.host.textContent.includes('Two phase synthetic'), 'guest public detail');
     await click(button(harness.host, 'Check quote availability'));
-    assert.equal(harness.host.querySelector('[data-location]').textContent, '/login');
+    assert.equal(harness.host.querySelector('[data-location]').textContent, '/login?redirect=%2Fprograms%2F12%2Fcheckout');
     assert.deepEqual(JSON.parse(harness.host.querySelector('[data-location]').getAttribute('data-state')), { from: '/programs/12/checkout' });
 
     globalThis.__ui6CatalogAuth = { user: { id: 41, tenant_id: 1, role: 'user' }, isAuthenticated: true, isLoading: false };
@@ -454,6 +460,165 @@ test('UI6 catalog: detail DOM handles public guest/permitted destinations and Ba
     api.defaults.adapter = previousAdapter;
     await harness.close();
   }
+});
+
+test('customer detail: successful direct and 2FA sign-in returns through real Login and navigation service to selected checkout', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/programs/12');
+  const calls = [];
+  api.defaults.adapter = async (config) => {
+    calls.push(config);
+    assert.equal(config.method, 'get', 'no quote or payment is submitted on return');
+    assert.equal(config.url, '/programs/12');
+    return response(config, program());
+  };
+  const routes = () => h(Routes, null,
+    h(Route, { path: '/programs/:id', element: h(ProgramDetails) }),
+    h(Route, { path: '/login', element: h(Login) }),
+    h(Route, { path: '/programs/:programId/checkout', element: h(Checkout) }),
+  );
+  const type = async (node, value) => act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(node, value);
+    node.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await settle();
+  });
+  const submit = async () => act(async () => {
+    harness.host.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    await settle();
+  });
+  try {
+    for (const twoFactor of [false, true]) {
+      const principal = { id: 41, tenant_id: 1, role: 'user' };
+      const state = {
+        user: null, isAuthenticated: false, isLoading: false, pending2FA: null,
+        error: null, clearError() {}, cancel2FA() { state.pending2FA = null; },
+        async login(email, password) {
+          assert.equal(email, 'synthetic@example.test');
+          assert.equal(password, 'SyntheticPassword9');
+          if (twoFactor) { state.pending2FA = { userId: 41 }; return { requires2FA: true, userId: 41 }; }
+          state.user = principal; state.isAuthenticated = true;
+          return { requires2FA: false, user: principal };
+        },
+        async login2FA(userId, token) {
+          assert.equal(userId, 41); assert.equal(token, '123456');
+          assert.ok(state.pending2FA, 'transient password proof is retained until verification');
+          state.user = principal; state.isAuthenticated = true; state.pending2FA = null;
+          return { user: principal };
+        },
+      };
+      globalThis.__ui6CatalogAuth = state;
+      await renderRouter(harness, routes(), '/programs/12', `return-${twoFactor}`);
+      await waitFor(() => button(harness.host, 'Check quote availability'), 'selected program');
+      await click(button(harness.host, 'Check quote availability'));
+      assert.equal(harness.host.querySelector('[data-location]').textContent, '/login?redirect=%2Fprograms%2F12%2Fcheckout');
+      await type(harness.host.querySelector('#login-email'), 'synthetic@example.test');
+      await type(harness.host.querySelector('#login-password'), 'SyntheticPassword9');
+      await submit();
+      if (twoFactor) {
+        await waitFor(() => harness.host.querySelector('#two-factor-code'), '2FA challenge');
+        assert.equal(harness.host.querySelector('[data-location]').textContent, '/login?redirect=%2Fprograms%2F12%2Fcheckout');
+        await type(harness.host.querySelector('#two-factor-code'), '123456');
+        await submit();
+      }
+      await waitFor(() => harness.host.querySelector('[data-location]').textContent === '/programs/12/checkout', 'actual selected checkout return');
+      await waitFor(() => button(harness.host, 'Request server quote'), 'real unpaid checkout UI');
+      assert.match(harness.host.textContent, /Quotes only\. Payments are not enabled\./);
+    }
+    assert.ok(calls.length >= 4);
+  } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
+});
+
+test('customer detail: jump links and help destinations use current catalog without extra reads or inferred missing values', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/programs/12');
+  const calls = [];
+  api.defaults.adapter = async (config) => {
+    calls.push(config);
+    assert.equal(config.method, 'get');
+    assert.equal(config.url, '/programs/12');
+    const value = program();
+    value.terms.profit_target = null;
+    value.profit_target = null;
+    value.terms.rules.synthetic_missing = null;
+    return response(config, value);
+  };
+  const routes = h(Routes, null,
+    h(Route, { path: '/programs/:id', element: h(ProgramDetails) }),
+    h(Route, { path: '*', element: h('p', null, 'help destination reached') }),
+  );
+  try {
+    globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
+    await renderRouter(harness, routes, '/programs/12', 'detail-jumps');
+    await waitFor(() => harness.host.querySelector('[aria-label="On this program page"]'), 'detail navigation');
+    const nav = harness.host.querySelector('[aria-label="On this program page"]');
+    assert.match(nav.className, /flex-wrap/);
+    const before = calls.length;
+    for (const target of ['program-rules', 'program-addons', 'program-additional', 'program-next-step']) {
+      const link = nav.querySelector(`a[href="/programs/12#${target}"]`);
+      assert.ok(link);
+      const node = harness.host.querySelector(`#${target}`);
+      assert.ok(node);
+      assert.match(node.className, /scroll-mt-28/);
+      await click(link);
+      assert.equal(harness.host.querySelector('[data-location]').textContent, `/programs/12#${target}`);
+    }
+    assert.equal(calls.length, before, 'hash-only navigation never requests catalog again');
+    const ruleLabel = [...harness.host.querySelectorAll('dt')].find((node) => node.textContent === 'Profit target');
+    assert.equal(ruleLabel.nextElementSibling.textContent, 'Not specified');
+    assert.match(harness.host.textContent, /does not mean zero or no restriction/);
+    assert.match(harness.host.textContent, /USD 199\.99/);
+    assert.match(harness.host.textContent, /Quotes only\. Payments are not enabled\./);
+    assert.match(harness.host.textContent, /does not confirm that a quote is available/);
+    await click(anchor(harness.host, 'Browse FAQ'));
+    assert.equal(harness.host.querySelector('[data-location]').textContent, '/faq');
+    await renderRouter(harness, routes, '/programs/12', 'detail-contact');
+    await waitFor(() => anchor(harness.host, 'Contact options'), 'contact help');
+    await click(anchor(harness.host, 'Contact options'));
+    assert.equal(harness.host.querySelector('[data-location]').textContent, '/contact');
+  } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
+});
+
+test('customer detail: same-mount identity/route changes hide old navigation and terms while held or failed', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/programs/12');
+  let mode = 'success';
+  let release;
+  let signal;
+  api.defaults.adapter = async (config) => {
+    assert.equal(config.method, 'get');
+    signal = config.signal;
+    if (mode === 'held') await new Promise((resolve) => { release = resolve; });
+    if (mode === 'failure') throw apiError();
+    return response(config, program(Number(config.url.split('/').at(-1))));
+  };
+  const routes = () => h(Routes, null,
+    h(Route, { path: '/programs/:id', element: h(ProgramDetails) }),
+    h(Route, { path: '*', element: h('p', null, 'destination') }),
+  );
+  try {
+    globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
+    await renderRouter(harness, routes(), '/programs/12', 'detail-scope');
+    await waitFor(() => harness.host.querySelector('#program-next-step'), 'initial detail');
+    const oldSignal = signal;
+    mode = 'held';
+    globalThis.__ui6CatalogAuth = { user: { id: 41, tenant_id: 1 }, isAuthenticated: true, isLoading: false };
+    // The stub is not a subscribed store: renew the element to model the render
+    // that a real Zustand identity subscription emits, retaining the same router.
+    await renderRouter(harness, routes(), '/programs/12', 'detail-scope');
+    await waitFor(() => release && harness.host.querySelector('[aria-busy="true"]'), 'identity read held');
+    assert.equal(oldSignal.aborted, true);
+    assert.equal(harness.host.querySelector('#program-next-step'), null);
+    assert.equal(harness.host.querySelector('[aria-label="On this program page"]'), null);
+    assert.equal(harness.host.textContent.includes('USD 199.99'), false);
+    mode = 'success';
+    await act(async () => { release(); await settle(); });
+    await waitFor(() => harness.host.querySelector('#program-next-step'), 'identity read restored');
+    mode = 'failure';
+    await renderRouter(harness, routes(), '/programs/99', 'detail-new-route');
+    await waitFor(() => harness.host.querySelector('[role="alert"]'), 'new route error');
+    assert.equal(harness.host.querySelector('#program-next-step'), null);
+    assert.equal(harness.host.querySelector('[aria-label="On this program page"]'), null);
+  } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
 });
 
 test('UI6 catalog: checkout DOM blocks guest/admin routes and reveals an unpaid quote only after matching synthetic owner acknowledgement', { concurrency: false }, async () => {

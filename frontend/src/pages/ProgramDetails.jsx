@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowRight, Layers } from "lucide-react";
 import useAuthStore from "../store/authStore";
 import useProgramCatalog from "../hooks/useProgramCatalog";
@@ -28,7 +28,7 @@ export default function ProgramDetails() {
   const proceed = () => {
     const destination = `/programs/${program.id}/checkout`;
     navigate(
-      user ? destination : "/login",
+      user ? destination : `/login?redirect=${encodeURIComponent(destination)}`,
       user ? undefined : { state: { from: destination } },
     );
   };
@@ -52,13 +52,33 @@ export default function ProgramDetails() {
               trading account.
             </p>
           </header>
+          <nav aria-label="On this program page" className="mb-7 flex flex-wrap gap-2">
+            {[
+              ["program-rules", "Settings"],
+              ["program-addons", "Add-ons"],
+              ["program-additional", "Additional rules"],
+              ["program-next-step", "Next step"],
+            ].map(([target, label]) => (
+              <Link
+                key={target}
+                to={`#${target}`}
+                className="rounded-full border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:border-cyan-400 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
           <div className="grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
             <div className="space-y-6">
               <section className={panelStyle} aria-labelledby="program-rules">
-                <h2 id="program-rules" className="mb-4 text-xl font-semibold">
+                <h2 id="program-rules" className="mb-4 scroll-mt-28 text-xl font-semibold">
                   Published program settings
                 </h2>
                 <ProgramRules terms={program.terms} />
+                <p className="mt-4 text-sm leading-relaxed text-slate-400">
+                  “Not specified” means a value has not been published in this
+                  catalog entry. It does not mean zero or no restriction.
+                </p>
                 {program.terms.description && (
                   <div className="mt-5 border-t border-slate-700 pt-4">
                     <h3 className="text-sm font-semibold text-cyan-200">
@@ -77,13 +97,9 @@ export default function ProgramDetails() {
               <section className={panelStyle} aria-labelledby="program-addons">
                 <h2
                   id="program-addons"
-                  className="flex items-center gap-2 text-xl font-semibold"
+                  className="flex scroll-mt-28 items-center gap-2 text-xl font-semibold"
                 >
-                  <Layers
-                    size={20}
-                    className="text-cyan-300"
-                    aria-hidden="true"
-                  />
+                  <Layers size={20} className="text-cyan-300" aria-hidden="true" />
                   Optional add-ons
                 </h2>
                 <p className="mt-2 text-sm text-slate-400">
@@ -96,9 +112,7 @@ export default function ProgramDetails() {
                     {program.addons.map((addon) => (
                       <li key={addon.id} className="py-4">
                         <div className="flex flex-wrap justify-between gap-3">
-                          <h3 className="break-words font-medium">
-                            {addon.name}
-                          </h3>
+                          <h3 className="break-words font-medium">{addon.name}</h3>
                           <span className="text-sm tabular-nums text-cyan-200">
                             {addonPriceLabel(addon)}
                           </span>
@@ -117,10 +131,13 @@ export default function ProgramDetails() {
                   </p>
                 )}
               </section>
-              <ConfiguredRules terms={program.terms} />
+              <div id="program-additional" className="scroll-mt-28">
+                <ConfiguredRules terms={program.terms} />
+              </div>
             </div>
             <aside
-              className={`${panelStyle} space-y-6`}
+              id="program-next-step"
+              className={`${panelStyle} scroll-mt-28 space-y-6`}
               aria-label="Program fee and next step"
             >
               <div>
@@ -136,15 +153,27 @@ export default function ProgramDetails() {
                   terms in an unpaid quote. No charge is made.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={proceed}
-                className={`${primaryAction} w-full`}
-              >
+              <button type="button" onClick={proceed} className={`${primaryAction} w-full`}>
                 Check quote availability
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
+              <p className="text-sm leading-relaxed text-slate-400">
+                If you are not signed in, this step opens sign-in first and
+                keeps the selected program as the return destination. It does
+                not confirm that a quote is available.
+              </p>
               <PaymentBoundary />
+              <div className="border-t border-slate-700 pt-5">
+                <h2 className="text-base font-semibold">Need more context?</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                  Browse general questions or view contact options for details
+                  not specified in this listing.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link to="/faq" className="rounded text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Browse FAQ</Link>
+                  <Link to="/contact" className="rounded text-sm font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Contact options</Link>
+                </div>
+              </div>
             </aside>
           </div>
         </>

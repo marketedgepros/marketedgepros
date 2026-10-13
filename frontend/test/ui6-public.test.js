@@ -325,8 +325,11 @@ test('UI6 FAQ DOM expands, filters, and clears source state while retaining cano
     assert.equal(question.isConnected, false, 'changing a filter removes prior expanded DOM rather than retaining stale content');
     await click([...view.host.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear search'));
     await waitFor(() => view.host.querySelector('#faq-search').value === '', 'cleared FAQ filter');
-    assert.equal(anchors(view.host, '/programs').length, 1);
-    assert.equal(anchors(view.host, '/contact').length, 1);
+    // Answer panels now offer additional links; the public bottom actions remain
+    // singular and must still resolve to the canonical destinations.
+    const actions = [...view.host.querySelectorAll('section')].find((node) => node.querySelector('h2')?.textContent === 'Need more information?');
+    assert.equal(anchors(actions, '/programs').length, 1);
+    assert.equal(anchors(actions, '/contact').length, 1);
   } finally {
     await view.close();
   }

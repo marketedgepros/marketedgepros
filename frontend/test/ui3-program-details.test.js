@@ -27,7 +27,7 @@ test("quote CTA and optional add-on copy do not promise quote availability", () 
 test("page keeps the catalog source, protected-route identity behavior, and opaque program ID", () => {
   assert.match(source, /useProgramCatalog\(id\)/);
   assert.match(source, /const destination = `\/programs\/\$\{program\.id\}\/checkout`/);
-  assert.match(source, /user \? destination : "\/login"/);
+  assert.match(source, /user \? destination : `\/login\?redirect=\$\{encodeURIComponent\(destination\)\}`/);
   assert.match(source, /state: \{ from: destination \}/);
   assert.match(source, /<CatalogPage>/);
   assert.match(source, /<ProgramRules terms=\{program\.terms\} \/>/);
