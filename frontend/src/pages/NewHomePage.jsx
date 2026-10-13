@@ -20,7 +20,7 @@ const NewHomePage = () => {
 
   return (
     <Layout>
-      <div data-visual-paused={ambient.paused || ambient.reduced ? "true" : "false"} className="mep-screen home-motion min-h-screen overflow-hidden scroll-smooth text-white">
+      <div data-motion-replay={ambient.replay ? "true" : "false"} data-visual-paused={ambient.paused || ambient.reduced ? "true" : "false"} className="mep-screen home-motion min-h-screen overflow-hidden scroll-smooth text-white">
       <SchemaMarkup />
       <section ref={ambient.ref} data-motion-running={ambient.running ? "true" : "false"} className="premium-hero relative isolate flex min-h-[76vh] items-center overflow-hidden">
         <div aria-hidden="true" className="home-motion__hero-background pointer-events-none absolute inset-0">

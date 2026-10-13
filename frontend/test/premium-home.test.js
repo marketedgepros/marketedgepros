@@ -125,6 +125,9 @@ test('centred globe uses real help destinations, shared pause, independent visib
       const globe=h.host.querySelector('#home-help');
       assert.ok(globe); assert.equal(globe.getAttribute('aria-labelledby'),'home-help-heading');
       assert.equal(globe.querySelector('img').getAttribute('src'),'/images/stats-globe-hologram.webp');
+      const originalImage=globe.querySelector('img');
+      const motionHost=h.host.querySelector('.home-motion');
+      assert.equal(motionHost.dataset.motionReplay,'false');
       assert.equal(globe.querySelector('img').getAttribute('loading'),'lazy');
       assert.ok(globe.querySelector('[aria-hidden="true"] img'));
       assert.deepEqual([...globe.querySelectorAll('a')].map(a=>a.getAttribute('href')),['/faq','/support','/programs']);
@@ -137,7 +140,18 @@ test('centred globe uses real help destinations, shared pause, independent visib
         assert.equal(h.host.querySelector('.home-motion').dataset.visualPaused,'true');
         await click(globe.querySelector('button'));
         assert.equal(globe.dataset.motionRunning,'true');
+        assert.equal(motionHost.dataset.motionReplay,'true');
+        assert.equal(globe.querySelector('img'),originalImage);
+        const heroButton=h.host.querySelector('.premium-hero button');
+        await click(heroButton);
+        assert.equal(globe.dataset.motionRunning,'false');
+        await click(heroButton);
+        assert.equal(globe.dataset.motionRunning,'true');
+        assert.equal(motionHost.dataset.motionReplay,'false');
+        assert.equal(globe.querySelector('img'),originalImage);
         await act(async()=>observer.visible(false)); assert.equal(globe.dataset.motionRunning,'false');
+        await act(async()=>observer.visible(true));
+        assert.equal(motionHost.dataset.motionReplay,'false');
       } else assert.equal(globe.querySelector('button').disabled,true);
       assert.equal(globe.querySelectorAll('canvas,video,iframe').length,0);
     } finally { await h.close(); }
@@ -147,4 +161,15 @@ test('centred globe uses real help destinations, shared pause, independent visib
   assert.match(css,/width: min\(112vw, 42rem\)/);
   assert.match(css,/\.home-help-globe\[data-motion-running="true"\]/);
   assert.doesNotMatch(css,/infinite/);
+});
+
+test('resume uses equivalent finite keyframes for every ambient layer, including the visible mobile light', () => {
+  const css=fs.readFileSync(new URL('components/visual/homeMotion.css',src),'utf8');
+  for (const name of ['premiumLightSweep','premiumArtworkFloat','homeMotionGlowBreath','homeHelpGlobeFloat']) {
+    const block=(n)=>new RegExp('@keyframes '+n+' \\{([\\s\\S]*?)\\n\\}').exec(css)?.[1].trim().replace(/\s+/g,' ');
+    assert.ok(block(name));assert.equal(block(name+'Replay'),block(name));
+    assert.match(css,new RegExp('animation-name: '+name+'Replay'));
+  }
+  assert.doesNotMatch(css,/\.premium-hero__beam \{ animation: none; \}/);
+  assert.match(css,/radial-gradient\(ellipse at 60% 22%/);
 });

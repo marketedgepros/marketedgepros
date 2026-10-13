@@ -156,7 +156,9 @@
 
 @media (max-width: 639px) {
   .premium-hero__grid { background-size: 48px 48px; }
-  .premium-hero__beam { animation: none; }
+  .premium-hero__beam {
+    background: radial-gradient(ellipse at 60% 22%, rgba(34,211,238,.3), transparent 55%);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .premium-hero__beam, .premium-hero__artwork, .premium-switch-in {
@@ -230,4 +232,41 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .home-help-globe__orbit { animation: none !important; transform: none !important; }
+}
+
+/* Explicit Resume selects equivalent finite keyframes. Unlike play-state alone,
+   a changed name replays a completed CSS animation, without remounts or timers. */
+.home-motion[data-motion-replay="true"] .premium-hero__beam {
+  animation-name: premiumLightSweepReplay;
+}
+.home-motion[data-motion-replay="true"] .premium-hero__artwork {
+  animation-name: premiumArtworkFloatReplay;
+}
+.home-motion[data-motion-replay="true"] .home-motion__ambient-ring {
+  animation-name: homeMotionGlowBreathReplay;
+}
+.home-motion[data-motion-replay="true"] .home-help-globe__orbit {
+  animation-name: homeHelpGlobeFloatReplay;
+}
+@keyframes premiumLightSweepReplay {
+  0%, 100% { opacity: .15; transform: translate3d(-3%,0,0); }
+  50% { opacity: .42; transform: translate3d(3%,0,0); }
+}
+@keyframes premiumArtworkFloatReplay {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(0,-7px,0); }
+}
+@keyframes homeMotionGlowBreathReplay {
+  0%, 100% {
+    opacity: 0.34;
+    box-shadow: 0 0 30px rgba(103, 232, 249, 0.09), inset 0 0 18px rgba(103, 232, 249, 0.03);
+  }
+  50% {
+    opacity: 0.58;
+    box-shadow: 0 0 54px rgba(103, 232, 249, 0.2), inset 0 0 32px rgba(103, 232, 249, 0.07);
+  }
+}
+@keyframes homeHelpGlobeFloatReplay {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-.6deg); }
+  50% { transform: translate3d(0, -8px, 0) rotate(.6deg); }
 }

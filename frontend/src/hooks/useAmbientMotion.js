@@ -6,6 +6,7 @@ export default function useAmbientMotion() {
   const ref = useRef(null);
   const reduced = usePrefersReducedMotion();
   const [paused, setPaused] = useState(false);
+  const [replay, setReplay] = useState(false);
   const [visible, setVisible] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
 
@@ -34,8 +35,14 @@ export default function useAmbientMotion() {
   }, []);
 
   return {
-    ref, paused, reduced,
+    ref, paused, reduced, replay,
     running: visible && pageVisible && !paused && !reduced,
-    togglePaused: () => setPaused((value) => !value),
+    togglePaused: () => {
+      if (reduced) return;
+      // Switching between equivalent CSS names restarts a finished finite run.
+      // It does not remount content or restart on visibility/observer deliveries.
+      if (paused) setReplay((value) => !value);
+      setPaused(!paused);
+    },
   };
 }
