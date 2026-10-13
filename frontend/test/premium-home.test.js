@@ -68,9 +68,9 @@ test('premium workspace changes real visible content and destinations without cu
 });
 function Probe() {
   const m = ambient.module.default();
-  return React.createElement('section', { ref: m.ref, 'data-running': String(m.running) }, React.createElement('button', { disabled: m.reduced, onClick: m.togglePaused }, m.paused ? 'Resume' : 'Pause'));
+  return React.createElement('section', { ref: m.ref, 'data-running': String(m.running) });
 }
-test('ambient motion pauses offscreen, on document hide and by user, then cleans its observer/listener', async () => {
+test('ambient motion runs automatically onscreen, stops on document hide, and cleans its observer/listener', async () => {
   const h = dom();
   try {
     await act(async () => h.root.render(React.createElement(Probe)));
@@ -78,8 +78,8 @@ test('ambient motion pauses offscreen, on document hide and by user, then cleans
     assert.equal(running(), 'false'); assert.equal(h.instances.length, 1);
     const o = h.instances[0];
     await act(async () => o.visible(true)); assert.equal(running(), 'true');
-    await click(h.host.querySelector('button')); assert.equal(running(), 'false');
-    await click(h.host.querySelector('button')); assert.equal(running(), 'true');
+    assert.equal(h.host.querySelectorAll('button').length, 0);
+    await act(async () => o.visible(true)); assert.equal(running(), 'true');
     await act(async () => o.visible(false)); assert.equal(running(), 'false');
     await act(async () => o.visible(true));
     Object.defineProperty(h.d.window.document, 'visibilityState', { configurable: true, value: 'hidden' });
@@ -94,17 +94,17 @@ test('ambient motion pauses offscreen, on document hide and by user, then cleans
 test('reduced motion and unavailable observer keep ambient illustration static', async () => {
   for (const options of [{ reduced: true }, { observer: false }]) {
     const h = dom(options);
-    try { await act(async () => h.root.render(React.createElement(Probe))); if (h.instances.length) await act(async () => h.instances[0].visible(true)); assert.equal(h.host.querySelector('section').dataset.running, 'false'); if (options.reduced) assert.equal(h.host.querySelector('button').disabled, true); }
+    try { await act(async () => h.root.render(React.createElement(Probe))); if (h.instances.length) await act(async () => h.instances[0].visible(true)); assert.equal(h.host.querySelector('section').dataset.running, 'false'); assert.equal(h.host.querySelectorAll('button').length, 0); }
     finally { await h.close(); }
   }
 });
-test('premium motion is bounded, pauses by data attribute, has no feed or polling, and preserves own image paths', () => {
+test('premium motion is visibility-bound, has no feed or polling, and preserves own image paths', () => {
   const css = fs.readFileSync(new URL('components/visual/homeMotion.css', src), 'utf8');
   const hook = fs.readFileSync(new URL('hooks/useAmbientMotion.js', src), 'utf8');
   const home = fs.readFileSync(new URL('pages/NewHomePage.jsx', src), 'utf8');
-  assert.doesNotMatch(css, /infinite/); assert.match(css, /premiumLightSweep 8s ease-in-out 2/); assert.match(css, /premiumArtworkFloat 6s ease-in-out 3/);
-  assert.match(css, /animation-play-state: paused/); assert.match(css, /prefers-reduced-motion: reduce/); assert.doesNotMatch(hook, /requestAnimationFrame|setInterval|fetch\(/);
-  assert.match(home, /CatalogPreview interactive/); assert.match(home, /Pause visual motion/); assert.match(home, /hero-trading-3d.webp/);
+  assert.match(css, /premiumLightSweep 2.4s ease-in-out infinite/); assert.match(css, /premiumArtworkFloat 2.4s ease-in-out infinite/);
+  assert.match(css, /animation: none;/); assert.match(css, /prefers-reduced-motion: reduce/); assert.doesNotMatch(hook, /requestAnimationFrame|setInterval|fetch\(/);
+  assert.match(home, /CatalogPreview interactive/); assert.doesNotMatch(home, /Pause visual motion|Resume visual motion|togglePaused|motion-control/); assert.match(home, /hero-trading-3d.webp/);
 });
 test.after(() => fs.rmSync(tmp, { force: true, recursive: true }));
 
@@ -117,7 +117,7 @@ const homeSource = fs.readFileSync(new URL('pages/NewHomePage.jsx', src), 'utf8'
   .replace("'../components/visual/PlatformShowcase'", JSON.stringify(showcase.url))
   .replace(/import '[^']+\.css';/, '');
 const homeModule = await compile('centred-globe-home', homeSource);
-test('centred globe uses real help destinations, shared pause, independent visibility and a static reduced-motion fallback', async () => {
+test('centred globe starts automatically with independent visibility, real links and static reduced-motion fallback', async () => {
   for (const reduced of [false,true]) {
     const h = dom({reduced});
     try {
@@ -126,50 +126,39 @@ test('centred globe uses real help destinations, shared pause, independent visib
       assert.ok(globe); assert.equal(globe.getAttribute('aria-labelledby'),'home-help-heading');
       assert.equal(globe.querySelector('img').getAttribute('src'),'/images/stats-globe-hologram.webp');
       const originalImage=globe.querySelector('img');
-      const motionHost=h.host.querySelector('.home-motion');
-      assert.equal(motionHost.dataset.motionReplay,'false');
+      assert.equal(h.host.querySelectorAll('.premium-hero button, #home-help button').length,0);
       assert.equal(globe.querySelector('img').getAttribute('loading'),'lazy');
       assert.ok(globe.querySelector('[aria-hidden="true"] img'));
       assert.deepEqual([...globe.querySelectorAll('a')].map(a=>a.getAttribute('href')),['/faq','/support','/programs']);
       const observer=h.instances.find(o=>o.target===globe); assert.ok(observer);
       await act(async()=>observer.visible(true));
       assert.equal(globe.dataset.motionRunning,String(!reduced));
-      if (!reduced) {
-        await click(globe.querySelector('button'));
-        assert.equal(globe.dataset.motionRunning,'false');
-        assert.equal(h.host.querySelector('.home-motion').dataset.visualPaused,'true');
-        await click(globe.querySelector('button'));
-        assert.equal(globe.dataset.motionRunning,'true');
-        assert.equal(motionHost.dataset.motionReplay,'true');
-        assert.equal(globe.querySelector('img'),originalImage);
-        const heroButton=h.host.querySelector('.premium-hero button');
-        await click(heroButton);
-        assert.equal(globe.dataset.motionRunning,'false');
-        await click(heroButton);
-        assert.equal(globe.dataset.motionRunning,'true');
-        assert.equal(motionHost.dataset.motionReplay,'false');
-        assert.equal(globe.querySelector('img'),originalImage);
-        await act(async()=>observer.visible(false)); assert.equal(globe.dataset.motionRunning,'false');
-        await act(async()=>observer.visible(true));
-        assert.equal(motionHost.dataset.motionReplay,'false');
-      } else assert.equal(globe.querySelector('button').disabled,true);
+      const hero=h.host.querySelector('.premium-hero');
+      const heroObserver=h.instances.find(o=>o.target===hero);
+      await act(async()=>heroObserver.visible(false));
+      assert.equal(globe.dataset.motionRunning,String(!reduced));
+      await act(async()=>observer.visible(false)); assert.equal(globe.dataset.motionRunning,'false');
+      await act(async()=>observer.visible(true)); assert.equal(globe.dataset.motionRunning,String(!reduced));
+      await act(async()=>observer.visible(true)); assert.equal(globe.querySelector('img'),originalImage);
       assert.equal(globe.querySelectorAll('canvas,video,iframe').length,0);
     } finally { await h.close(); }
   }
   const css=fs.readFileSync(new URL('components/visual/homeMotion.css',src),'utf8');
-  assert.match(css,/homeHelpGlobeFloat 8s ease-in-out 3/);
+  assert.match(css,/homeHelpGlobeFloat 2.4s ease-in-out infinite/);
   assert.match(css,/width: min\(112vw, 42rem\)/);
   assert.match(css,/\.home-help-globe\[data-motion-running="true"\]/);
-  assert.doesNotMatch(css,/infinite/);
+  assert.equal([...css.matchAll(/animation:[^;]*infinite/g)].length,4);
 });
 
-test('resume uses equivalent finite keyframes for every ambient layer, including the visible mobile light', () => {
+test('automatic motion is visible-only, transform/opacity based and contains no replay/control machinery', () => {
   const css=fs.readFileSync(new URL('components/visual/homeMotion.css',src),'utf8');
+  const hook=fs.readFileSync(new URL('hooks/useAmbientMotion.js',src),'utf8');
   for (const name of ['premiumLightSweep','premiumArtworkFloat','homeMotionGlowBreath','homeHelpGlobeFloat']) {
-    const block=(n)=>new RegExp('@keyframes '+n+' \\{([\\s\\S]*?)\\n\\}').exec(css)?.[1].trim().replace(/\s+/g,' ');
-    assert.ok(block(name));assert.equal(block(name+'Replay'),block(name));
-    assert.match(css,new RegExp('animation-name: '+name+'Replay'));
+    assert.match(css,new RegExp('animation: '+name+' 2\\.4s ease-in-out infinite;'));
+    const block=new RegExp('@keyframes '+name+' \\{([\\s\\S]*?)\\n\\}').exec(css)?.[1];
+    assert.ok(block); assert.doesNotMatch(block,/box-shadow|filter|width|height|top|left/);
   }
-  assert.doesNotMatch(css,/\.premium-hero__beam \{ animation: none; \}/);
+  assert.doesNotMatch(css,/Replay|animation-play-state|motion-control/);
+  assert.doesNotMatch(hook,/togglePaused|setPaused|setReplay|setInterval|setTimeout|requestAnimationFrame/);
   assert.match(css,/radial-gradient\(ellipse at 60% 22%/);
 });

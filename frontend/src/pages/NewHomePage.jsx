@@ -20,7 +20,7 @@ const NewHomePage = () => {
 
   return (
     <Layout>
-      <div data-motion-replay={ambient.replay ? "true" : "false"} data-visual-paused={ambient.paused || ambient.reduced ? "true" : "false"} className="mep-screen home-motion min-h-screen overflow-hidden scroll-smooth text-white">
+      <div data-visual-paused={ambient.reduced ? "true" : "false"} className="mep-screen home-motion min-h-screen overflow-hidden scroll-smooth text-white">
       <SchemaMarkup />
       <section ref={ambient.ref} data-motion-running={ambient.running ? "true" : "false"} className="premium-hero relative isolate flex min-h-[76vh] items-center overflow-hidden">
         <div aria-hidden="true" className="home-motion__hero-background pointer-events-none absolute inset-0">
@@ -30,7 +30,6 @@ const NewHomePage = () => {
         <div aria-hidden="true" className="premium-hero__grid pointer-events-none absolute inset-0" />
         <div aria-hidden="true" className="premium-hero__beam pointer-events-none absolute inset-0" />
         <div aria-hidden="true" className="home-motion__ambient-ring pointer-events-none absolute -right-24 top-16 h-80 w-80 rounded-full border border-cyan-300/10" />
-        <button type="button" onClick={ambient.togglePaused} aria-pressed={ambient.paused} disabled={ambient.reduced} className="premium-motion-control absolute right-6 top-5 z-10 rounded-full border border-slate-500/70 bg-slate-950/80 px-3 py-2 text-xs text-slate-300 hover:border-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-60">{ambient.reduced ? "Reduced motion enabled" : ambient.paused ? "Resume visual motion" : "Pause visual motion"}</button>
         <div className="home-motion__content mx-auto grid w-full max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.2fr_.8fr] lg:items-center lg:px-8">
           <div ref={heroCopy.ref} className={heroCopy.className}>
             <p className="mb-6 text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">MarketEdgePros · Trading programs</p>
@@ -81,12 +80,11 @@ const NewHomePage = () => {
         </div>
       </section>
 
-      <section id="home-help" ref={globeMotion.ref} data-motion-running={globeMotion.running && !ambient.paused ? "true" : "false"} className="home-help-globe border-t border-white/5" aria-labelledby="home-help-heading">
+      <section id="home-help" ref={globeMotion.ref} data-motion-running={globeMotion.running ? "true" : "false"} className="home-help-globe border-t border-white/5" aria-labelledby="home-help-heading">
         <div aria-hidden="true" className="home-help-globe__scene">
           <div className="home-help-globe__light" />
           <div className="home-help-globe__orbit"><img src="/images/stats-globe-hologram.webp" alt="" width="1024" height="1024" loading="lazy" decoding="async" className="home-help-globe__image" /></div>
         </div>
-        <button type="button" onClick={ambient.togglePaused} aria-pressed={ambient.paused} disabled={ambient.reduced} className="home-help-globe__control premium-motion-control rounded-full border border-slate-500/70 bg-slate-950/80 px-3 py-2 text-xs text-slate-300 hover:border-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-60">{ambient.reduced ? "Reduced motion enabled" : ambient.paused ? "Resume visual motion" : "Pause visual motion"}</button>
         <div ref={supportPanel.ref} className={`${supportPanel.className} home-help-globe__copy mx-auto max-w-4xl px-6 text-center lg:px-8`}>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Clarity before commitment</p>
           <h2 id="home-help-heading" className="mep-heading mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Questions before you decide?</h2>

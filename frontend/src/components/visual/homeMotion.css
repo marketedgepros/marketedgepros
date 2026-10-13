@@ -37,19 +37,12 @@
 
 .home-motion__ambient-ring {
   box-shadow: 0 0 42px rgba(103, 232, 249, 0.13), inset 0 0 24px rgba(103, 232, 249, 0.04);
-  animation: homeMotionGlowBreath 5.6s ease-in-out 3;
+  opacity: .34;
 }
 
 @keyframes homeMotionGlowBreath {
-  0%, 100% {
-    opacity: 0.34;
-    box-shadow: 0 0 30px rgba(103, 232, 249, 0.09), inset 0 0 18px rgba(103, 232, 249, 0.03);
-  }
-
-  50% {
-    opacity: 0.58;
-    box-shadow: 0 0 54px rgba(103, 232, 249, 0.2), inset 0 0 32px rgba(103, 232, 249, 0.07);
-  }
+  0%, 100% { opacity: .34; transform: scale(.97); }
+  50% { opacity: .58; transform: scale(1.03); }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -97,22 +90,24 @@
   z-index: 0;
   opacity: .32;
   background: linear-gradient(110deg, transparent 46%, rgba(103,232,249,.14) 48%, rgba(103,232,249,.25) 49%, transparent 52%);
-  animation: premiumLightSweep 8s ease-in-out 2;
-  animation-play-state: paused;
+  animation: none;
 }
 .premium-hero__artwork {
   position: relative;
   transform-origin: center;
-  animation: premiumArtworkFloat 6s ease-in-out 3;
-  animation-play-state: paused;
+  animation: none;
 }
-.premium-hero .home-motion__ambient-ring {
-  animation-play-state: paused;
+/* Removing the animation offscreen lets the next section entry start naturally.
+   Only visible sections animate; no clock, polling, or repeating JS work. */
+.premium-hero .home-motion__ambient-ring { animation: none; }
+.premium-hero[data-motion-running="true"] .premium-hero__beam {
+  animation: premiumLightSweep 2.4s ease-in-out infinite;
 }
-.premium-hero[data-motion-running="true"] .premium-hero__beam,
-.premium-hero[data-motion-running="true"] .premium-hero__artwork,
+.premium-hero[data-motion-running="true"] .premium-hero__artwork {
+  animation: premiumArtworkFloat 2.4s ease-in-out infinite;
+}
 .premium-hero[data-motion-running="true"] .home-motion__ambient-ring {
-  animation-play-state: running;
+  animation: homeMotionGlowBreath 2.4s ease-in-out infinite;
 }
 .premium-view-button {
   transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
@@ -131,19 +126,19 @@
   overflow-wrap: anywhere;
 }
 @keyframes premiumLightSweep {
-  0%, 100% { opacity: .15; transform: translate3d(-3%,0,0); }
-  50% { opacity: .42; transform: translate3d(3%,0,0); }
+  0%, 100% { opacity: .15; transform: translate3d(-5%,0,0); }
+  50% { opacity: .42; transform: translate3d(5%,0,0); }
 }
 @keyframes premiumArtworkFloat {
   0%, 100% { transform: translate3d(0,0,0); }
-  50% { transform: translate3d(0,-7px,0); }
+  50% { transform: translate3d(0,-9px,0); }
 }
 @keyframes premiumContentEnter {
   from { opacity: .55; transform: translate3d(0,8px,0); }
   to { opacity: 1; transform: translate3d(0,0,0); }
 }
 
-/* A manual pause is page-wide: reveal content rather than freeze it invisible. */
+/* Reduced motion reveals all content without entrance transitions. */
 .home-motion[data-visual-paused="true"] .scroll-reveal,
 .home-motion[data-visual-paused="true"] .home-motion__panel,
 .home-motion[data-visual-paused="true"] .premium-switch-in,
@@ -193,8 +188,7 @@
   left: 50%;
   width: min(112vw, 42rem);
   margin-left: max(-56vw, -21rem);
-  animation: homeHelpGlobeFloat 8s ease-in-out 3;
-  animation-play-state: paused;
+  animation: none;
   transform-origin: center;
 }
 .home-help-globe__image {
@@ -210,63 +204,16 @@
   padding-top: clamp(18rem, 38vw, 28rem);
   text-wrap: balance;
 }
-.home-help-globe__control {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 2;
-  min-height: 2.75rem;
-}
 .home-help-globe[data-motion-running="true"] .home-help-globe__orbit {
-  animation-play-state: running;
+  animation: homeHelpGlobeFloat 2.4s ease-in-out infinite;
 }
 @keyframes homeHelpGlobeFloat {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(-.6deg); }
-  50% { transform: translate3d(0, -8px, 0) rotate(.6deg); }
-}
-.home-motion[data-visual-paused="true"] .home-help-globe__orbit {
-  animation-play-state: paused !important;
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
+  50% { transform: translate3d(0, -12px, 0) rotate(1.2deg); }
 }
 @media (max-width: 639px) {
   .home-help-globe { padding-bottom: 2.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .home-help-globe__orbit { animation: none !important; transform: none !important; }
-}
-
-/* Explicit Resume selects equivalent finite keyframes. Unlike play-state alone,
-   a changed name replays a completed CSS animation, without remounts or timers. */
-.home-motion[data-motion-replay="true"] .premium-hero__beam {
-  animation-name: premiumLightSweepReplay;
-}
-.home-motion[data-motion-replay="true"] .premium-hero__artwork {
-  animation-name: premiumArtworkFloatReplay;
-}
-.home-motion[data-motion-replay="true"] .home-motion__ambient-ring {
-  animation-name: homeMotionGlowBreathReplay;
-}
-.home-motion[data-motion-replay="true"] .home-help-globe__orbit {
-  animation-name: homeHelpGlobeFloatReplay;
-}
-@keyframes premiumLightSweepReplay {
-  0%, 100% { opacity: .15; transform: translate3d(-3%,0,0); }
-  50% { opacity: .42; transform: translate3d(3%,0,0); }
-}
-@keyframes premiumArtworkFloatReplay {
-  0%, 100% { transform: translate3d(0,0,0); }
-  50% { transform: translate3d(0,-7px,0); }
-}
-@keyframes homeMotionGlowBreathReplay {
-  0%, 100% {
-    opacity: 0.34;
-    box-shadow: 0 0 30px rgba(103, 232, 249, 0.09), inset 0 0 18px rgba(103, 232, 249, 0.03);
-  }
-  50% {
-    opacity: 0.58;
-    box-shadow: 0 0 54px rgba(103, 232, 249, 0.2), inset 0 0 32px rgba(103, 232, 249, 0.07);
-  }
-}
-@keyframes homeHelpGlobeFloatReplay {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(-.6deg); }
-  50% { transform: translate3d(0, -8px, 0) rotate(.6deg); }
 }

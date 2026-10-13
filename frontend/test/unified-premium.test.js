@@ -57,9 +57,9 @@ test('all active public and account shells use shared surfaces without changing 
   assert.match(layout, /Fragment key=\{identityKey\}/);
   assert.match(layout, /role="status" aria-live="polite"/);
 });
-test('manual home motion pause also removes reveals and selection transitions while keeping content visible', () => {
+test('home reduced motion removes reveals and selection transitions while keeping content visible', () => {
   const home = read('pages/NewHomePage.jsx');
-  assert.match(home, /data-visual-paused=\{ambient.paused \|\| ambient.reduced \? "true" : "false"\}/);
+  assert.match(home, /data-visual-paused=\{ambient.reduced \? "true" : "false"\}/);
   const css = read('components/visual/homeMotion.css');
   for (const name of ['scroll-reveal', 'home-motion__panel', 'premium-switch-in', 'program-selector-card']) {
     assert.match(css, new RegExp(`\\.home-motion\\[data-visual-paused="true"\\] \\.${name}`));

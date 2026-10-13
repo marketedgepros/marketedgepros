@@ -139,8 +139,8 @@ test('homepage restored artwork keeps source paths, intrinsic dimensions, and tr
 
 test('visual CSS bounds illumination, reserves hover for fine pointers, and disables motion for reduced motion', () => {
   const css = fs.readFileSync(stylePath, 'utf8');
-  assert.match(css, /animation:\s*homeMotionGlowBreath\s+5\.6s\s+ease-in-out\s+3;/);
-  assert.doesNotMatch(css, /infinite/);
+  assert.match(css, /animation:\s*homeMotionGlowBreath\s+2\.4s\s+ease-in-out\s+infinite;/);
+  assert.equal([...css.matchAll(/animation:[^;]*infinite/g)].length, 4, "only four visible-section decorative layers repeat");
   assert.match(css, /@media \(hover: hover\) and \(pointer: fine\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /transform:\s*none\s*!important/);
