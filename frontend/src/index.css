@@ -171,6 +171,62 @@
     background-color: #67e8f9;
     box-shadow: 0 6px 24px rgba(8, 145, 178, 0.15);
   }
+
+  /* One entrance per mounted screen/panel. No route key or data remount is needed. */
+  .mep-page > :not([role="alert"]):not([role="status"]),
+  .mep-page [role="tabpanel"],
+  .mep-tab-panel {
+    animation: mep-interior-arrive 180ms ease-out 1;
+  }
+
+  .mep-page .mep-panel {
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .mep-workspace-hero {
+    background-color: var(--mep-canvas);
+    background-image: radial-gradient(ellipse at 0% 0%, rgba(34, 211, 238, 0.1), transparent 60%),
+      linear-gradient(145deg, rgba(11, 20, 37, 0.8), transparent);
+    border-color: var(--mep-border);
+  }
+
+  .mep-interior-card {
+    min-width: 0;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .mep-interior-card:focus-within {
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.4), var(--mep-surface-shadow);
+  }
+
+  .mep-page [role="tab"] {
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  }
+}
+
+@keyframes mep-interior-arrive {
+  from { opacity: 0.96; }
+  to { opacity: 1; }
+}
+
+/* Pointer-only response: no translated cards, sticky hover, blur or animated lights on phones. */
+@media (hover: hover) and (pointer: fine) {
+  .mep-interior-card:hover {
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.22), var(--mep-surface-shadow);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mep-page > :not([role="alert"]):not([role="status"]),
+  .mep-page [role="tabpanel"],
+  .mep-tab-panel {
+    animation: none;
+  }
+  .mep-page .mep-panel,
+  .mep-page [role="tab"],
+  .mep-interior-card {
+    transition: none;
+  }
 }
 
 /* Respect the user's motion preference, including Tailwind animation utilities.

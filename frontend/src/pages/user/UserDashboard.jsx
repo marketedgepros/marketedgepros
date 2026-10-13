@@ -2,10 +2,21 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, BarChart3, BookOpen, FileText, RefreshCw, ShieldAlert, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
+import api, { profileAPI } from '../../services/api';
+import AccountSetupGuide from '../../components/account/AccountSetupGuide';
+import { createProfileApiTransport } from '../../services/profileViewService';
+import { createAccountSetupViewService } from '../../services/accountSetupViewService';
 import {
   isDashboardRequestCanceled,
   loadUserDashboard,
 } from '../../services/userDashboardViewService';
+
+// The guide receives the same configured same-origin clients as the rest of the
+// account pages. Its service only exposes the two existing read endpoints.
+const configuredAccountSetupService = createAccountSetupViewService({
+  profileTransport: createProfileApiTransport(profileAPI),
+  documentsClient: api,
+});
 
 const countLabel = (value) => new Intl.NumberFormat('en-US').format(value);
 
@@ -38,7 +49,7 @@ const humanizeStatus = (value) => (
 
 function MetricCard({ label, value, description, icon: Icon }) {
   return (
-    <article className="min-w-0 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/70 to-slate-900/90 p-5 shadow-lg shadow-slate-950/20 transition-colors hover:border-cyan-300/30 motion-reduce:transition-none">
+    <article className="mep-interior-card min-w-0 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/70 to-slate-900/90 p-5 shadow-lg shadow-slate-950/20 transition-colors hover:border-cyan-300/30 motion-reduce:transition-none">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-300">{label}</p>
@@ -66,50 +77,9 @@ function DashboardLink({ to, children, primary = false }) {
   );
 }
 
-export function AccountGettingStarted({ dashboard }) {
-  const [expanded, setExpanded] = useState(true);
-  const hasRecords = dashboard.statistics.statusCounts.total > 0;
-  const profileContext = dashboard.user.firstName === null
-    ? 'Your first name was not returned. Review your profile; completeness has not been checked.'
-    : 'A first name is recorded. Review your contact details; profile completeness has not been checked.';
-  const actions = [
-    { title: 'Review your profile', to: '/profile', detail: profileContext },
-    { title: hasRecords ? 'Explore your challenge records' : 'Explore current programs',
-      to: hasRecords ? '/challenges' : '/programs',
-      detail: hasRecords
-        ? `${countLabel(dashboard.statistics.statusCounts.total)} challenge records were returned in the account summary. Recorded status is not live activity.`
-        : 'The account summary contains no challenge records. You can compare the current catalog; payment and activation are not enabled.' },
-    { title: 'Review your documents', to: '/documents', detail: 'Open your document records to check their status. Identity verification is not confirmed by this dashboard.' },
-    { title: 'Find support', to: '/support/my-tickets', detail: 'Review your tickets or open the support area when you need help.' },
-  ];
-  return (
-    <section className="mep-panel mt-7 min-w-0 rounded-2xl border p-5 sm:p-6" aria-labelledby="getting-started-heading">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Your next steps</p>
-          <h2 id="getting-started-heading" className="mep-heading mt-2 text-xl font-semibold text-white">Make this workspace yours</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">A guide to the areas available in your account, not a verification or completion checklist.</p>
-        </div>
-        <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-controls="account-starting-guide"
-          className="rounded-lg border border-white/20 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-cyan-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-          {expanded ? 'Hide getting-started guide' : 'Show getting-started guide'}
-        </button>
-      </div>
-      {expanded && <div id="account-starting-guide" className="mt-5 grid gap-3 sm:grid-cols-2">
-        {actions.map((action) => <article key={action.to} className="mep-panel min-w-0 rounded-xl border p-4">
-          <Link to={action.to} className="inline-flex items-center gap-2 rounded font-semibold text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-            {action.title}<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-          </Link>
-          <p className="mt-2 text-sm leading-6 text-slate-400">{action.detail}</p>
-        </article>)}
-      </div>}
-    </section>
-  );
-}
-
 export function DashboardChallengeCards({ challenges }) {
   return <div className="space-y-3 p-4 md:hidden" aria-label="Latest recorded challenge cards">
-    {challenges.map((challenge) => <article key={challenge.id} className="mep-panel min-w-0 rounded-xl border p-4">
+    {challenges.map((challenge) => <article key={challenge.id} className="mep-interior-card mep-panel min-w-0 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Link to={`/challenges/${challenge.id}`} className="min-w-0 break-words rounded font-semibold text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">{challenge.programName || 'Program name unavailable'}</Link>
         <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-xs text-amber-100">{humanizeStatus(challenge.status)}</span>
@@ -164,7 +134,7 @@ export function DashboardReadState({ state, onRetry }) {
   return null;
 }
 
-export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) {
+export function DashboardOverview({ dashboard, onRefresh, refreshing = false, accountSetupService }) {
   const { user, statistics, recentChallenges } = dashboard;
   const { statusCounts } = statistics;
   const hasRecords = statusCounts.total > 0;
@@ -198,7 +168,7 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
 
   return (
     <>
-      <section className="border-b border-cyan-300/15 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-cyan-500/15 via-slate-950 to-slate-950">
+      <section className="mep-workspace-hero border-b border-cyan-300/15 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-cyan-500/15 via-slate-950 to-slate-950">
         <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Account records</p>
           <div className="mt-3 grid items-start gap-6 lg:grid-cols-[1.4fr_0.8fr] lg:gap-10">
@@ -215,7 +185,7 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
                 <DashboardLink to="/support/my-tickets">Support</DashboardLink>
               </div>
             </div>
-            <aside className="mep-panel min-w-0 rounded-2xl border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.35)]" aria-label="Account workspace summary">
+            <aside className="mep-interior-card mep-panel min-w-0 rounded-2xl border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.35)]" aria-label="Account workspace summary">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Your recorded workspace</p>
               <p className="mt-3 text-4xl font-semibold tabular-nums text-white">{countLabel(statusCounts.total)} <span className="text-sm font-normal text-slate-400">challenge records</span></p>
               <p className="mt-3 text-sm leading-6 text-slate-400">{hasRecords ? 'Open a record to inspect its recorded status and available details.' : 'No challenge records in this account summary. Start by reviewing the current catalog.'}</p>
@@ -259,9 +229,13 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
           </p>
         </section>
 
-        <AccountGettingStarted key={`${dashboard.owner.userId}:${dashboard.owner.tenantId}:${user.role}`} dashboard={dashboard} />
+        <AccountSetupGuide
+          owner={{ userId: dashboard.owner.userId, tenantId: dashboard.owner.tenantId, role: user.role }}
+          dashboardCount={statusCounts.total}
+          service={accountSetupService}
+        />
 
-        <section className="mep-panel mt-7 overflow-hidden rounded-2xl border shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
+        <section className="mep-interior-card mep-panel mt-7 overflow-hidden rounded-2xl border shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
           <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <h2 id="latest-records-heading" className="mep-heading text-xl font-semibold tracking-tight text-white">Latest recorded challenges</h2>
@@ -332,7 +306,13 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
   );
 }
 
-export function UserDashboardData({ userId, tenantId, role, apiClient }) {
+export function UserDashboardData({
+  userId,
+  tenantId,
+  role,
+  apiClient = api,
+  accountSetupService = configuredAccountSetupService,
+}) {
   const [dashboard, setDashboard] = useState(null);
   const [state, setState] = useState('loading');
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -380,7 +360,7 @@ export function UserDashboardData({ userId, tenantId, role, apiClient }) {
     );
   }
 
-  return <DashboardOverview dashboard={dashboard} onRefresh={refresh} refreshing={false} />;
+  return <DashboardOverview dashboard={dashboard} onRefresh={refresh} refreshing={false} accountSetupService={accountSetupService} />;
 }
 
 export default function UserDashboard() {
@@ -405,5 +385,12 @@ export default function UserDashboard() {
   }
 
   // A new auth/id/tenant/role context unmounts the old request and its data immediately.
-  return <UserDashboardData key={identityKey} userId={userId} tenantId={tenantId} role={role} />;
+  return <UserDashboardData
+    key={identityKey}
+    userId={userId}
+    tenantId={tenantId}
+    role={role}
+    apiClient={api}
+    accountSetupService={configuredAccountSetupService}
+  />;
 }

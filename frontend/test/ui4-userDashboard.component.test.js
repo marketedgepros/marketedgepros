@@ -8,17 +8,28 @@ import { transformWithEsbuild } from 'vite';
 
 const serviceUrl = new URL('../src/services/userDashboardViewService.js', import.meta.url).href;
 const uiTarget = new URL('../node_modules/.cache-ui4-user-dashboard.mjs', import.meta.url);
+const guideTarget = new URL('../node_modules/.cache-ui4-account-setup.mjs', import.meta.url);
+const profileServiceUrl = new URL('../src/services/profileViewService.js', import.meta.url).href;
+const setupServiceUrl = new URL('../src/services/accountSetupViewService.js', import.meta.url).href;
 const service = await import(serviceUrl);
 let ui;
 try {
+  const guideFile = new URL('../src/components/account/AccountSetupGuide.jsx', import.meta.url);
+  const guideSource = fs.readFileSync(guideFile, 'utf8').replace("'../../services/accountSetupViewService.js'", JSON.stringify(setupServiceUrl));
+  fs.writeFileSync(guideTarget, (await transformWithEsbuild(guideSource, guideFile.pathname, { loader: 'jsx', jsx: 'automatic' })).code);
   const sourceFile = new URL('../src/pages/user/UserDashboard.jsx', import.meta.url);
   const source = fs.readFileSync(sourceFile, 'utf8')
     .replace(/import useAuthStore from ['"]\.\.\/\.\.\/store\/authStore['"];/, "const useAuthStore = () => ({ isAuthenticated: true, user: { id: 1, tenant_id: 10, role: 'user' } });")
+    .replace("import api, { profileAPI } from '../../services/api';", "const api = { get: () => { throw new Error('SSR must not request an API'); } }; const profileAPI = api;")
+    .replace("import AccountSetupGuide from '../../components/account/AccountSetupGuide';", `import AccountSetupGuide from ${JSON.stringify(guideTarget.href)};`)
+    .replace("import { createProfileApiTransport } from '../../services/profileViewService';", `import { createProfileApiTransport } from ${JSON.stringify(profileServiceUrl)};`)
+    .replace("import { createAccountSetupViewService } from '../../services/accountSetupViewService';", `import { createAccountSetupViewService } from ${JSON.stringify(setupServiceUrl)};`)
     .replace(/['"]\.\.\/\.\.\/services\/userDashboardViewService['"]/g, JSON.stringify(serviceUrl));
   fs.writeFileSync(uiTarget, (await transformWithEsbuild(source, sourceFile.pathname, { loader: 'jsx', jsx: 'automatic' })).code);
   ui = await import(uiTarget.href);
 } finally {
   fs.rmSync(uiTarget, { force: true });
+  fs.rmSync(guideTarget, { force: true });
 }
 
 const response = () => ({
@@ -63,6 +74,7 @@ const response = () => ({
 
 const ownerOptions = { expectedOwner: { userId: 1, tenantId: 10 }, role: 'user' };
 const render = (component) => renderToStaticMarkup(React.createElement(MemoryRouter, null, component));
+const ssrSetupService = { loadProfile: () => { throw new Error('SSR must not run setup effects'); }, loadDocuments: () => { throw new Error('SSR must not run setup effects'); } };
 
 test('injected Axios-free API receives AbortSignal and rejects owner-one data under an owner-two browser context', async () => {
   const calls = [];
@@ -111,6 +123,7 @@ test('actual React dashboard overview presents recorded values without false cur
   const html = render(React.createElement(ui.DashboardOverview, {
     dashboard: view,
     onRefresh: () => {},
+    accountSetupService: ssrSetupService,
   }));
 
   assert.match(html, /Recorded legacy status — not provider verified/);
@@ -136,6 +149,7 @@ test('actual React read states keep loading, error, and successful empty respons
   const empty = render(React.createElement(ui.DashboardOverview, {
     dashboard: emptyView,
     onRefresh: () => {},
+    accountSetupService: ssrSetupService,
   }));
   assert.match(empty, /No recent challenge records were returned/);
   assert.doesNotMatch(empty, /role="alert"|Retry dashboard/);

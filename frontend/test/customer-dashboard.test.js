@@ -14,10 +14,23 @@ const require = createRequire(import.meta.url);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-dashboard-'));
 const sourceUrl = new URL('../src/pages/user/UserDashboard.jsx', import.meta.url);
 const serviceUrl = new URL('../src/services/userDashboardViewService.js', import.meta.url).href;
+const profileServiceUrl = new URL('../src/services/profileViewService.js', import.meta.url).href;
+const accountSetupServiceUrl = new URL('../src/services/accountSetupViewService.js', import.meta.url).href;
+const guideSourceUrl = new URL('../src/components/account/AccountSetupGuide.jsx', import.meta.url);
 const external = Object.fromEntries(['react', 'react/jsx-runtime', 'lucide-react', 'react-router-dom'].map((name) => [name, pathToFileURL(require.resolve(name)).href]));
 const resolve = (text) => Object.entries(external).reduce((s, [name, url]) => s.replaceAll(`from '${name}'`, `from ${JSON.stringify(url)}`).replaceAll(`from "${name}"`, `from ${JSON.stringify(url)}`), text);
+const guideSource = fs.readFileSync(guideSourceUrl, 'utf8')
+  .replace("'../../services/accountSetupViewService.js'", JSON.stringify(accountSetupServiceUrl));
+const guideCode = await transformWithEsbuild(resolve(guideSource), guideSourceUrl.pathname, { loader: 'jsx', jsx: 'automatic' });
+const guidePath = path.join(tmp, 'account-setup-guide.mjs');
+fs.writeFileSync(guidePath, resolve(guideCode.code));
+const guideUrl = pathToFileURL(guidePath).href;
 const source = fs.readFileSync(sourceUrl, 'utf8')
   .replace(/import useAuthStore from ['"]\.\.\/\.\.\/store\/authStore['"];/, 'const useAuthStore = () => null;')
+  .replace("import api, { profileAPI } from '../../services/api';", "const api = { get: () => Promise.reject(new Error('synthetic API only')) }; const profileAPI = { get: () => Promise.reject(new Error('synthetic API only')) };")
+  .replace("import AccountSetupGuide from '../../components/account/AccountSetupGuide';", `import AccountSetupGuide from ${JSON.stringify(guideUrl)};`)
+  .replace("import { createProfileApiTransport } from '../../services/profileViewService';", `import { createProfileApiTransport } from ${JSON.stringify(profileServiceUrl)};`)
+  .replace("import { createAccountSetupViewService } from '../../services/accountSetupViewService';", `import { createAccountSetupViewService } from ${JSON.stringify(accountSetupServiceUrl)};`)
   .replace(/['"]\.\.\/\.\.\/services\/userDashboardViewService['"]/g, JSON.stringify(serviceUrl));
 const code = await transformWithEsbuild(resolve(source), sourceUrl.pathname, { loader: 'jsx', jsx: 'automatic' });
 const modulePath = path.join(tmp, 'dashboard.mjs');
@@ -51,23 +64,28 @@ function payload(id = 1, { name = 'Recorded owner', count = 1 } = {}) {
 }
 const view = (id = 1, options = {}) => normalizeUserDashboard(payload(id, options), { expectedOwner: { userId: id, tenantId: 10 }, role: 'user' });
 const overview = (dashboard) => React.createElement(ui.DashboardOverview, { dashboard, onRefresh: () => {} });
+const syntheticSetupService = {
+  loadProfile: async () => ({ recordedFields: ['First name'], missingFields: ['Last name', 'Email address', 'Phone number'] }),
+  loadDocuments: async () => ({ documentTypesShown: 3, documents: [], recordedCount: 0, allRequestedRecordsPresent: false, hasRejectedRecord: false }),
+};
 
 test('customer guide offers real next destinations without asserting profile completeness, KYC or funding', async () => {
   const h = harness();
   try {
     await h.render(overview(view(1, { name: null, count: 0 })));
     const guide = h.host.querySelector('[aria-labelledby="getting-started-heading"]');
-    assert.match(guide.textContent, /first name was not returned/);
-    assert.match(guide.textContent, /completeness has not been checked/);
-    assert.match(guide.textContent, /payment and activation are not enabled/);
-    assert.match(guide.textContent, /Identity verification is not confirmed/);
-    assert.deepEqual([...guide.querySelectorAll('a')].map((a) => a.getAttribute('href')), ['/profile', '/programs', '/documents', '/support/my-tickets']);
+    assert.match(guide.textContent, /Profile record is unavailable/);
+    assert.match(guide.textContent, /Document records are unavailable/);
+    assert.match(guide.textContent, /current catalog/);
+    assert.match(guide.textContent, /Payments, MT5, and KYC-provider capabilities are unavailable/);
+    assert.deepEqual([...guide.querySelectorAll('[data-setup-step] a')].map((a) => a.getAttribute('href')), ['/profile', '/documents', '/programs', '/support/create-ticket']);
+    assert.equal(guide.querySelector('[aria-labelledby="setup-next-action-heading"] a').getAttribute('href'), '/profile');
     assert.equal(guide.querySelectorAll('input,[role="progressbar"]').length, 0);
-    const toggle = guide.querySelector('button');
+    const toggle = guide.querySelector('[aria-controls="account-starting-guide"]');
     assert.equal(toggle.getAttribute('aria-expanded'), 'true');
     await click(toggle); assert.equal(guide.querySelector('#account-starting-guide'), null);
     await click(toggle); assert.ok(guide.querySelector('#account-starting-guide'));
-    assert.doesNotMatch(guide.textContent, /completed|verified identity|approved KYC|eligible payout/i);
+    assert.doesNotMatch(guide.textContent, /profile complete|verified identity|approved KYC|eligible payout/i);
   } finally { await h.close(); }
 });
 
@@ -76,12 +94,12 @@ test('guide switches using recorded counts only and resets its local collapse st
   try {
     await h.render(overview(view()));
     let guide = h.host.querySelector('[aria-labelledby="getting-started-heading"]');
-    assert.equal(guide.querySelectorAll('a')[1].getAttribute('href'), '/challenges');
-    await click(guide.querySelector('button'));
+    assert.equal(guide.querySelectorAll('[data-setup-step] a')[2].getAttribute('href'), '/challenges');
+    await click(guide.querySelector('[aria-controls="account-starting-guide"]'));
     await h.render(overview(view(2, { name: 'Second owner', count: 0 })));
     guide = h.host.querySelector('[aria-labelledby="getting-started-heading"]');
-    assert.equal(guide.querySelector('button').getAttribute('aria-expanded'), 'true');
-    assert.equal(guide.querySelectorAll('a')[1].getAttribute('href'), '/programs');
+    assert.equal(guide.querySelector('[aria-controls="account-starting-guide"]').getAttribute('aria-expanded'), 'true');
+    assert.equal(guide.querySelectorAll('[data-setup-step] a')[2].getAttribute('href'), '/programs');
     assert.doesNotMatch(h.host.textContent, /Recorded owner/);
     assert.equal(h.host.querySelectorAll('table').length, 0);
   } finally { await h.close(); }
@@ -107,7 +125,7 @@ test('mobile challenge cards and desktop table preserve exact recorded decimals,
 });
 
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
-const data = (id, client) => React.createElement(ui.UserDashboardData, { key: `true:${id}:10:user`, userId: id, tenantId: 10, role: 'user', apiClient: client });
+const data = (id, client) => React.createElement(ui.UserDashboardData, { key: `true:${id}:10:user`, userId: id, tenantId: 10, role: 'user', apiClient: client, accountSetupService: syntheticSetupService });
 test('dashboard enhancement performs one owner-bound read, aborts prior identity and never exposes late owner data or guide', async () => {
   const h = harness();
   const reads = [];

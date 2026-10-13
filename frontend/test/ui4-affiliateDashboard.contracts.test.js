@@ -209,3 +209,29 @@ test('dashboard source keys all state by auth, identity, tenant, and role and in
   assert.match(source, /loadAffiliateDashboard\(\{ signal: controller\.signal, expectedOwner \}\)/);
   assert.doesNotMatch(source, /setInterval|setTimeout/);
 });
+
+test('affiliate next action uses only supplied safe links and keeps payout unavailable', () => {
+  const dashboard = mapAffiliateDashboard(payload(), { expectedOwner: owner });
+  const html = render(dashboardUi.AffiliateDashboardView, { dashboard, isLoading: false });
+  assert.match(html, /mep-workspace-hero/);
+  assert.match(html, /affiliate-next-action-heading/);
+  assert.match(html, /href="\/#affiliate-links-heading"/);
+  assert.match(html, /Review supplied links/);
+  assert.match(html, /Payout availability: not enabled/);
+  assert.match(html, /href="\/affiliate\/payout"/);
+  assert.doesNotMatch(html, /Earn 15%|Withdraw now|Verified earnings/);
+});
+
+test('affiliate missing-link next action points to real records; loading/error do not invent next-step data', () => {
+  const raw = payload();
+  raw.links[0].url = null;
+  const dashboard = mapAffiliateDashboard(raw, { expectedOwner: owner });
+  const html = render(dashboardUi.AffiliateDashboardView, { dashboard, isLoading: false });
+  assert.match(html, /No shareable canonical link was returned/);
+  assert.match(html, /href="\/affiliate\/traders"/);
+  assert.doesNotMatch(html, /Review supplied links/);
+  for (const props of [{ isLoading: true }, { isLoading: false, loadError: 'Synthetic unavailable' }]) {
+    const stateHtml = render(dashboardUi.AffiliateDashboardView, props);
+    assert.doesNotMatch(stateHtml, /affiliate-next-action-heading/);
+  }
+});

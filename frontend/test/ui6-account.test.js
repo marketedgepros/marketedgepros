@@ -68,6 +68,18 @@ async function compileJsx(name, relative, mutate) {
   }
 }
 
+async function compileJsxDependency(name, relative, mutate) {
+  const sourcePath = source(relative);
+  const targetPath = path.join(frontendDirectory, 'node_modules', `.ui6-account-${name}-${process.pid}.mjs`);
+  compiledTargets.add(targetPath);
+  const transformed = await transformWithEsbuild(mutate(fs.readFileSync(sourcePath, 'utf8')), sourcePath, {
+    loader: 'jsx',
+    jsx: 'automatic',
+  });
+  fs.writeFileSync(targetPath, transformed.code);
+  return pathToFileURL(targetPath).href;
+}
+
 const accountAuthStub = `const useAuthStore = (selector) => {
   const state = globalThis.__ui6AccountStore;
   return typeof selector === 'function' ? selector(state) : state;
@@ -99,8 +111,14 @@ const DocumentsModule = await compileJsx('documents', 'pages/user/Documents.jsx'
   .replace("import api from '../../services/api';", 'const api = globalThis.__ui6KycApi;')
   .replace("import useAuthStore from '../../store/authStore';", accountAuthStub)
   .replace("} from '../../services/kycViewService';", `} from ${JSON.stringify(sourceUrl('services/kycViewService.js'))};`));
+const AccountSetupGuideUrl = await compileJsxDependency('account-setup-guide', 'components/account/AccountSetupGuide.jsx', (text) => text
+  .replace("'../../services/accountSetupViewService.js'", JSON.stringify(sourceUrl('services/accountSetupViewService.js'))));
 const UserDashboardModule = await compileJsx('user-dashboard', 'pages/user/UserDashboard.jsx', (text) => text
   .replace("import useAuthStore from '../../store/authStore';", accountAuthStub)
+  .replace("import api, { profileAPI } from '../../services/api';", "const api = { get: () => Promise.reject(new Error('synthetic UI6 API only')) }; const profileAPI = { get: () => Promise.reject(new Error('synthetic UI6 API only')) };")
+  .replace("import AccountSetupGuide from '../../components/account/AccountSetupGuide';", `import AccountSetupGuide from ${JSON.stringify(AccountSetupGuideUrl)};`)
+  .replace("import { createProfileApiTransport } from '../../services/profileViewService';", `import { createProfileApiTransport } from ${JSON.stringify(sourceUrl('services/profileViewService.js'))};`)
+  .replace("import { createAccountSetupViewService } from '../../services/accountSetupViewService';", `import { createAccountSetupViewService } from ${JSON.stringify(sourceUrl('services/accountSetupViewService.js'))};`)
   .replace("} from '../../services/userDashboardViewService';", `} from ${JSON.stringify(sourceUrl('services/userDashboardViewService.js'))};`));
 globalThis.__ui6AccountRoleDashboard = RoleDashboardModule.default;
 

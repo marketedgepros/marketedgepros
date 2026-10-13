@@ -217,7 +217,7 @@ export function AffiliateDashboardView({
 
   return (
     <div className="bg-slate-950 text-white">
-      <section className="border-b border-cyan-400/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-slate-950 to-slate-950">
+      <section className="mep-workspace-hero border-b">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Affiliate account</p>
           <div className="mt-3 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
@@ -273,6 +273,27 @@ export function AffiliateDashboardView({
           </div>
         ) : dashboard ? (
           <>
+            <section aria-labelledby="affiliate-next-action-heading" className="mep-panel mep-interior-card mb-6 grid gap-5 rounded-2xl border p-5 sm:p-6 lg:grid-cols-[1.3fr_1fr]">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Your workspace, in order</p>
+                <h2 id="affiliate-next-action-heading" className="mep-heading mt-2 text-xl font-semibold">Your next action</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {safeLinks.some((link) => link.shareUrl)
+                    ? 'A canonical referral link was returned. Review your supplied links and their recorded activity below.'
+                    : 'No shareable canonical link was returned. Review your referral records, or ask support about the account record.'}
+                </p>
+                <Link to={safeLinks.some((link) => link.shareUrl) ? '#affiliate-links-heading' : '/affiliate/traders'}
+                  className="mep-primary mt-4 inline-flex items-center gap-2 px-4 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
+                  {safeLinks.some((link) => link.shareUrl) ? 'Review supplied links' : 'Review referral records'}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </div>
+              <div className="min-w-0 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                <p className="text-sm font-semibold text-amber-100">Payout availability: not enabled</p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Recorded commission labels do not establish payable money or approved affiliate terms.</p>
+                <Link to="/affiliate/payout" className="mt-3 inline-flex rounded text-sm font-semibold text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Review payout status</Link>
+              </div>
+            </section>
             <section aria-label="Reported affiliate metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="Referral clicks" value={formatCount(stats.totalClicks)} icon={<MousePointerClick className="h-5 w-5" aria-hidden="true" />} />
               <MetricCard label="Conversions" value={formatCount(stats.totalConversions)} icon={<Users className="h-5 w-5" aria-hidden="true" />} />
@@ -302,7 +323,7 @@ export function AffiliateDashboardView({
             <section aria-labelledby="affiliate-links-heading" className="mep-panel mt-6 rounded-2xl border p-5 sm:p-6">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <div className="min-w-0">
-                  <h2 id="affiliate-links-heading" className="mep-heading text-xl font-semibold">Server-provided referral links</h2>
+                  <h2 id="affiliate-links-heading" className="mep-heading scroll-mt-24 text-xl font-semibold">Server-provided referral links</h2>
                   <p className="mt-1 text-sm text-slate-400">
                     Only canonical public HTTPS links returned by the account API are available to copy.
                   </p>
@@ -441,7 +462,7 @@ function ExactAmount({ value, align = 'left' }) {
 
 function MetricCard({ label, value, icon }) {
   return (
-    <div className="mep-panel min-w-0 rounded-2xl border p-5 shadow-lg shadow-slate-950/20">
+    <div className="mep-panel mep-interior-card min-w-0 rounded-2xl border p-5 shadow-lg shadow-slate-950/20">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm text-slate-400">{label}</p>

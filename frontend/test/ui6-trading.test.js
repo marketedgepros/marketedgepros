@@ -483,7 +483,9 @@ test('UI6 trading challenge detail DOM rejects an owner mismatch and only expose
     await waitFor(() => text(view.host).includes('Recorded Evaluation'), 'confirmed detail after retry');
     assert.equal(requests, 2);
     assert.match(view.host.innerHTML, /md:grid-cols-2/, 'responsive detail markup is emitted to DOM');
-    await click(button(view.host, 'Back to challenges'));
+    const backLink = view.host.querySelector('a[href="/challenges"]');
+    assert.ok(backLink, 'ready-state return action is an exact Router anchor');
+    await click(backLink);
     assert.equal(location(view.host), '/challenges');
   } finally {
     await view.close();
