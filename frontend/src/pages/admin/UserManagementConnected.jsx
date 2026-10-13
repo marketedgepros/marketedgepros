@@ -9,6 +9,7 @@ import {
   isAdminClosureUsersRequestCanceled,
 } from "../../services/adminClosureUsersService.js";
 import useAdminClosureUsersRead from "../../hooks/useAdminClosureUsers.js";
+import { useDialogFocus } from "../../hooks/useDialogFocus.js";
 
 const usersService = createAdminClosureUsersService();
 const panel = "rounded-2xl border border-white/10 bg-slate-900/80 shadow-xl shadow-slate-950/20";
@@ -30,12 +31,13 @@ const errorMessage = (error, fallback) => {
 };
 
 function DialogFrame({ title, children, onClose, labelledBy }) {
+  const dialogRef = useDialogFocus({ open: true, onClose });
   return (
     <div className="fixed inset-0 z-[1400] flex items-end bg-slate-950/80 p-0 sm:items-center sm:p-6" role="presentation">
-      <section role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="mep-panel max-h-[94vh] w-full overflow-y-auto rounded-t-2xl border shadow-2xl sm:max-w-3xl sm:rounded-2xl">
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="mep-panel max-h-[94vh] w-full overflow-y-auto rounded-t-2xl border shadow-2xl sm:max-w-3xl sm:rounded-2xl">
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-white/10 bg-slate-900/95 px-5 py-4 backdrop-blur sm:px-6">
           <div><h2 id={labelledBy} className="mep-heading text-xl font-bold text-white">{title}</h2></div>
-          <button type="button" onClick={onClose} className={`${button} -mr-2 p-2 text-slate-300 hover:bg-white/10 hover:text-white`} aria-label="Close dialog"><X size={20} /></button>
+          <button type="button" onClick={onClose} data-autofocus className={`${button} -mr-2 p-2 text-slate-300 hover:bg-white/10 hover:text-white`} aria-label="Close dialog"><X size={20} /></button>
         </header>
         {children}
       </section>
@@ -111,8 +113,8 @@ export function AdminClosureUsersContent({ read, viewMode, filters, onFilter, on
       <section className={`${panel} p-4 sm:p-5`} aria-labelledby="user-record-filters"><div className="flex items-center justify-between gap-3"><div><h2 id="user-record-filters" className="mep-heading font-semibold text-white">User filters</h2><p className="mt-1 text-sm text-slate-400">Filters are enforced by the server.</p></div><button type="button" onClick={read.refresh} disabled={read.loading} className={`${button} border border-white/15 text-slate-100 hover:bg-white/10`}><RefreshCw size={16} />Refresh</button></div><div className="mt-5 grid gap-4 md:grid-cols-3"><label className="text-sm font-medium text-slate-200">Search<input value={filters.search} onChange={(event) => onFilter("search", event.target.value)} placeholder="Name or email" className={`${input} mt-2`} /></label><label className="text-sm font-medium text-slate-200">Role<select value={filters.role || ""} onChange={(event) => onFilter("role", event.target.value || null)} className={`${input} mt-2`}><option value="">All roles</option>{ADMIN_CLOSURE_USERS_ROLES.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select></label><label className="text-sm font-medium text-slate-200">Account status<select value={filters.status || ""} onChange={(event) => onFilter("status", event.target.value || null)} className={`${input} mt-2`}><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div></section>
       <ReadState read={read} empty={!read.loading && !read.error && read.value && rows.length === 0} emptyTitle="No user records" emptyMessage="The server returned no records for this page and selected filters. This does not establish the absence of accounts outside your permitted scope." />
       {!read.loading && !read.error && rows.length > 0 && <><p className="px-1 text-sm text-slate-300" aria-live="polite">Showing {rows.length} record{rows.length === 1 ? "" : "s"} on this page · {read.value.pagination.total} server-scoped record{read.value.pagination.total === 1 ? "" : "s"}.</p><UserTable users={rows} onView={onView} onEdit={onEdit} onDeactivate={onDeactivate} canEdit={canEdit} /></>}
-      {!read.loading && !read.error && read.value && <nav className={`${panel} flex flex-wrap items-center justify-between gap-3 p-4`} aria-label="User pagination"><p className="text-sm text-slate-300">Page {read.value.pagination.page} of {read.value.pagination.pages || 0}</p><div className="flex gap-2"><button type="button" className={`${button} border border-white/15 text-white hover:bg-white/10`} disabled={read.value.pagination.page <= 1} onClick={() => onPage(read.value.pagination.page - 1)}>Previous</button><button type="button" className={`${button} border border-white/15 text-white hover:bg-white/10`} disabled={read.value.pagination.pages === 0 || read.value.pagination.page >= read.value.pagination.pages} onClick={() => onPage(read.value.pagination.page + 1)}>Next</button></div></nav>}
-    </>}
+      {!read.loading && !read.error && read.value && (read.value.pagination.pages > 0 ? <nav className={`${panel} flex flex-wrap items-center justify-between gap-3 p-4`} aria-label="User pagination"><p className="text-sm text-slate-300">Page {read.value.pagination.page} of {read.value.pagination.pages}</p><div className="flex gap-2"><button type="button" className={`${button} border border-white/15 text-white hover:bg-white/10`} disabled={read.value.pagination.page <= 1} onClick={() => onPage(read.value.pagination.page - 1)}>Previous</button><button type="button" className={`${button} border border-white/15 text-white hover:bg-white/10`} disabled={read.value.pagination.page >= read.value.pagination.pages} onClick={() => onPage(read.value.pagination.page + 1)}>Next</button></div></nav> : <p className="px-1 text-sm text-slate-400" role="status">No server pages are available for these filters.</p>)}
+      </>}
     {isTree && <><ReadState read={read} empty={!read.loading && !read.error && read.value && rows.length === 0} emptyTitle="No hierarchy records" emptyMessage="The server returned no bounded hierarchy nodes for your active account." />{!read.loading && !read.error && rows.length > 0 && <Tree users={rows} onView={onView} />}</>}
   </div>;
 }

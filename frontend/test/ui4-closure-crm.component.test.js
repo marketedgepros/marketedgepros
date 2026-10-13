@@ -14,6 +14,7 @@ const toastStub = new URL(`../node_modules/.ui4-closure-crm-toast-${process.pid}
 const authStub = new URL(`../node_modules/.ui4-closure-crm-auth-${process.pid}.mjs`, import.meta.url);
 const crmService = new URL("../src/services/adminClosureCrmService.js", import.meta.url).href;
 const identityGuard = new URL("../src/hooks/useAdminClosureCrmIdentityGuard.js", import.meta.url).href;
+const dialogFocus = new URL("../src/hooks/useDialogFocus.js", import.meta.url).href;
 
 fs.writeFileSync(layoutStub, 'import React from "react"; export default function AdminLayout({children}) { return React.createElement("main", {"data-admin-layout":"true"}, children); }');
 fs.writeFileSync(toastStub, 'export const useToast = () => ({ success() {}, error() {}, warning() {} });');
@@ -24,6 +25,7 @@ const compile = async (file, suffix) => {
     .replace(/['"]\.\.\/\.\.\/components\/admin\/AdminLayout['"]/g, JSON.stringify(layoutStub.href))
     .replace(/['"]\.\.\/\.\.\/contexts\/ToastContext['"]/g, JSON.stringify(toastStub.href))
     .replace(/['"]\.\.\/\.\.\/hooks\/useAdminClosureCrmIdentityGuard['"]/g, JSON.stringify(identityGuard))
+    .replace(/['"]\.\.\/\.\.\/hooks\/useDialogFocus['"]/g, JSON.stringify(dialogFocus))
     .replace(/['"]\.\.\/\.\.\/store\/authStore['"]/g, JSON.stringify(authStub.href))
     .replace(/['"]\.\.\/\.\.\/services\/adminClosureCrmService['"]/g, JSON.stringify(crmService));
   const target = new URL(`../node_modules/.ui4-closure-crm-${suffix}-${process.pid}.mjs`, import.meta.url);

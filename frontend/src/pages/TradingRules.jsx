@@ -1,11 +1,12 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { ArrowRight, BookOpen, ShieldCheck } from 'lucide-react';
 
 function TradingRules() {
   return (
     <Layout>
-      <main className="mep-screen min-h-screen text-white">
+      <div className="mep-screen min-h-screen text-white">
         <section className="relative overflow-hidden border-b border-cyan-400/15 bg-gradient-to-br from-slate-950 via-blue-950/50 to-slate-900">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,0.12),transparent_55%)]" />
           <div className="relative mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
@@ -28,9 +29,9 @@ function TradingRules() {
                 <p className="mt-3 leading-relaxed text-slate-300">
                   Program-specific settings are displayed in the catalog and on each program details page. Those displayed settings are not a blanket set of live trading rules for every program; this page does not establish additional approved rules.
                 </p>
-                <a href="/programs" className="mep-primary mt-6 inline-flex min-h-11 items-center gap-2 px-5 py-2.5 font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">
+                <Link to="/programs" className="mep-primary mt-6 inline-flex min-h-11 items-center gap-2 px-5 py-2.5 font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">
                   Browse programs <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -45,7 +46,7 @@ function TradingRules() {
             </p>
           </aside>
         </section>
-      </main>
+      </div>
     </Layout>
   );
 }

@@ -339,12 +339,14 @@ test('UI6 support DOM consumes only a synthetic public fixture, surfaces loading
   const view = installDom('/support');
   const restoreConsoleError = suppressExpectedFixtureConsoleError();
   const calls = [];
+  const requests = [];
   let mode = 'loading';
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
   globalThis.__ui6PublicApi = {
-    get: async (endpoint) => {
+    get: async (endpoint, config = {}) => {
       calls.push(endpoint);
+      requests.push({ endpoint, config });
       if (mode === 'loading') await pending;
       if (mode === 'error') throw new Error('synthetic support failure');
       return { data: { articles: [{ title: 'Synthetic help article', slug: 'synthetic-help', category: 'Getting Started', status: 'published' }] } };
@@ -370,7 +372,13 @@ test('UI6 support DOM consumes only a synthetic public fixture, surfaces loading
 
     mode = 'error';
     await view.render(routeElement('/support', '/support', pages.SupportHub, 'support-error'));
-    await waitFor(() => view.host.querySelector('[role="status"]')?.textContent.includes('could not be loaded'), 'support read failure state');
+    await waitFor(() => view.host.querySelector('[role="alert"]')?.textContent.includes('Articles could not be loaded. Please try again later.'), 'support read failure state');
+    const requestsBeforeRetry = requests.length;
+    mode = 'success';
+    await click([...view.host.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Try again'));
+    await waitFor(() => text(view.host).includes('Synthetic help article'), 'support explicit retry result');
+    assert.equal(requests.length, requestsBeforeRetry + 1, 'support failure retries only after the explicit action');
+    assert.ok(requests.every(({ endpoint, config }) => endpoint === '/support/articles' && config.signal instanceof AbortSignal), 'all support fixture reads retain the abortable request contract');
   } finally {
     restoreConsoleError();
     delete globalThis.__ui6PublicApi;
@@ -455,8 +463,10 @@ test('UI6 blog DOM binds public synthetic reads to filtering, categories, pagina
     assert.equal(anchors(view.host, '/blog/synthetic-post').length, 3, 'title, read-more, and featured source Links are rendered');
     assert.equal(anchors(view.host, '/contact').length, 1, 'newsletter boundary points to the public contact page');
 
+    const readsBeforeSearch = calls.filter(([endpoint]) => endpoint === '/blog/posts').length;
     await changeValue(view.host.querySelector('#blog-search'), 'missing');
-    await waitFor(() => text(view.host).includes('No posts match your search.'), 'blog empty search state');
+    await waitFor(() => text(view.host).includes('No posts match your search on the currently loaded page.'), 'blog empty current-page search state');
+    assert.equal(calls.filter(([endpoint]) => endpoint === '/blog/posts').length, readsBeforeSearch, 'current-page search filters already loaded posts without an additional request');
     await click([...view.host.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear search'));
     await waitFor(() => text(view.host).includes('Synthetic Post'), 'blog clear search state');
 
@@ -476,6 +486,9 @@ test('UI6 blog DOM binds public synthetic reads to filtering, categories, pagina
     mode = 'success';
     await click([...view.host.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Try again'));
     await waitFor(() => text(view.host).includes('Synthetic Post'), 'blog retry acknowledged by rendered synthetic result');
+    const retry = calls.filter(([endpoint]) => endpoint === '/blog/posts').at(-1);
+    assert.deepEqual(retry[1].params, { page: 1, per_page: 9 }, 'retry preserves the active page and unfiltered current category request');
+    assert.ok(retry[1].signal instanceof AbortSignal, 'retry remains abortable');
   } finally {
     restoreConsoleError();
     delete globalThis.__ui6PublicApi;

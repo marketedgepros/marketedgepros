@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Edit2, Eye, LoaderCircle, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import useAuthStore from '../../store/authStore.js';
+import useDialogFocus from '../../hooks/useDialogFocus.js';
 import {
   AdminProgramsContractError,
   adminProgramsPrincipalFromAuth,
@@ -157,12 +158,13 @@ function ProgramFields({ draft, onChange, readOnly, requireStorageFields }) {
 }
 
 function ProgramEditor({ editor, pending, error, onClose, onSave, onChange }) {
+  const dialogRef = useDialogFocus({ open: Boolean(editor), onClose });
   if (!editor) return null;
   const isView = editor.mode === 'view';
   const title = isView ? 'Program record' : editor.program ? 'Edit persisted program' : 'Create persisted program';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4" role="presentation">
-      <section className="mep-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
+      <section ref={dialogRef} className="mep-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
         <header className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
           <div>
             <h2 id="program-editor-title" className="mep-heading text-xl font-semibold text-white">{title}</h2>
@@ -176,7 +178,7 @@ function ProgramEditor({ editor, pending, error, onClose, onSave, onChange }) {
           <ProgramFields draft={editor.draft} onChange={onChange} readOnly={isView || pending} requireStorageFields={false} />
           {error ? <p className="mt-4 rounded-md border border-rose-400/50 bg-rose-950/30 p-3 text-sm text-rose-100" role="alert">{error}</p> : null}
           <footer className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-700 pt-4">
-            <button type="button" onClick={onClose} disabled={pending} className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+            <button type="button" onClick={onClose} disabled={pending} data-autofocus className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300">
               {isView ? 'Close' : 'Cancel'}
             </button>
             {!isView ? (
@@ -193,17 +195,18 @@ function ProgramEditor({ editor, pending, error, onClose, onSave, onChange }) {
 }
 
 function DeleteProgramDialog({ program, pending, error, onClose, onConfirm }) {
+  const dialogRef = useDialogFocus({ open: Boolean(program), onClose });
   if (!program) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4" role="presentation">
-      <section className="mep-panel w-full max-w-lg rounded-xl border border-rose-300/30 p-6 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description">
+      <section ref={dialogRef} className="mep-panel w-full max-w-lg rounded-xl border border-rose-300/30 p-6 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description">
         <h2 id="delete-program-title" className="mep-heading text-xl font-semibold text-white">Delete program record?</h2>
         <p id="delete-program-description" className="mt-2 break-words text-sm text-slate-300">
           Delete <strong>{program.name}</strong> only if the server confirms it. The server can reject deletion when an active challenge exists.
         </p>
         {error ? <p className="mt-4 rounded-md border border-rose-400/50 bg-rose-950/30 p-3 text-sm text-rose-100" role="alert">{error}</p> : null}
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} disabled={pending} className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300">Cancel</button>
+          <button type="button" onClick={onClose} disabled={pending} data-autofocus className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300">Cancel</button>
           <button type="button" onClick={onConfirm} disabled={pending} className="inline-flex items-center gap-2 rounded-md bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-200">
             {pending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             Confirm server deletion
@@ -235,6 +238,27 @@ export default function ProgramsManagement() {
   const writeControllerRef = useRef(null);
 
   const retry = useCallback(() => setRefreshKey((value) => value + 1), []);
+  const refetchCurrentRange = useCallback(() => {
+    setPrograms([]);
+    setReadState('loading');
+    setReadError(null);
+    setRefreshKey((value) => value + 1);
+  }, []);
+  const refetchAfterDelete = useCallback(() => {
+    setPrograms([]);
+    setReadState('loading');
+    setReadError(null);
+    setPagination((current) => {
+      const total = Math.max(0, current.total - 1);
+      const pages = total === 0 ? 0 : Math.ceil(total / current.perPage);
+      return { ...current, total, pages, page: Math.min(current.page, Math.max(1, pages)) };
+    });
+    setRefreshKey((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    setNotice(null);
+  }, [principalKey, isAuthLoading]);
 
   useEffect(() => {
     generationRef.current += 1;
@@ -246,7 +270,6 @@ export default function ProgramsManagement() {
     setDeleteTarget(null);
     setMutationPending(false);
     setMutationError(null);
-    setNotice(null);
 
     if (isAuthLoading) {
       setReadState('loading');
@@ -322,14 +345,11 @@ export default function ProgramsManagement() {
         expectedOwner,
       });
       if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) return;
-      setPrograms((rows) => editor.program
-        ? rows.map((row) => row.id === saved.program.id ? saved.program : row)
-        : [...rows, saved.program].sort((left, right) => left.id - right.id).slice(0, pagination.perPage));
-      setPagination((current) => ({
-        ...current,
-        total: editor.program ? current.total : current.total + 1,
-        pages: editor.program ? current.pages : Math.ceil((current.total + 1) / current.perPage),
-      }));
+      if (editor.program) {
+        setPrograms((rows) => rows.map((row) => row.id === saved.program.id ? saved.program : row));
+      } else {
+        refetchCurrentRange();
+      }
       setEditor(null);
       setNotice(editor.program ? 'Saved the server-confirmed program record.' : 'Created the server-confirmed program record.');
     } catch (error) {
@@ -357,12 +377,7 @@ export default function ProgramsManagement() {
         expectedOwner,
       });
       if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) return;
-      setPrograms((rows) => rows.filter((row) => row.id !== deleted.deletedProgramId));
-      setPagination((current) => ({
-        ...current,
-        total: Math.max(0, current.total - 1),
-        pages: Math.ceil(Math.max(0, current.total - 1) / current.perPage),
-      }));
+      refetchAfterDelete();
       setDeleteTarget(null);
       setNotice('Deleted the server-confirmed program record.');
     } catch (error) {

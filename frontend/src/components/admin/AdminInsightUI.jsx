@@ -1,4 +1,5 @@
 import { AlertTriangle, BarChart3, Loader2, RefreshCw, ShieldAlert, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const adminInsightPanel = "mep-panel min-w-0 rounded-2xl border p-4 sm:p-6";
 export const adminInsightButton = "inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/40 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-45";
@@ -73,11 +74,11 @@ export function AdminInsightCountCards({ counts }) {
   return (
     <section aria-label="Recorded counts" className="grid gap-4 sm:grid-cols-3">
       {countCards.map((card) => (
-        <a key={card.key} href={card.href} className={`${adminInsightPanel} group block transition-colors hover:border-cyan-300/35 hover:bg-slate-800/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300`}>
+        <Link key={card.key} to={card.href} className={`${adminInsightPanel} group block transition-colors hover:border-cyan-300/35 hover:bg-slate-800/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300`}>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Recorded {card.title}</p>
           <p className={`mt-2 text-3xl font-bold ${card.accent}`}>{adminInsightCount(counts[card.key])}</p>
           <p className="mt-2 text-xs text-slate-400">Current count in this server-provided scope</p>
-        </a>
+        </Link>
       ))}
     </section>
   );

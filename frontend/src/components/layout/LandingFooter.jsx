@@ -110,12 +110,12 @@ export default function LandingFooter() {
         <div className="mt-12 pt-8 border-t border-white/10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
-              <h3 className="text-white font-semibold mb-2">Stay Updated</h3>
-              <p className="text-gray-400 text-sm">Newsletter subscriptions are not available. Contact us for current information.</p>
+              <h3 className="text-white font-semibold mb-2">Information and help</h3>
+              <p className="text-gray-400 text-sm">Newsletter subscriptions and message submission are unavailable. View the contact page for current information and available help options.</p>
             </div>
             <Link to="/contact" className="mep-cta max-w-full text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
                 <Mail size={18} className="mr-2" />
-                Contact us
+                View contact options
             </Link>
           </div>
         </div>

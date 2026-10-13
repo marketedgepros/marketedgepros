@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import { profileAPI } from '../../services/api';
+import useDialogFocus from '../../hooks/useDialogFocus';
+import useTabNavigation from '../../hooks/useTabNavigation';
 import {
   createProfileApiTransport,
   createProfileViewService,
@@ -32,6 +34,7 @@ const EMPTY_PASSWORDS = {
 
 const operationNames = ['load', 'personal', 'avatar', 'password'];
 const mutationOperationNames = ['personal', 'avatar', 'password'];
+const PROFILE_TAB_IDS = Object.freeze(['personal', 'security']);
 
 const statusClasses = {
   success: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100',
@@ -86,6 +89,19 @@ function ProfileContent() {
   const dirtyDraftRef = useRef(false);
   const flightsRef = useRef(Object.fromEntries(operationNames.map((name) => [name, false])));
   const requestsRef = useRef({ context: 0, active: {} });
+  const closeDeleteAvatarDialog = useCallback(() => {
+    if (mutationOperationNames.some((name) => flightsRef.current[name])) return;
+    setIsDeleteDialogOpen(false);
+  }, []);
+  const deleteAvatarDialogRef = useDialogFocus({
+    open: isDeleteDialogOpen,
+    onClose: closeDeleteAvatarDialog,
+  });
+  const getTabProps = useTabNavigation({
+    ids: PROFILE_TAB_IDS,
+    activeId: activeTab,
+    onChange: setActiveTab,
+  });
 
   const invalidateRequests = useCallback(() => {
     const requests = requestsRef.current;
@@ -339,7 +355,7 @@ function ProfileContent() {
     : 'Unavailable';
 
   return (
-    <main key={principal?.key || 'unauthenticated-profile'} className="mep-screen min-h-screen text-slate-100">
+    <div key={principal?.key || 'unauthenticated-profile'} className="mep-screen min-h-screen text-slate-100">
       <header className="border-b border-slate-700/70 bg-slate-900/80 backdrop-blur-sm">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account</p>
@@ -385,10 +401,10 @@ function ProfileContent() {
         <section aria-label="Profile settings forms" className="mep-panel overflow-hidden rounded-xl border shadow-lg shadow-black/10">
           <div className="overflow-x-auto border-b border-slate-700">
             <div role="tablist" aria-label="Profile setting categories" className="flex min-w-max px-2">
-              <button id="profile-personal-tab" role="tab" type="button" aria-selected={activeTab === 'personal'} aria-controls="profile-personal-panel" onClick={() => setActiveTab('personal')} className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold outline-none transition focus:ring-2 focus:ring-inset focus:ring-cyan-300 ${activeTab === 'personal' ? 'border-cyan-400 text-cyan-200' : 'border-transparent text-slate-300 hover:text-white'}`}>
+              <button id="profile-personal-tab" type="button" aria-controls="profile-personal-panel" {...getTabProps('personal')} className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold outline-none transition focus:ring-2 focus:ring-inset focus:ring-cyan-300 ${activeTab === 'personal' ? 'border-cyan-400 text-cyan-200' : 'border-transparent text-slate-300 hover:text-white'}`}>
                 <User className="h-4 w-4" aria-hidden="true" /> Personal details
               </button>
-              <button id="profile-security-tab" role="tab" type="button" aria-selected={activeTab === 'security'} aria-controls="profile-security-panel" onClick={() => setActiveTab('security')} className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold outline-none transition focus:ring-2 focus:ring-inset focus:ring-cyan-300 ${activeTab === 'security' ? 'border-cyan-400 text-cyan-200' : 'border-transparent text-slate-300 hover:text-white'}`}>
+              <button id="profile-security-tab" type="button" aria-controls="profile-security-panel" {...getTabProps('security')} className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold outline-none transition focus:ring-2 focus:ring-inset focus:ring-cyan-300 ${activeTab === 'security' ? 'border-cyan-400 text-cyan-200' : 'border-transparent text-slate-300 hover:text-white'}`}>
                 <Lock className="h-4 w-4" aria-hidden="true" /> Security
               </button>
             </div>
@@ -485,17 +501,17 @@ function ProfileContent() {
 
       {isDeleteDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-slate-950/80 p-4 sm:items-center sm:justify-center" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="delete-avatar-heading" aria-describedby="delete-avatar-description" className="mep-panel w-full max-w-md rounded-xl border p-5 shadow-2xl">
+          <section ref={deleteAvatarDialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-avatar-heading" aria-describedby="delete-avatar-description" className="mep-panel w-full max-w-md rounded-xl border p-5 shadow-2xl">
             <h2 id="delete-avatar-heading" className="mep-heading text-lg font-semibold text-white">Delete profile photo?</h2>
             <p id="delete-avatar-description" className="mt-2 text-sm leading-6 text-slate-300">This will remove the current photo from your profile. This action cannot be undone from this screen.</p>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setIsDeleteDialogOpen(false)} disabled={isMutationPending} className="min-h-11 rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">Cancel</button>
+              <button type="button" data-autofocus onClick={closeDeleteAvatarDialog} disabled={isMutationPending} className="min-h-11 rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">Cancel</button>
               <button type="button" onClick={confirmDeleteAvatar} disabled={isMutationPending} className="min-h-11 rounded-lg bg-red-500 px-4 py-2 font-semibold text-white hover:bg-red-400 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:opacity-50">{isAvatarPending ? 'Deleting…' : 'Delete photo'}</button>
             </div>
           </section>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 

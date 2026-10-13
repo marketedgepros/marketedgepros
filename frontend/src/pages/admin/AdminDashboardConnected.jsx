@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { Link, useLocation } from "react-router-dom";
 import useAuthStore from "../../store/authStore.js";
 import { loadAdminInsight } from "../../services/adminInsightViewService.js";
 import useAdminInsightRead from "../../hooks/useAdminInsightRead.js";
@@ -21,12 +22,12 @@ const quickLinks = [
 export function AdminInsightQuickLinks({ current }) {
   return (
     <nav aria-label="Administrator record views" className="flex max-w-full flex-wrap gap-2">
-      {quickLinks.map(([label, href]) => <a key={href} href={href} aria-current={current === href ? "page" : undefined} className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${current === href ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100" : "border-white/10 text-slate-300 hover:border-cyan-300/30 hover:text-cyan-100"}`}>{label}</a>)}
+      {quickLinks.map(([label, href]) => <Link key={href} to={href} aria-current={current === href ? "page" : undefined} className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${current === href ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100" : "border-white/10 text-slate-300 hover:border-cyan-300/30 hover:text-cyan-100"}`}>{label}</Link>)}
     </nav>
   );
 }
 
-export function AdminDashboardInsightContent({ read }) {
+export function AdminDashboardInsightContent({ read, currentPath = "/admin/dashboard" }) {
   const insight = read.value;
   const isEmpty = Boolean(insight && insight.counts.users === 0 && insight.counts.challenges === 0 && insight.counts.payments === 0);
   return (
@@ -39,7 +40,7 @@ export function AdminDashboardInsightContent({ read }) {
         </div>
         <button type="button" className={adminInsightButton} onClick={read.refresh} disabled={read.loading}>Refresh records</button>
       </header>
-      <AdminInsightQuickLinks current="/admin/dashboard" />
+      <AdminInsightQuickLinks current={currentPath} />
       {insight && <AdminInsightBoundary asOf={insight.asOf} />}
       <AdminInsightReadState
         loading={read.loading}
@@ -72,6 +73,7 @@ export function AdminDashboardInsightContent({ read }) {
 
 export default function AdminDashboardConnected() {
   const { user, isAuthenticated } = useAuthStore();
+  const location = useLocation();
   const role = user?.role;
   const load = useCallback((expectedOwner, signal) => loadAdminInsight({
     kind: "dashboard", expectedOwner, days: null, signal,
@@ -85,5 +87,5 @@ export default function AdminDashboardConnected() {
     days: null,
     load,
   });
-  return <AdminDashboardInsightContent read={read} />;
+  return <AdminDashboardInsightContent read={read} currentPath={location.pathname === "/admin" ? "/admin/dashboard" : location.pathname} />;
 }

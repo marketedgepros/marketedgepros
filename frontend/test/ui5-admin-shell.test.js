@@ -1,75 +1,38 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import React from 'react';
+import React, { act } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { JSDOM } from 'jsdom';
 import { transformWithEsbuild } from 'vite';
 
+// ReactDOM observes DOM support while loading; provide a disposable bootstrap
+// so the real source hook and the test renderer share React's actual dispatcher.
+const bootstrap = new JSDOM('<!doctype html><html><body></body></html>');
+const bootstrapKeys = ['window', 'document', 'navigator'];
+const bootstrapPrior = new Map(bootstrapKeys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+for (const [key, value] of Object.entries({ window: bootstrap.window, document: bootstrap.window.document, navigator: bootstrap.window.navigator })) {
+  Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+}
+const { createRoot } = await import('react-dom/client');
+for (const [key, descriptor] of bootstrapPrior) {
+  if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+  else delete globalThis[key];
+}
+bootstrap.window.close();
+
 const layoutFile = new URL('../src/components/admin/AdminLayout.jsx', import.meta.url);
-const temporaryFiles = [
-  'hooks',
-  'router',
-  'auth',
-  'icons',
-  'bell',
-  'layout',
-].map((name) => new URL(`../node_modules/.ui5-admin-shell-${name}-${process.pid}.mjs`, import.meta.url));
-const [hooksFile, routerFile, authFile, iconsFile, bellFile, moduleFile] = temporaryFiles;
+const temporaryFiles = ['router', 'auth', 'icons', 'bell', 'layout']
+  .map((name) => new URL(`../node_modules/.ui5-admin-shell-${name}-${process.pid}.mjs`, import.meta.url));
+const [routerFile, authFile, iconsFile, bellFile, moduleFile] = temporaryFiles;
+const dialogFocusUrl = new URL('../src/hooks/useDialogFocus.js', import.meta.url).href;
 
 function writeStub(file, source) {
   fs.writeFileSync(file, source);
 }
 
-function childElements(value) {
-  if (Array.isArray(value)) return value.flatMap(childElements);
-  if (!React.isValidElement(value)) return [];
-  return [value, ...childElements(value.props.children)];
-}
-
-function findElement(tree, predicate) {
-  return childElements(tree).find(predicate);
-}
-
 let shell;
-let hooks;
 try {
-  writeStub(hooksFile, `
-    let slots = [];
-    let cursor = 0;
-    let pendingEffects = [];
-    export const __reset = () => { slots = []; cursor = 0; pendingEffects = []; };
-    export const __beginRender = () => { cursor = 0; };
-    export const __flushEffects = () => {
-      const effects = pendingEffects;
-      pendingEffects = [];
-      for (const { index, callback } of effects) {
-        const previous = slots[index]?.cleanup;
-        if (typeof previous === 'function') previous();
-        slots[index] = { ...slots[index], cleanup: callback() };
-      }
-    };
-    export const useState = (initialValue) => {
-      const index = cursor++;
-      if (!Object.hasOwn(slots, index)) slots[index] = typeof initialValue === 'function' ? initialValue() : initialValue;
-      return [slots[index], (nextValue) => {
-        slots[index] = typeof nextValue === 'function' ? nextValue(slots[index]) : nextValue;
-      }];
-    };
-    export const useRef = (initialValue) => {
-      const index = cursor++;
-      if (!Object.hasOwn(slots, index)) slots[index] = { current: initialValue };
-      return slots[index];
-    };
-    export const useEffect = (callback, dependencies) => {
-      const index = cursor++;
-      const previous = slots[index];
-      const changed = !previous || dependencies.length !== previous.dependencies.length || dependencies.some((value, dependencyIndex) => value !== previous.dependencies[dependencyIndex]);
-      if (changed) {
-        slots[index] = { dependencies, cleanup: previous?.cleanup };
-        pendingEffects.push({ index, callback });
-      }
-    };
-  `);
   writeStub(routerFile, `
     import React from 'react';
     let pathname = '/admin/dashboard';
@@ -89,52 +52,62 @@ try {
   writeStub(iconsFile, `
     import React from 'react';
     const Icon = () => React.createElement('svg', { 'aria-hidden': true });
-    export const LayoutDashboard = Icon;
-    export const Users = Icon;
-    export const CreditCard = Icon;
-    export const DollarSign = Icon;
-    export const CheckCircle = Icon;
-    export const BarChart3 = Icon;
-    export const Settings = Icon;
-    export const LogOut = Icon;
-    export const Menu = Icon;
-    export const X = Icon;
-    export const Shield = Icon;
-    export const ChevronRight = Icon;
-    export const LifeBuoy = Icon;
-    export const Award = Icon;
+    export const LayoutDashboard = Icon; export const Users = Icon; export const CreditCard = Icon;
+    export const DollarSign = Icon; export const CheckCircle = Icon; export const BarChart3 = Icon;
+    export const Settings = Icon; export const LogOut = Icon; export const Menu = Icon; export const X = Icon;
+    export const Shield = Icon; export const ChevronRight = Icon; export const LifeBuoy = Icon; export const Award = Icon;
   `);
   writeStub(bellFile, `import React from 'react'; export default function NotificationBell() { return React.createElement('button', { type: 'button', 'aria-label': 'Notifications' }); }`);
 
   const source = fs.readFileSync(layoutFile, 'utf8')
-    .replace("from 'react';", `from ${JSON.stringify(hooksFile.href)};`)
     .replace("from 'react-router-dom';", `from ${JSON.stringify(routerFile.href)};`)
     .replace("from '../../store/authStore';", `from ${JSON.stringify(authFile.href)};`)
     .replace("from 'lucide-react';", `from ${JSON.stringify(iconsFile.href)};`)
-    .replace("from '../notifications/NotificationBell';", `from ${JSON.stringify(bellFile.href)};`);
+    .replace("from '../notifications/NotificationBell';", `from ${JSON.stringify(bellFile.href)};`)
+    .replace("from '../../hooks/useDialogFocus.js';", `from ${JSON.stringify(dialogFocusUrl)};`);
   const transformed = await transformWithEsbuild(source, layoutFile.pathname, { loader: 'jsx', jsx: 'automatic' });
   fs.writeFileSync(moduleFile, transformed.code);
   shell = await import(`${moduleFile.href}?ui5=${process.pid}`);
-  hooks = await import(hooksFile.href);
 } finally {
-  fs.rmSync(moduleFile, { force: true });
-  fs.rmSync(hooksFile, { force: true });
-  fs.rmSync(routerFile, { force: true });
-  fs.rmSync(authFile, { force: true });
-  fs.rmSync(iconsFile, { force: true });
-  fs.rmSync(bellFile, { force: true });
+  temporaryFiles.forEach((file) => fs.rmSync(file, { force: true }));
 }
 
-function renderShell() {
-  hooks.__beginRender();
-  return shell.default({ children: React.createElement('section', null, 'Admin content') });
+function installDom() {
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { pretendToBeVisual: true });
+  const keys = ['window', 'document', 'navigator', 'HTMLElement', 'Node', 'Event', 'MouseEvent', 'KeyboardEvent', 'MutationObserver', 'IS_REACT_ACT_ENVIRONMENT'];
+  const prior = new Map(keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const values = {
+    window: dom.window, document: dom.window.document, navigator: dom.window.navigator,
+    HTMLElement: dom.window.HTMLElement, Node: dom.window.Node, Event: dom.window.Event,
+    MouseEvent: dom.window.MouseEvent, KeyboardEvent: dom.window.KeyboardEvent,
+    MutationObserver: dom.window.MutationObserver, IS_REACT_ACT_ENVIRONMENT: true,
+  };
+  for (const [key, value] of Object.entries(values)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  const root = createRoot(dom.window.document.getElementById('root'));
+  return {
+    dom,
+    root,
+    host: dom.window.document.getElementById('root'),
+    async close() {
+      await act(async () => { root.unmount(); });
+      dom.window.close();
+      for (const [key, descriptor] of prior) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else delete globalThis[key];
+      }
+    },
+  };
+}
+
+async function settle() {
+  await act(async () => {
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 }
 
 test('UI5 admin shell renders named, associated mobile menu controls through React DOM', () => {
-  hooks.__reset();
-  hooks.__beginRender();
   const html = renderToStaticMarkup(React.createElement(shell.default, null, 'Admin content'));
-
   assert.match(html, /<aside[^>]*id="admin-navigation"[^>]*aria-label="Administration navigation"/);
   assert.match(html, /<button[^>]*type="button"[^>]*aria-label="Open administration menu"[^>]*aria-controls="admin-navigation"[^>]*aria-expanded="false"/);
   assert.match(html, /<button[^>]*type="button"[^>]*aria-label="Close administration menu"[^>]*aria-controls="admin-navigation"/);
@@ -142,97 +115,35 @@ test('UI5 admin shell renders named, associated mobile menu controls through Rea
   assert.match(html, /focus-visible:ring-cyan-400/);
 });
 
-test('UI5 admin shell opens its mobile menu, returns focus from close, and handles Escape', () => {
-  const originalDocument = globalThis.document;
-  const originalWindow = globalThis.window;
-  const frames = new Map();
-  let nextFrame = 0;
-  globalThis.window = {
-    requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
-    cancelAnimationFrame(id) { frames.delete(id); },
-  };
-  const paint = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
-  const listeners = new Map();
-  const documentStub = {
-    addEventListener(type, listener) { listeners.set(type, listener); },
-    removeEventListener(type, listener) {
-      if (listeners.get(type) === listener) listeners.delete(type);
-    },
-  };
-  globalThis.document = documentStub;
-
+test('UI5 admin shell opens its drawer with the real focus hook and Escape restores its trigger', async () => {
+  const environment = installDom();
   try {
-    hooks.__reset();
-    let tree = renderShell();
-    hooks.__flushEffects();
+    await act(async () => { environment.root.render(React.createElement(shell.default, null, 'Admin content')); });
+    const open = environment.host.querySelector('[aria-label="Open administration menu"]');
+    assert.ok(open, 'the mobile-menu trigger is rendered');
+    assert.equal(open.getAttribute('aria-expanded'), 'false');
+    open.focus();
 
-    const openButton = findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Open administration menu');
-    const closeButton = findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Close administration menu');
-    assert.ok(openButton, 'the mobile-menu trigger is rendered');
-    assert.ok(closeButton, 'the close control is rendered');
-    assert.equal(openButton.props['aria-expanded'], false);
+    await act(async () => { open.click(); });
+    await settle();
+    const close = environment.host.querySelector('[aria-label="Close administration menu"]');
+    const sidebar = environment.host.querySelector('#admin-navigation');
+    assert.equal(open.getAttribute('aria-expanded'), 'true');
+    assert.equal(sidebar.getAttribute('role'), 'dialog');
+    assert.equal(sidebar.getAttribute('aria-modal'), 'true');
+    assert.match(sidebar.className, /visible translate-x-0/);
+    assert.equal(environment.dom.window.document.activeElement, close, 'the real hook focuses the data-autofocus close control');
+    assert.equal(environment.host.querySelector('main').getAttribute('aria-hidden'), 'true', 'open drawer isolates background content');
 
-    const focusLog = [];
-    openButton.ref.current = { focus: () => focusLog.push('open') };
-    closeButton.ref.current = { focus: () => focusLog.push('close') };
-
-    openButton.props.onClick();
-    tree = renderShell();
-    hooks.__flushEffects();
-    assert.deepEqual(focusLog, [], 'focus must wait until the sidebar is visible');
-    paint();
-    assert.deepEqual(focusLog, [], 'first frame only schedules focus after paint');
-    paint();
-
-    const openMenuButton = findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Open administration menu');
-    const openedCloseButton = findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Close administration menu');
-    const openedSidebar = findElement(tree, (element) => element.type === 'aside');
-    assert.equal(openMenuButton.props['aria-expanded'], true);
-    assert.match(openedSidebar.props.className, /visible translate-x-0/);
-    assert.deepEqual(focusLog, ['close']);
-    assert.ok(listeners.has('keydown'), 'an open mobile menu listens for Escape');
-
-    openedCloseButton.props.onClick();
-    tree = renderShell();
-    hooks.__flushEffects();
-
-    let closedMenuButton = findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Open administration menu');
-    let closedSidebar = findElement(tree, (element) => element.type === 'aside');
-    assert.equal(closedMenuButton.props['aria-expanded'], false);
-    assert.match(closedSidebar.props.className, /invisible/);
-    assert.deepEqual(focusLog, ['close', 'open']);
-    assert.equal(listeners.has('keydown'), false);
-
-    closedMenuButton.props.onClick();
-    tree = renderShell();
-    hooks.__flushEffects();
-    paint();
-    paint();
-    assert.deepEqual(focusLog, ['close', 'open', 'close']);
-    assert.ok(listeners.has('keydown'), 'the reopened menu listens for Escape');
-
-    let prevented = false;
-    listeners.get('keydown')({ key: 'Escape', preventDefault: () => { prevented = true; } });
-    tree = renderShell();
-    hooks.__flushEffects();
-
-    closedMenuButton = findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Open administration menu');
-    closedSidebar = findElement(tree, (element) => element.type === 'aside');
-    assert.equal(prevented, true);
-    assert.equal(closedMenuButton.props['aria-expanded'], false);
-    assert.match(closedSidebar.props.className, /invisible/);
-    assert.deepEqual(focusLog, ['close', 'open', 'close', 'open']);
-    assert.equal(listeners.has('keydown'), false);
-    closedMenuButton.props.onClick();
-    tree = renderShell();
-    hooks.__flushEffects();
-    assert.equal(frames.size, 1);
-    findElement(tree, (element) => element.type === 'button' && element.props['aria-label'] === 'Close administration menu').props.onClick();
-    tree = renderShell();
-    hooks.__flushEffects();
-    assert.equal(frames.size, 0, 'closing before paint cancels stale focus');
+    await act(async () => {
+      environment.dom.window.document.dispatchEvent(new environment.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    await settle();
+    assert.equal(open.getAttribute('aria-expanded'), 'false');
+    assert.match(sidebar.className, /invisible/);
+    assert.equal(environment.dom.window.document.activeElement, open, 'Escape through the real hook returns focus to the trigger');
+    assert.equal(environment.host.querySelector('main').getAttribute('aria-hidden'), null, 'closing restores background accessibility');
   } finally {
-    globalThis.document = originalDocument;
-    globalThis.window = originalWindow;
+    await environment.close();
   }
 });

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { transformWithEsbuild } from "vite";
 
 const uiFile = new URL("../src/components/admin/AdminInsightUI.jsx", import.meta.url);
@@ -29,7 +30,9 @@ try {
     ["../../components/admin/AdminInsightUI.jsx", uiTarget.href], ["./AdminDashboardConnected.jsx", dashboardTarget.href], ["../../store/authStore.js", absolute("../src/store/authStore.js")], ["../../services/adminInsightViewService.js", absolute("../src/services/adminInsightViewService.js")], ["../../hooks/useAdminInsightRead.js", absolute("../src/hooks/useAdminInsightRead.js")],
   ]);
 } finally { fs.rmSync(analyticsTarget, { force: true }); fs.rmSync(dashboardTarget, { force: true }); fs.rmSync(uiTarget, { force: true }); }
-const render = (element) => renderToStaticMarkup(element);
+const render = (element) => renderToStaticMarkup(
+  React.createElement(MemoryRouter, { initialEntries: ["/admin/dashboard"] }, element),
+);
 const insight = {
   asOf: "2026-10-12T13:00:00Z",
   counts: { users: 1, challenges: 1, payments: 1 },

@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../src/pages/support/SupportHub.jsx', import.meta.url), 'utf8');
 
 test('preserves articles API, published filter, article routes, ticket and FAQ navigation', () => {
-  assert.match(source, /api\.get\('\/support\/articles'\)/);
+  assert.match(source, /api\.get\('\/support\/articles', \{ signal: controller\.signal \}\)/);
   assert.match(source, /article\.status === 'published'/);
   assert.match(source, /`\/support\/\$\{article\.slug\}`/);
   assert.match(source, /link: '\/support\/create-ticket'/);

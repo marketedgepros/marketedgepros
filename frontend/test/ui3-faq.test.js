@@ -36,6 +36,6 @@ test('accordions expose state and relationship for their answer panel', () => {
 test('FAQ structured data is generated from the same safe questions and supported navigation remains', () => {
   assert.match(source, /questions: allQuestions\.map/);
   assert.match(source, /<StructuredData type="faq" data=\{faqData\}/);
-  assert.match(source, /href="\/programs"/);
-  assert.match(source, /href="\/contact"/);
+  assert.match(source, /<Link to="\/programs"/);
+  assert.match(source, /<Link to="\/contact"/);
 });

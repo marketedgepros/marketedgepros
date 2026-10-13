@@ -3,38 +3,23 @@ import {
   LayoutDashboard, TrendingUp, DollarSign, FileText, 
   User, LogOut, Menu, X, Wallet, MessageSquare
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import useAuthStore from '../../store/authStore';
 import NotificationBell from '../notifications/NotificationBell';
 import { accountHome } from '../../services/navigationService.js';
+import { useDialogFocus } from '../../hooks/useDialogFocus.js';
 
 export default function TraderLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const menuButtonRef = useRef(null);
-  const closeButtonRef = useRef(null);
   const sidebarId = 'trader-navigation';
 
-  const closeSidebar = (restoreFocus = false) => {
+  const closeSidebar = () => {
     setSidebarOpen(false);
-    if (restoreFocus) menuButtonRef.current?.focus();
   };
-
-  useEffect(() => {
-    if (!sidebarOpen) return undefined;
-
-    closeButtonRef.current?.focus();
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeSidebar(true);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sidebarOpen]);
+  const sidebarRef = useDialogFocus({ open: sidebarOpen, onClose: closeSidebar });
 
   const navigation = [
     { name: 'Dashboard', href: accountHome(user), icon: LayoutDashboard },
@@ -62,13 +47,16 @@ export default function TraderLayout({ children }) {
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           aria-hidden="true"
-          onClick={() => closeSidebar(true)}
+          onClick={closeSidebar}
         />
       )}
 
       {/* Sidebar */}
       <aside
+        ref={sidebarRef}
         id={sidebarId}
+        role={sidebarOpen ? 'dialog' : undefined}
+        aria-modal={sidebarOpen ? 'true' : undefined}
         aria-label="Account navigation"
         className={`fixed top-0 left-0 z-50 h-full w-64 mep-chrome backdrop-blur-sm border-r transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -84,9 +72,9 @@ export default function TraderLayout({ children }) {
               <span className="min-w-0 truncate text-white font-bold text-lg">MarketEdgePros</span>
             </Link>
             <button
-              ref={closeButtonRef}
               type="button"
-              onClick={() => closeSidebar(true)}
+              onClick={closeSidebar}
+              data-autofocus
               aria-label="Close navigation menu"
               className="lg:hidden rounded p-1 text-gray-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
@@ -125,7 +113,7 @@ export default function TraderLayout({ children }) {
                 <Link
                   key={item.name}
                   to={item.href}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={closeSidebar}
                   aria-current={isActive ? 'page' : undefined}
                   className={`mep-nav-item flex min-w-0 items-center gap-3 px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 ${
                     isActive
@@ -155,11 +143,10 @@ export default function TraderLayout({ children }) {
       </aside>
 
       {/* Main content */}
-      <div className="min-w-0 lg:pl-64">
+      <div className="min-w-0 lg:pl-64" aria-hidden={sidebarOpen ? true : undefined} inert={sidebarOpen ? '' : undefined}>
         {/* One header and one notification consumer at every viewport width. */}
         <div className="sticky top-0 z-30 flex items-center justify-between lg:justify-end h-16 px-4 mep-chrome backdrop-blur-sm border-b">
           <button
-            ref={menuButtonRef}
             type="button"
             onClick={() => setSidebarOpen(true)}
             aria-controls={sidebarId}

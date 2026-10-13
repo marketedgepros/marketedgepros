@@ -24,6 +24,7 @@ async function compileUserPage() {
     ["../../constants/roles.js", absolute("../src/constants/roles.js")],
     ["../../services/adminClosureUsersService.js", absolute("../src/services/adminClosureUsersService.js")],
     ["../../hooks/useAdminClosureUsers.js", absolute("../src/hooks/useAdminClosureUsers.js")],
+    ["../../hooks/useDialogFocus.js", absolute("../src/hooks/useDialogFocus.js")],
   ]) source = source.replaceAll(`"${from}"`, JSON.stringify(to));
   const transformed = await transformWithEsbuild(source, userPageFile.pathname, { loader: "jsx", jsx: "automatic" });
   fs.writeFileSync(userPageTarget, transformed.code);

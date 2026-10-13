@@ -190,6 +190,9 @@ export function ApprovalRequestsTable({ requests }) {
 
 export function AdminPaymentPagination({ pagination, onPage, disabled = false }) {
   if (!pagination) return null;
+  if (pagination.pages === 0) {
+    return <p className="px-1 text-sm text-slate-400" role="status">No recorded payment pages are available for this result.</p>;
+  }
   const browseLimit = Math.min(ADMIN_PAYMENT_PAGE_LIMIT, Math.floor(ADMIN_PAYMENT_OFFSET_LIMIT / pagination.per_page) + 1);
   const maxPage = Math.min(pagination.pages, browseLimit);
   return (

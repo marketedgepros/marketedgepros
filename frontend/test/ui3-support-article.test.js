@@ -5,7 +5,7 @@ import test from 'node:test';
 const source = await readFile(new URL('../src/pages/support/Article.jsx', import.meta.url), 'utf8');
 
 test('support article keeps the public article, sanitization and related-article navigation flow', () => {
-  assert.match(source, /api\.get\(`\/support\/articles\/\$\{slug\}`\)/);
+  assert.match(source, /api\.get\(`\/support\/articles\/\$\{encodeURIComponent\(slug \|\| ''\)\}`, \{ signal: controller\.signal \}\)/);
   assert.match(source, /api\.get\('\/support\/articles'/);
   assert.match(source, /DOMPurify\.sanitize\(htmlContent\)/);
   assert.match(source, /ReactMarkdown/);

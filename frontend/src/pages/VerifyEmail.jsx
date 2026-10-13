@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Mail, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import api from '../services/api';
+
+const isValidEmail = (value) => (
+  typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+);
 
 export default function VerifyEmail() {
   const toast = useToast();
@@ -18,6 +22,16 @@ export default function VerifyEmail() {
   const [success, setSuccess] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const isMountedRef = useRef(false);
+  const redirectTimerRef = useRef(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -33,30 +47,39 @@ export default function VerifyEmail() {
 
     try {
       await api.post('/auth/verify-email', { email, code });
+      if (!isMountedRef.current) return;
       setSuccess(true);
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
+        if (!isMountedRef.current) return;
         navigate('/login', { state: { message: 'Email verified successfully! Please login.' } });
       }, 2000);
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(err.response?.data?.error || 'Verification failed. Please check your code and try again.');
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (resendCooldown > 0) return;
+    if (resendCooldown > 0 || resending) return;
+    if (!isValidEmail(email)) {
+      setError('Enter a valid email address before requesting a new verification code.');
+      return;
+    }
 
     setError('');
     setResending(true);
     try {
       await api.post('/auth/resend-verification', { email });
+      if (!isMountedRef.current) return;
       setResendCooldown(120);
       toast.warning('If the email exists and is not verified, a new verification code has been sent.');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Unable to process the request right now. Please try again.');
+    } catch {
+      if (!isMountedRef.current) return;
+      setError('Unable to process the request right now. Please try again.');
     } finally {
-      setResending(false);
+      if (isMountedRef.current) setResending(false);
     }
   };
 
@@ -122,7 +145,7 @@ export default function VerifyEmail() {
               {!emailFromState && (
                 <div>
                   <label htmlFor="verify-email" className="mb-2 block text-sm font-semibold text-slate-800">Email address</label>
-                  <input id="verify-email" name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className={inputClass} required />
+                  <input id="verify-email" name="email" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} placeholder="you@example.com" className={inputClass} required />
                 </div>
               )}
 
@@ -138,7 +161,7 @@ export default function VerifyEmail() {
             </form>
 
             <div className="mt-7 border-t border-slate-100 pt-6 text-center">
-              <button type="button" onClick={handleResend} disabled={resending || resendCooldown > 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none" aria-live="polite">
+              <button type="button" onClick={handleResend} disabled={resending || resendCooldown > 0 || !isValidEmail(email)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none" aria-live="polite">
                 <RefreshCw className={'h-4 w-4 ' + (resending ? 'animate-spin motion-reduce:animate-none' : '')} aria-hidden="true" />
                 {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : resending ? 'Sending…' : 'Resend verification code'}
               </button>

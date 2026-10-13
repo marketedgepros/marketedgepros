@@ -13,6 +13,7 @@ import {
 import { useToast } from '../../contexts/ToastContext';
 import useAuthStore from '../../store/authStore';
 import useAdminClosureKyc from '../../hooks/useAdminClosureKyc.js';
+import useDialogFocus from '../../hooks/useDialogFocus.js';
 import {
   adminClosureKycAcknowledgement,
   createAdminClosureKycService,
@@ -68,7 +69,16 @@ export function KycReviewNotice() {
   );
 }
 
-export function KycSubmissionList({ list, selectedUserId, onSelect, disabled }) {
+export function KycSubmissionList({
+  list,
+  selectedUserId,
+  onSelect,
+  onPreviousPage,
+  onNextPage,
+  canPreviousPage,
+  canNextPage,
+  disabled,
+}) {
   if (list.loading) {
     return (
       <section className="mep-panel rounded-2xl border p-8" aria-busy="true" aria-label="Loading pending KYC submissions">
@@ -149,6 +159,29 @@ export function KycSubmissionList({ list, selectedUserId, onSelect, disabled }) 
           </tbody>
         </table>
       </div>
+      {list.value.pagination.pages > 1 && (
+        <nav className="flex flex-col gap-3 border-t border-slate-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6" aria-label="Pending KYC submission pages">
+          <p className="text-sm text-slate-300" aria-live="polite">Page {list.value.pagination.page} of {list.value.pagination.pages}</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={disabled || !canPreviousPage}
+              onClick={onPreviousPage}
+              className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous page
+            </button>
+            <button
+              type="button"
+              disabled={disabled || !canNextPage}
+              onClick={onNextPage}
+              className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next page
+            </button>
+          </div>
+        </nav>
+      )}
     </section>
   );
 }
@@ -251,6 +284,10 @@ export function KycSubmissionDetail({ detail, onDownload, onReview, disabled }) 
 }
 
 export function KycDocumentReviewDialog({ review, onClose, onChange, onSubmit, isSaving }) {
+  const closeDialog = () => {
+    if (!isSaving) onClose();
+  };
+  const dialogRef = useDialogFocus({ open: Boolean(review), onClose: closeDialog });
   if (!review) return null;
   const acknowledgement = adminClosureKycAcknowledgement(review.userId, review.document.type);
   const needsReason = review.status === 'rejected';
@@ -260,13 +297,13 @@ export function KycDocumentReviewDialog({ review, onClose, onChange, onSubmit, i
     && !isSaving;
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-slate-950/80 p-4 sm:items-center sm:justify-center" role="presentation">
-      <section className="mep-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="kyc-review-dialog-title">
+      <section ref={dialogRef} className="mep-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="kyc-review-dialog-title">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Manual recorded review</p>
             <h2 id="kyc-review-dialog-title" className="mep-heading mt-1 text-xl font-semibold text-white">{review.status === 'approved' ? 'Record document approval' : 'Record document rejection'}</h2>
           </div>
-          <button type="button" disabled={isSaving} onClick={onClose} className="rounded-md p-1 text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50" aria-label="Close recorded document review dialog">
+          <button type="button" disabled={isSaving} onClick={closeDialog} className="rounded-md p-1 text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50" aria-label="Close recorded document review dialog">
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
@@ -284,6 +321,7 @@ export function KycDocumentReviewDialog({ review, onClose, onChange, onSubmit, i
           maxLength={500}
           required={needsReason}
           disabled={isSaving}
+          data-autofocus="true"
           className="mt-2 min-h-24 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 disabled:opacity-50"
           placeholder={needsReason ? 'Explain why this document record was rejected' : 'Optional recorded note'}
         />
@@ -301,7 +339,7 @@ export function KycDocumentReviewDialog({ review, onClose, onChange, onSubmit, i
           placeholder="Type the exact acknowledgement"
         />
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button type="button" disabled={isSaving} onClick={onClose} className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50">Cancel</button>
+          <button type="button" disabled={isSaving} onClick={closeDialog} className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50">Cancel</button>
           <button type="button" disabled={!canSave} onClick={onSubmit} className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50 ${review.status === 'approved' ? 'bg-emerald-700 hover:bg-emerald-600 focus-visible:ring-emerald-300' : 'bg-rose-700 hover:bg-rose-600 focus-visible:ring-rose-300'}`}>
             {isSaving ? 'Saving recorded review…' : review.status === 'approved' ? 'Save recorded approval' : 'Save recorded rejection'}
           </button>
@@ -414,7 +452,16 @@ export function KYCApprovalContent({ user, isAuthenticated, service = kycAdminSe
       </header>
       <KycReviewNotice />
       {outcome && <section className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 p-4 text-sm text-emerald-100" role="status">Confirmed saved response: User #{outcome.userId}, {outcome.document}, recorded as {formatStatus(outcome.status)}.</section>}
-      <KycSubmissionList list={read.list} selectedUserId={read.selectedUserId} onSelect={read.selectSubmission} disabled={disabled} />
+      <KycSubmissionList
+        list={read.list}
+        selectedUserId={read.selectedUserId}
+        onSelect={read.selectSubmission}
+        onPreviousPage={read.previousPage}
+        onNextPage={read.nextPage}
+        canPreviousPage={read.canPreviousPage}
+        canNextPage={read.canNextPage}
+        disabled={disabled}
+      />
       <KycSubmissionDetail detail={read.detail} onDownload={downloadDocument} onReview={openReview} disabled={disabled} />
       <KycDocumentReviewDialog
         review={review}

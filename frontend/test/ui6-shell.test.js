@@ -127,6 +127,7 @@ const TraderLayout = (await compile(
   'TraderLayout',
   read('components', 'trader', 'TraderLayout.jsx')
     .replace("import useAuthStore from '../../store/authStore';", 'const useAuthStore = () => globalThis.__ui6Auth;')
+    .replace("import { useDialogFocus } from '../../hooks/useDialogFocus.js';", `import { useDialogFocus } from ${JSON.stringify(pathToFileURL(sourcePath('hooks', 'useDialogFocus.js')).href)};`)
     .replace("import NotificationBell from '../notifications/NotificationBell';", 'const NotificationBell = () => null;')
     .replace("import { accountHome } from '../../services/navigationService.js';", "const accountHome = (user) => user?.role === 'trader' ? '/trader' : '/user/dashboard';"),
 )).default;
@@ -134,12 +135,14 @@ const AffiliateLayout = (await compile(
   'AgentLayout',
   read('components', 'agent', 'AgentLayout.jsx')
     .replace("import useAuthStore from '../../store/authStore';", 'const useAuthStore = () => globalThis.__ui6Auth;')
+    .replace("import { useDialogFocus } from '../../hooks/useDialogFocus.js';", `import { useDialogFocus } from ${JSON.stringify(pathToFileURL(sourcePath('hooks', 'useDialogFocus.js')).href)};`)
     .replace("import NotificationBell from '../notifications/NotificationBell';", 'const NotificationBell = () => null;'),
 )).default;
 const AdminLayout = (await compile(
   'AdminLayout',
   read('components', 'admin', 'AdminLayout.jsx')
     .replace("import useAuthStore from '../../store/authStore';", 'const useAuthStore = () => globalThis.__ui6Auth;')
+    .replace("import { useDialogFocus } from '../../hooks/useDialogFocus.js';", `import { useDialogFocus } from ${JSON.stringify(pathToFileURL(sourcePath('hooks', 'useDialogFocus.js')).href)};`)
     .replace("import NotificationBell from '../notifications/NotificationBell';", 'const NotificationBell = () => null;'),
 )).default;
 const RoleGuard = (await compile(

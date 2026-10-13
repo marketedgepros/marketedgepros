@@ -90,6 +90,7 @@ const roleGuard = await compile('RoleGuard', roleGuardSource);
 
 const pageSource = fs.readFileSync(sourcePath('pages', 'admin', 'ChallengesManagement.jsx'), 'utf8')
   .replace("from '../../store/authStore';", `from ${JSON.stringify(authStub)};`)
+  .replace("from '../../hooks/useDialogFocus.js';", `from ${JSON.stringify(sourceUrl('hooks', 'useDialogFocus.js'))};`)
   .replace("from '../../services/adminClosureChallengesService';", `from ${JSON.stringify(sourceUrl('services', 'adminClosureChallengesService.js'))};`);
 const challengePage = await compile('ChallengesManagement', pageSource);
 

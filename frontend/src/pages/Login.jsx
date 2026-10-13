@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { postLoginDestination } from '../services/navigationService.js';
 import Layout from '../components/layout/Layout';
@@ -26,11 +26,20 @@ export default function Login() {
   const [userId, setUserId] = useState(null);
   const [twoFactorToken, setTwoFactorToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const mountedRef = useRef(false);
+  const attemptRef = useRef(0);
 
-  useEffect(() => () => {
-    // A password-proof challenge must not survive leaving this route.
-    cancel2FA();
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      attemptRef.current += 1;
+      // A password-proof challenge must not survive leaving this route.
+      cancel2FA();
+    };
   }, [cancel2FA]);
+
+  const isCurrentAttempt = (attempt) => mountedRef.current && attempt === attemptRef.current;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -39,10 +48,13 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     setIsLoading(true);
 
     try {
       const result = await login(formData.email, formData.password);
+      if (!isCurrentAttempt(attempt) || result?.stale) return;
 
       if (result.requires2FA) {
         setRequires2FA(true);
@@ -52,25 +64,30 @@ export default function Login() {
       }
     } catch {
       // authStore owns login errors; its state is rendered below.
+      if (!isCurrentAttempt(attempt)) return;
     } finally {
-      setIsLoading(false);
+      if (isCurrentAttempt(attempt)) setIsLoading(false);
     }
   };
 
   const handle2FASubmit = async (e) => {
     e.preventDefault();
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     setIsLoading(true);
 
     try {
       const result = await login2FA(userId, twoFactorToken);
+      if (!isCurrentAttempt(attempt) || result?.stale) return;
       navigate(postLoginDestination(result.user, location.search), { replace: true });
     } catch (err) {
       // Verification failures deliberately invalidate the single-use pending challenge.
+      if (!isCurrentAttempt(attempt)) return;
       setRequires2FA(false);
       setUserId(null);
       setTwoFactorToken('');
     } finally {
-      setIsLoading(false);
+      if (isCurrentAttempt(attempt)) setIsLoading(false);
     }
   };
 
@@ -129,7 +146,9 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => {
+                    attemptRef.current += 1;
                     cancel2FA();
+                    setIsLoading(false);
                     setRequires2FA(false);
                     setUserId(null);
                     setTwoFactorToken('');

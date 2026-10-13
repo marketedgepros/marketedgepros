@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, ArrowRight, Search, Loader, Mail, BookOpen } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import api from "../services/api";
+
+const POSTS_PER_PAGE = 9;
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -12,29 +14,44 @@ export default function Blog() {
   const [featuredPosts, setFeaturedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, per_page: 9, total_posts: 0, total_pages: 0 });
-
-  useEffect(() => {
-    fetchPosts();
-    fetchCategories();
-    fetchFeaturedPosts();
-  }, []);
+  const [pagination, setPagination] = useState({ page: 1, per_page: POSTS_PER_PAGE, total_posts: 0, total_pages: 0 });
+  const [requestedPage, setRequestedPage] = useState(1);
+  const postsRequestRef = useRef({ controller: null, version: 0 });
 
   const fetchPosts = async (page = 1, category = 'all') => {
+    const previousRequest = postsRequestRef.current;
+    previousRequest.controller?.abort();
+
+    const controller = new AbortController();
+    const version = previousRequest.version + 1;
+    postsRequestRef.current = { controller, version };
+    const isCurrentRequest = () => (
+      postsRequestRef.current.version === version
+      && postsRequestRef.current.controller === controller
+    );
+
     try {
       setLoading(true);
       setError('');
-      const params = { page, per_page: pagination.per_page };
+      const params = { page, per_page: POSTS_PER_PAGE };
       if (category !== 'all') params.category = category;
-      const response = await api.get('/blog/posts', { params });
+      const response = await api.get('/blog/posts', { params, signal: controller.signal });
+      if (!isCurrentRequest()) return;
+
       setPosts(Array.isArray(response.data?.posts) ? response.data.posts : []);
-      setPagination(response.data?.pagination || pagination);
+      setPagination(response.data?.pagination || {
+        page,
+        per_page: POSTS_PER_PAGE,
+        total_posts: 0,
+        total_pages: 0,
+      });
     } catch (err) {
+      if (controller.signal.aborted || !isCurrentRequest()) return;
       console.error('Failed to fetch posts:', err);
       setError('Blog posts could not be loaded. Please try again.');
       setPosts([]);
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) setLoading(false);
     }
   };
 
@@ -59,11 +76,36 @@ export default function Blog() {
     }
   };
 
+  useEffect(() => {
+    fetchPosts();
+    fetchCategories();
+    fetchFeaturedPosts();
+
+    return () => {
+      const activeRequest = postsRequestRef.current;
+      activeRequest.version += 1;
+      activeRequest.controller?.abort();
+      postsRequestRef.current = { controller: null, version: activeRequest.version };
+    };
+  }, []);
+
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
+    setRequestedPage(1);
     fetchPosts(1, category);
   };
-  const handlePageChange = (page) => fetchPosts(page, selectedCategory);
+  const handlePageChange = (page) => {
+    setRequestedPage(page);
+    fetchPosts(page, selectedCategory);
+  };
+
+  const retryPosts = () => {
+    if (requestedPage === 1) {
+      fetchPosts(1, selectedCategory);
+      return;
+    }
+    fetchPosts(requestedPage, selectedCategory);
+  };
 
   const query = searchQuery.trim().toLocaleLowerCase();
   const filteredPosts = posts.filter((post) => {
@@ -92,11 +134,11 @@ export default function Blog() {
               ) : error ? (
                 <div className="rounded-2xl border border-rose-400/30 bg-rose-950/30 p-8 text-center" role="alert">
                   <p className="mb-4 text-rose-200">{error}</p>
-                  <button type="button" onClick={() => fetchPosts(1, selectedCategory)} className="rounded-lg border border-cyan-400/50 px-5 py-2.5 font-semibold text-cyan-200 hover:bg-cyan-400/10 focus:outline-none focus:ring-2 focus:ring-cyan-300">Try again</button>
+                  <button type="button" onClick={retryPosts} className="rounded-lg border border-cyan-400/50 px-5 py-2.5 font-semibold text-cyan-200 hover:bg-cyan-400/10 focus:outline-none focus:ring-2 focus:ring-cyan-300">Try again</button>
                 </div>
               ) : filteredPosts.length === 0 ? (
                 <div className="mep-panel rounded-2xl border px-6 py-12 text-center">
-                  <p className="text-lg text-slate-300">{query ? 'No posts match your search.' : 'No posts are available in this view.'}</p>
+                  <p className="text-lg text-slate-300">{query ? 'No posts match your search on the currently loaded page.' : 'No posts are available in this view.'}</p>
                   {query && <button type="button" onClick={() => setSearchQuery('')} className="mt-3 text-cyan-300 underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-cyan-300">Clear search</button>}
                 </div>
               ) : (
@@ -127,9 +169,10 @@ export default function Blog() {
               </section>
 
               <section>
-                <h2 className="mep-heading mb-3 text-lg font-bold text-white">Search posts</h2>
-                <label htmlFor="blog-search" className="sr-only">Search posts</label>
-                <div className="relative"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" /><input id="blog-search" type="search" placeholder="Search posts" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 pl-10 pr-3 text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40" /></div>
+                <h2 className="mep-heading mb-3 text-lg font-bold text-white">Search posts on this page</h2>
+                <label htmlFor="blog-search" className="sr-only">Search posts loaded on this page</label>
+                <div className="relative"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" /><input id="blog-search" type="search" placeholder="Search posts on this page" aria-describedby="blog-search-scope" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 pl-10 pr-3 text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40" /></div>
+                <p id="blog-search-scope" className="mt-2 text-sm leading-5 text-slate-400">Search is limited to posts loaded on the current page.</p>
               </section>
 
               {categories.length > 0 && <section>

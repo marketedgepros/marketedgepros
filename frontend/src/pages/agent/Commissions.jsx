@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import useAuthStore from '../../store/authStore';
 import {
   AFFILIATE_COMMISSION_STATUSES,
@@ -21,9 +21,9 @@ import {
 
 const tenantSelector = (state) => state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null;
 
-export function AffiliateCommissionsView({ view, loading, error, exportError, onRefresh, onPage, onStatus, onExport }) {
+export function AffiliateCommissionsView({ view, pagination, loading, error, exportError, onRefresh, onPage, onStatus, onExport, requestedPage, selectedStatus }) {
   const commissions = view?.commissions ?? [];
-  const status = view?.filters?.status ?? null;
+  const status = view?.filters?.status ?? selectedStatus;
   const canExport = Boolean(view && !loading && !error);
   return (
     <div className="mep-screen min-h-screen text-white">
@@ -51,7 +51,7 @@ export function AffiliateCommissionsView({ view, loading, error, exportError, on
             </div>
             <label className="flex shrink-0 items-center gap-3 text-sm text-slate-200" htmlFor="commission-status">
               Status
-              <select id="commission-status" value={status ?? 'all'} onChange={(event) => onStatus(event.target.value)} className="rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200">
+              <select id="commission-status" value={status ?? 'all'} disabled={loading} onChange={(event) => onStatus(event.target.value)} className="rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-60">
                 <option value="all">All statuses</option>
                 {AFFILIATE_COMMISSION_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
@@ -99,9 +99,9 @@ export function AffiliateCommissionsView({ view, loading, error, exportError, on
               </div>
               {commissions.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-400 sm:px-6">No commission records were returned for this server-filtered page.</p>}
             </section>
-            <div className="mt-6"><AffiliateRecordPagination pagination={view.pagination} onPage={onPage} /></div>
           </>
         )}
+        {!error && pagination && <div className="mt-6"><AffiliateRecordPagination pagination={pagination} onPage={onPage} disabled={loading} loadingPage={loading ? requestedPage : null} /></div>}
       </main>
     </div>
   );
@@ -115,6 +115,8 @@ export default function Commissions() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState(null);
   const [exportError, setExportError] = useState(null);
+  const [lastPagination, setLastPagination] = useState(null);
+  const pendingPageRef = useRef(null);
   const read = useAffiliateRecordRead({
     kind: 'commissions',
     isAuthenticated,
@@ -126,12 +128,25 @@ export default function Commissions() {
     status,
   });
 
+  useEffect(() => {
+    if (read.view?.pagination) setLastPagination({ principalKey: read.principalKey, pagination: read.view.pagination });
+  }, [read.principalKey, read.view]);
+  useEffect(() => {
+    if (!read.loading) pendingPageRef.current = null;
+  }, [read.loading]);
+
+  const pagination = read.view?.pagination ?? (lastPagination?.principalKey === read.principalKey ? lastPagination.pagination : null);
+
   const changeStatus = (nextStatus) => {
+    if (read.loading || pendingPageRef.current !== null) return;
+    pendingPageRef.current = 'status';
     setExportError(null);
     setStatus(nextStatus === 'all' ? null : nextStatus);
     setPage(1);
   };
   const changePage = (nextPage) => {
+    if (read.loading || pendingPageRef.current !== null || nextPage === page) return;
+    pendingPageRef.current = nextPage;
     setExportError(null);
     setPage(nextPage);
   };
@@ -145,5 +160,5 @@ export default function Commissions() {
     }
   }, [read.error, read.loading, read.view]);
 
-  return <AffiliateCommissionsView view={read.view} loading={read.loading} error={read.error} exportError={exportError} onRefresh={read.refresh} onPage={changePage} onStatus={changeStatus} onExport={exportCurrentPage} />;
+  return <AffiliateCommissionsView view={read.view} pagination={pagination} loading={read.loading} error={read.error} exportError={exportError} onRefresh={read.refresh} onPage={changePage} onStatus={changeStatus} onExport={exportCurrentPage} requestedPage={page} selectedStatus={status} />;
 }

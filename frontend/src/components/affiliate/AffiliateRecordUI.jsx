@@ -119,16 +119,21 @@ export function AffiliateStatusPill({ status }) {
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>{affiliateRecordDisplay(status)}</span>;
 }
 
-export function AffiliateRecordPagination({ pagination, onPage, disabled = false }) {
+export function AffiliateRecordPagination({ pagination, onPage, disabled = false, loadingPage = null }) {
   if (!pagination) return null;
+  if (pagination.pages === 0) {
+    return <p className="px-1 text-sm text-slate-400" role="status">No server pages are available for this affiliate result.</p>;
+  }
   const serverLast = Math.min(pagination.pages, AFFILIATE_RECORD_PAGE_LIMIT);
   const beyondTotal = pagination.page > pagination.pages && pagination.pages > 0;
   const previousDisabled = disabled || pagination.page <= 1;
   const nextDisabled = disabled || pagination.page >= pagination.pages || pagination.page >= AFFILIATE_RECORD_PAGE_LIMIT;
   return (
-    <nav aria-label="Affiliate records pagination" className={`${affiliateRecordPanel} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
+    <nav aria-label="Affiliate records pagination" aria-busy={loadingPage !== null ? 'true' : undefined} className={`${affiliateRecordPanel} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}>
       <div className="min-w-0 text-sm text-slate-300">
-        <p>Page {pagination.page} · {pagination.total} server records · {pagination.pages} server pages</p>
+        {loadingPage !== null
+          ? <p className="text-cyan-100" role="status">Loading requested page {loadingPage}…</p>
+          : <p>Page {pagination.page} · {pagination.total} server records · {pagination.pages} server pages</p>}
         {pagination.pages > AFFILIATE_RECORD_PAGE_LIMIT && <p className="mt-1 text-xs text-amber-100">Browsing is limited to {AFFILIATE_RECORD_PAGE_LIMIT} pages.</p>}
         {beyondTotal && <p className="mt-1 text-xs text-amber-100">This requested page is beyond the server total and is validly empty. Choose the last available page or first page.</p>}
       </div>

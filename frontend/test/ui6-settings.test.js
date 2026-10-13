@@ -76,8 +76,12 @@ const authStub = writeModule('auth.mjs', `
   useAuthStore.subscribe = () => () => {};
 `);
 const settingsServiceStub = writeModule('settings-service.mjs', `
-  import { adminClosureSettingsError as actualError } from ${JSON.stringify(sourceUrl('services', 'adminClosureSettingsService.js'))};
+  import {
+    adminClosureSettingsError as actualError,
+    isAdminClosureSettingsContactEmail as actualContactEmailValidator,
+  } from ${JSON.stringify(sourceUrl('services', 'adminClosureSettingsService.js'))};
   export const adminClosureSettingsError = actualError;
+  export const isAdminClosureSettingsContactEmail = actualContactEmailValidator;
   const bound = (operation, options) => {
     globalThis.__ui6SettingsBindings.push({ operation, expectedOwner: options?.expectedOwner, signal: options?.signal, draft: options?.draft });
   };

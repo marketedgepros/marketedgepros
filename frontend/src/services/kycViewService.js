@@ -139,6 +139,14 @@ const normaliseDocumentMetadata = (documentMetadata) => {
     throw new Error('The KYC document response contained invalid metadata.');
   }
 
+  // `null` is a meaningful absence of a recorded upload timestamp. A nonempty
+  // value must be a date that can be displayed safely; never pass Invalid Date
+  // into the account screen or reinterpret it as `not_uploaded`.
+  if (documentMetadata.uploaded_at !== null
+    && !Number.isFinite(Date.parse(documentMetadata.uploaded_at))) {
+    throw new Error('The KYC document response contained an invalid upload timestamp.');
+  }
+
   // Return only the display/download contract. Do not retain arbitrary API
   // fields (which could contain unnecessary personal information) in view state.
   return {

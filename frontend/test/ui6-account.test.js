@@ -107,6 +107,8 @@ const RoleDashboardModule = await compileJsx('role-dashboard', 'components/RoleB
 const ProfileModule = await compileJsx('profile', 'pages/user/Profile.jsx', (text) => text
   .replace("import useAuthStore from '../../store/authStore';", accountAuthStub)
   .replace("import { profileAPI } from '../../services/api';", 'const profileAPI = globalThis.__ui6ProfileApi;')
+  .replace("import useDialogFocus from '../../hooks/useDialogFocus';", `import useDialogFocus from ${JSON.stringify(sourceUrl('hooks/useDialogFocus.js'))};`)
+  .replace("import useTabNavigation from '../../hooks/useTabNavigation';", `import useTabNavigation from ${JSON.stringify(sourceUrl('hooks/useTabNavigation.js'))};`)
   .replace("} from '../../services/profileViewService';", `} from ${JSON.stringify(sourceUrl('services/profileViewService.js'))};`));
 const DocumentsModule = await compileJsx('documents', 'pages/user/Documents.jsx', (text) => text
   .replace("import api from '../../services/api';", 'const api = globalThis.__ui6KycApi;')

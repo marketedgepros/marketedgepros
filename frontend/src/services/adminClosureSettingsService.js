@@ -7,6 +7,8 @@ export const ADMIN_CLOSURE_SETTINGS_REQUEST_TIMEOUT_MS = 5000;
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
+// Matches the ASCII email syntax enforced by an HTML <input type="email">.
+const CONTACT_EMAIL_PATTERN = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
 export class AdminClosureSettingsContractError extends Error {
   constructor(message) {
@@ -42,6 +44,25 @@ const requireNullableText = (value, label, maximum) => {
   if (value === null) return null;
   if (typeof value !== "string" || value.length > maximum || CONTROL_CHARACTERS.test(value)) {
     fail(`${label} must be a bounded text string or null.`);
+  }
+  return value;
+};
+
+/** Keeps the optional field's null semantics while matching the UI's email syntax. */
+export const isAdminClosureSettingsContactEmail = (value) => (
+  value === null
+  || (
+    typeof value === "string"
+    && value.length > 0
+    && value.length <= 255
+    && !CONTROL_CHARACTERS.test(value)
+    && CONTACT_EMAIL_PATTERN.test(value)
+  )
+);
+
+const requireNullableContactEmail = (value, label) => {
+  if (!isAdminClosureSettingsContactEmail(value)) {
+    fail(`${label} must be a valid bounded email address or null.`);
   }
   return value;
 };
@@ -109,6 +130,14 @@ export const normaliseAdminClosureTenantDraft = (draft) => {
 };
 export const normalizeAdminClosureTenantDraft = normaliseAdminClosureTenantDraft;
 
+const normaliseAdminClosureTenantSaveDraft = (draft) => {
+  const normalized = normaliseAdminClosureTenantDraft(draft);
+  return {
+    ...normalized,
+    contact_email: requireNullableContactEmail(normalized.contact_email, "Tenant contact email"),
+  };
+};
+
 const normalizeOwnerContext = (value, expectedOwner) => {
   const source = requireExactFields(value, ["user_id", "tenant_id"], "Settings owner context");
   const owner = {
@@ -174,7 +203,7 @@ const normalizeReadRequest = ({ expectedOwner } = {}) => ({
 
 const normalizeSaveRequest = ({ expectedOwner, draft } = {}) => ({
   owner: normaliseAdminClosureSettingsExpectedOwner(expectedOwner),
-  draft: normaliseAdminClosureTenantDraft(draft),
+  draft: normaliseAdminClosureTenantSaveDraft(draft),
 });
 
 /** Injectable Axios-compatible one-shot reader/writer. It neither polls nor retries. */

@@ -104,7 +104,7 @@ export default function FAQ() {
   return (
     <Layout>
       <StructuredData type="faq" data={faqData} />
-      <main className="mep-screen min-h-screen text-white">
+      <div className="mep-screen min-h-screen text-white">
         <section className="relative overflow-hidden border-b border-cyan-950 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/50 px-4 py-20 sm:py-28">
           <div className="relative mx-auto max-w-5xl text-center">
             <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-700/70 bg-cyan-950/60 text-cyan-300">
@@ -178,12 +178,12 @@ export default function FAQ() {
             <h2 className="mep-heading text-2xl font-bold sm:text-3xl">Need more information?</h2>
             <p className="mt-3 text-slate-300">Visit the programs page for program-specific details, or see the contact options.</p>
             <div className="mt-7 flex flex-wrap justify-center gap-4">
-              <a href="/programs" className="mep-primary px-6 py-3 font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">Explore programs</a>
-              <a href="/contact" className="rounded-lg border border-slate-600 px-6 py-3 font-semibold text-white outline-none transition-colors hover:border-cyan-400 hover:text-cyan-200 focus-visible:ring-2 focus-visible:ring-cyan-300">Contact</a>
+              <Link to="/programs" className="mep-primary px-6 py-3 font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">Explore programs</Link>
+              <Link to="/contact" className="rounded-lg border border-slate-600 px-6 py-3 font-semibold text-white outline-none transition-colors hover:border-cyan-400 hover:text-cyan-200 focus-visible:ring-2 focus-visible:ring-cyan-300">Contact</Link>
             </div>
           </div>
         </section>
-      </main>
+      </div>
     </Layout>
   );
 }

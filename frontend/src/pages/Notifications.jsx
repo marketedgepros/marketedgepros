@@ -5,6 +5,7 @@ import useAuthStore from '../store/authStore';
 import useNotificationStore from '../stores/notificationStore';
 import { notificationDestination } from '../services/notificationViewService';
 import { formatDistanceToNow } from '../utils/dateUtils';
+import useTabNavigation from '../hooks/useTabNavigation';
 
 const getPriorityColor = (priority) => ({
   low: 'border-slate-500/70 bg-slate-700/70 text-slate-100',
@@ -29,6 +30,7 @@ const tabs = [
   { label: 'Challenges', value: 'challenge' },
   { label: 'System', value: 'system' },
 ];
+const tabIds = tabs.map((tab) => tab.value);
 
 const actorIdentity = (state) => JSON.stringify([
   state.isAuthenticated,
@@ -60,6 +62,7 @@ function NotificationsView() {
   const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
   const deleteNotification = useNotificationStore((state) => state.deleteNotification);
   const filters = useMemo(() => filterForTab(activeTab), [activeTab]);
+  const getTabProps = useTabNavigation({ ids: tabIds, activeId: activeTab, onChange: setActiveTab });
   const anyActionPending = pendingAction !== null;
   const actionError = Object.values(actionErrors).find(Boolean);
 
@@ -106,8 +109,8 @@ function NotificationsView() {
       <div className="mep-panel mb-6 rounded-lg border p-1">
         <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Notification filters">
           {tabs.map((tab) => (
-            <button type="button" key={tab.value} role="tab" aria-selected={activeTab === tab.value}
-              onClick={() => setActiveTab(tab.value)}
+            <button type="button" key={tab.value} id={`notifications-tab-${tab.value}`}
+              aria-controls={`notifications-tabpanel-${tab.value}`} {...getTabProps(tab.value)}
               className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 ${
                 activeTab === tab.value ? 'bg-cyan-400/20 text-cyan-100' : 'text-slate-300 hover:bg-white/5 hover:text-white'
               }`}>{tab.label}</button>
@@ -117,7 +120,8 @@ function NotificationsView() {
 
       {actionError && <div role="alert" className="mb-4 rounded-lg border border-red-400/50 bg-red-500/10 p-4 text-red-100">{actionError}</div>}
 
-      <div className="mep-panel rounded-lg border" aria-live="polite">
+      <div className="mep-panel rounded-lg border" role="tabpanel" id={`notifications-tabpanel-${activeTab}`}
+        aria-labelledby={`notifications-tab-${activeTab}`} aria-live="polite">
         {error && (
           <div role="alert" className="m-4 rounded-lg border border-red-400/50 bg-red-500/10 p-4 text-red-100">
             <p className="break-words">{error}</p>

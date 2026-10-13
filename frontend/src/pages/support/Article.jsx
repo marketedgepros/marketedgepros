@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import Layout from '../../components/layout/Layout';
@@ -6,49 +6,87 @@ import ReactMarkdown from 'react-markdown';
 import DOMPurify from 'isomorphic-dompurify';
 import api from "../../services/api";
 
+const isRequestCanceled = (error) => (
+  error?.code === 'ERR_CANCELED' || error?.name === 'AbortError' || error?.__CANCEL__ === true
+);
+
 const Article = () => {
   const { slug } = useParams();
   const [article, setArticle] = useState(null);
+  const [articleSlug, setArticleSlug] = useState(null);
   const [content, setContent] = useState('');
   const [relatedArticles, setRelatedArticles] = useState([]);
+  const [relatedArticlesSlug, setRelatedArticlesSlug] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const requestRef = useRef(null);
+  const requestSequenceRef = useRef(0);
+
+  const loadArticle = useCallback(async () => {
+    requestRef.current?.abort();
+    const requestId = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestId;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const isCurrentRequest = () => requestSequenceRef.current === requestId && !controller.signal.aborted;
+
+    setLoading(true);
+    setError(null);
+    setArticle(null);
+    setArticleSlug(null);
+    setContent('');
+    setRelatedArticles([]);
+    setRelatedArticlesSlug(null);
+
+    try {
+      const response = await api.get(`/support/articles/${encodeURIComponent(slug || '')}`, { signal: controller.signal });
+      if (!isCurrentRequest()) return;
+      const data = response.data;
+      if (!data || typeof data !== 'object') throw new Error('Article not found');
+
+      setArticle(data);
+      setArticleSlug(slug);
+      setContent(typeof data.content === 'string' ? data.content : '');
+
+      try {
+        const relatedResponse = await api.get('/support/articles', {
+          params: { category: data.category, limit: 3 },
+          signal: controller.signal,
+        });
+        if (!isCurrentRequest()) return;
+        const candidates = Array.isArray(relatedResponse.data?.articles) ? relatedResponse.data.articles : [];
+        setRelatedArticles(candidates.filter((candidate) => candidate.slug !== slug).slice(0, 3));
+        setRelatedArticlesSlug(slug);
+      } catch (relatedError) {
+        if (!isCurrentRequest() || isRequestCanceled(relatedError)) return;
+        console.error('Failed to load related articles:', relatedError);
+      }
+    } catch (requestError) {
+      if (!isCurrentRequest() || isRequestCanceled(requestError)) return;
+      console.error('Failed to load article:', requestError);
+      setError({ slug, message: requestError.message });
+    } finally {
+      if (requestSequenceRef.current === requestId) {
+        setLoading(false);
+        if (requestRef.current === controller) requestRef.current = null;
+      }
+    }
+  }, [retryVersion, slug]);
 
   useEffect(() => {
-    const fetchArticle = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch article from API
-        const response = await api.get(`/support/articles/${slug}`);
-        const data = response.data;
-        
-        setArticle(data);
-        setContent(data.content || '');
-        
-        // Fetch related articles
-        try {
-          const relatedResponse = await api.get('/support/articles', {
-            params: { category: data.category, limit: 3 }
-          });
-          const filtered = relatedResponse.data.articles.filter(a => a.slug !== slug).slice(0, 3);
-          setRelatedArticles(filtered);
-        } catch (err) {
-          console.error('Failed to load related articles:', err);
-        }
-        
-      } catch (err) {
-        console.error('Failed to load article:', err);
-        setError(err.message);
-        setArticle(null);
-      } finally {
-        setLoading(false);
-      }
+    loadArticle();
+    return () => {
+      requestSequenceRef.current += 1;
+      requestRef.current?.abort();
+      requestRef.current = null;
     };
+  }, [loadArticle]);
 
-    fetchArticle();
-  }, [slug]);
+  const currentError = error?.slug === slug ? error.message : null;
+  const hasCurrentArticle = articleSlug === slug && article !== null;
+  const currentRelatedArticles = relatedArticlesSlug === slug ? relatedArticles : [];
+  const retryLoad = () => setRetryVersion((version) => version + 1);
 
   // Detect if content is HTML
   const isHTML = (text) => {
@@ -121,7 +159,7 @@ const Article = () => {
     return tempDiv.innerHTML;
   };
 
-  if (loading) {
+  if (loading || (!hasCurrentArticle && !currentError)) {
     return (
       <Layout>
         <div className="mep-screen min-h-screen from-black via-gray-900 to-black flex items-center justify-center">
@@ -131,13 +169,20 @@ const Article = () => {
     );
   }
 
-  if (error || !article) {
+  if (currentError || !hasCurrentArticle) {
     return (
       <Layout>
         <div className="mep-screen min-h-screen from-black via-gray-900 to-black flex items-center justify-center">
           <div className="text-center" role="alert">
             <h1 className="mep-heading text-4xl font-bold text-white mb-4">Unable to Load Article</h1>
             <p className="text-gray-400 mb-8">We couldn't load this article. Please try again or browse the Support Hub.</p>
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="mep-primary mr-3 px-6 py-3 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+            >
+              Try again
+            </button>
             <Link 
               to="/support" 
               className="mep-primary px-6 py-3 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
@@ -191,7 +236,11 @@ const Article = () => {
 
           {/* Article Content */}
           <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 mb-12">
-            {isHTML(content) ? (
+            {!content.trim() ? (
+              <section role="status" aria-live="polite" className="rounded-xl border border-slate-700 bg-slate-900/50 p-5 text-gray-300">
+                This article does not have any content yet.
+              </section>
+            ) : isHTML(content) ? (
               <div 
                 className="prose prose-invert max-w-none"
                 dangerouslySetInnerHTML={{ __html: styleHTMLContent(content) }}
@@ -223,11 +272,11 @@ const Article = () => {
           </div>
 
           {/* Related Articles */}
-          {relatedArticles.length > 0 && (
+          {currentRelatedArticles.length > 0 && (
             <div className="mb-12">
               <h2 className="mep-heading text-2xl font-bold text-white mb-6">Related Articles</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {relatedArticles.map((related) => (
+                {currentRelatedArticles.map((related) => (
                   <Link
                     key={related.slug}
                     to={`/support/${related.slug}`}

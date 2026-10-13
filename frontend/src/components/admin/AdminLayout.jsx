@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import {
@@ -18,11 +18,10 @@ import {
   Award,
 } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
+import { useDialogFocus } from '../../hooks/useDialogFocus.js';
 
 export default function AdminLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuButtonRef = useRef(null);
-  const closeMobileMenuButtonRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -42,7 +41,7 @@ export default function AdminLayout({ children }) {
   ];
 
   const isActive = (path) => {
-    return location.pathname === path;
+    return location.pathname === path || (path === '/admin/dashboard' && location.pathname === '/admin');
   };
 
   const handleLogout = async () => {
@@ -52,41 +51,22 @@ export default function AdminLayout({ children }) {
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
-    mobileMenuButtonRef.current?.focus();
   };
+  const mobileMenuDialogRef = useDialogFocus({ open: isMobileMenuOpen, onClose: closeMobileMenu });
 
   // A route change closes the navigation rather than leaving it over new content.
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  useEffect(() => {
-    if (!isMobileMenuOpen) return undefined;
-
-    // The previous effect could run while the formerly invisible sidebar was
-    // still hidden by the browser. Focus after its visibility has been painted.
-    let paintedFocusFrame;
-    const focusFrame = window.requestAnimationFrame(() => {
-      paintedFocusFrame = window.requestAnimationFrame(() => closeMobileMenuButtonRef.current?.focus());
-    });
-    const handleEscape = (event) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      closeMobileMenu();
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      if (paintedFocusFrame !== undefined) window.cancelAnimationFrame(paintedFocusFrame);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isMobileMenuOpen]);
-
   return (
     <div className="mep-shell flex h-screen text-white overflow-hidden">
       {/* Sidebar */}
       <aside
+        ref={mobileMenuDialogRef}
         id="admin-navigation"
+        role={isMobileMenuOpen ? 'dialog' : undefined}
+        aria-modal={isMobileMenuOpen ? 'true' : undefined}
         aria-label="Administration navigation"
         className={`
           fixed lg:static inset-y-0 left-0 z-40
@@ -110,9 +90,9 @@ export default function AdminLayout({ children }) {
             </div>
           </Link>
           <button
-            ref={closeMobileMenuButtonRef}
             type="button"
             onClick={closeMobileMenu}
+            data-autofocus
             aria-label="Close administration menu"
             aria-controls="admin-navigation"
             className="lg:hidden p-2 rounded-lg hover:bg-slate-700/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
@@ -197,13 +177,12 @@ export default function AdminLayout({ children }) {
         ></div>
       )}
       {/* Main Content */}
-      <main data-route-scroll-container className="min-w-0 flex-1 overflow-y-auto relative">
+      <main data-route-scroll-container className="min-w-0 flex-1 overflow-y-auto relative" aria-hidden={isMobileMenuOpen ? true : undefined} inert={isMobileMenuOpen ? '' : undefined}>
         {/* Top Bar */}
         <div className="mep-chrome sticky top-0 z-20 backdrop-blur-xl border-b px-4 sm:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex items-center gap-2 sm:gap-4">
               <button
-                ref={mobileMenuButtonRef}
                 type="button"
                 onClick={() => setIsMobileMenuOpen(true)}
                 aria-label="Open administration menu"

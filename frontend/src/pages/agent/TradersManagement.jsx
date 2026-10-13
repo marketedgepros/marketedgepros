@@ -27,7 +27,7 @@ export function AffiliateReferralsView({ view, loading, error, onRefresh, onPage
         onRefresh={onRefresh}
         refreshing={loading}
       />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <AffiliateRecordBoundary />
         <section className={`${affiliateRecordPanel} mt-6 p-4 sm:p-5`} aria-labelledby="referral-filter-heading">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -86,7 +86,7 @@ export function AffiliateReferralsView({ view, loading, error, onRefresh, onPage
             <div className="mt-6"><AffiliateRecordPagination pagination={view.pagination} onPage={onPage} /></div>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

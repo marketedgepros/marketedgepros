@@ -10,12 +10,14 @@ const pageFile = new URL('../src/pages/admin/ProgramsManagement.jsx', import.met
 const target = new URL(`../node_modules/.ui4-closure-programs-page-${process.pid}.mjs`, import.meta.url);
 const authStub = new URL(`../node_modules/.ui4-closure-programs-auth-${process.pid}.mjs`, import.meta.url);
 const service = new URL('../src/services/adminClosureProgramsService.js', import.meta.url).href;
+const dialogFocus = new URL('../src/hooks/useDialogFocus.js', import.meta.url).href;
 
 let page;
 try {
   fs.writeFileSync(authStub, 'const state = { user: null, isAuthenticated: false, isLoading: false }; export default function useAuthStore(selector) { return selector(state); }\n');
   const source = fs.readFileSync(pageFile, 'utf8')
     .replace("'../../store/authStore.js'", JSON.stringify(authStub.href))
+    .replace("'../../hooks/useDialogFocus.js'", JSON.stringify(dialogFocus))
     .replace("'../../services/adminClosureProgramsService.js'", JSON.stringify(service));
   const transformed = await transformWithEsbuild(source, pageFile.pathname, { loader: 'jsx', jsx: 'automatic' });
   fs.writeFileSync(target, transformed.code);

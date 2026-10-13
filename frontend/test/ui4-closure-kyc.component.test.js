@@ -18,6 +18,7 @@ try {
     '../../contexts/ToastContext': toastTarget.href,
     '../../store/authStore': src('store/authStore.js'),
     '../../hooks/useAdminClosureKyc.js': src('hooks/useAdminClosureKyc.js'),
+    '../../hooks/useDialogFocus.js': src('hooks/useDialogFocus.js'),
     '../../services/adminClosureKycService.js': src('services/adminClosureKycService.js'),
   })) {
     source = source.replaceAll(`'${from}'`, JSON.stringify(to));

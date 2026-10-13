@@ -20,6 +20,7 @@ import {
   createAdminClosureChallengesService,
   isAdminClosureChallengeRequestCanceled,
 } from '../../services/adminClosureChallengesService';
+import { useDialogFocus } from '../../hooks/useDialogFocus.js';
 
 const challengeService = createAdminClosureChallengesService();
 const LEGACY_STATUSES = ['active', 'passed', 'failed', 'funded', 'pending'];
@@ -290,7 +291,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
             </table>
           </div>
 
-          {!loading && principal && pagination && (
+          {!loading && principal && pagination && (totalPages > 0 ? (
             <div className="flex flex-col gap-3 border-t border-slate-700/50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-gray-400">Server page {pagination.page} of {totalPages}; {pagination.total} recorded rows in this scoped result.</p>
               <div className="flex gap-2">
@@ -298,7 +299,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
                 <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={loading || totalPages === 0 || currentPage >= totalPages} className="mep-primary px-4 py-2 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
               </div>
             </div>
-          )}
+          ) : <p className="border-t border-slate-700/50 px-6 py-4 text-sm text-gray-400" role="status">No server pages are available for this scoped result.</p>)}
         </div>
       </div>
 
@@ -308,6 +309,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
           loading={detailLoading}
           error={detailError}
           onClose={clearDetail}
+          onRetry={() => openDetail(selectedId)}
           selectedId={selectedId}
         />
       )}
@@ -331,17 +333,18 @@ function Mt5Snapshot({ challenge }) {
   return <div className="flex min-w-48 flex-col gap-1 text-sm"><span className="font-mono text-cyan-300">Login: {displayText(account.login)}</span><span className="text-gray-400">{displayText(account.server)} · {displayText(account.group)}</span><span className="text-xs text-gray-500">Recorded MT5 label: {displayText(account.status)}</span><span className="font-mono text-gray-200">Balance: {legacyDecimal(account.balance)}</span><span className="font-mono text-gray-400">Equity: {legacyDecimal(account.equity)} · Margin: {legacyDecimal(account.margin)}</span><span className="text-xs text-amber-200/80">Unverified legacy snapshot; provider authentication false.</span></div>;
 }
 
-function ChallengeDetailPanel({ challenge, loading, error, onClose, selectedId }) {
+function ChallengeDetailPanel({ challenge, loading, error, onClose, onRetry, selectedId }) {
+  const dialogRef = useDialogFocus({ open: true, onClose });
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 p-0 backdrop-blur-sm" role="presentation">
-      <section className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="challenge-detail-title">
+      <section ref={dialogRef} className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="challenge-detail-title">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div><p className="text-sm font-semibold uppercase tracking-wide text-cyan-300">Recorded snapshot</p><h2 id="challenge-detail-title" className="mep-heading mt-1 text-2xl font-bold text-white">Challenge #{selectedId} detail</h2></div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label="Close challenge detail"><X className="h-5 w-5" aria-hidden="true" /></button>
+          <button type="button" onClick={onClose} data-autofocus className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label="Close challenge detail"><X className="h-5 w-5" aria-hidden="true" /></button>
         </div>
         <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100"><strong>Read-only boundary.</strong> This detail does not establish a provider account, a funded result, a payment entitlement, or an evaluative outcome.</div>
         {loading && <p className="rounded-xl border border-slate-700 bg-slate-800/60 p-5 text-gray-300" role="status">Loading the current scoped recorded snapshot…</p>}
-        {error && <p className="rounded-xl border border-red-500/30 bg-red-500/20 p-5 text-red-100" role="alert">{error}</p>}
+        {error && <div className="rounded-xl border border-red-500/30 bg-red-500/20 p-5 text-red-100" role="alert"><p>{error}</p><button type="button" onClick={onRetry} className="mt-4 rounded-lg border border-red-200/40 px-3 py-2 text-sm font-semibold text-red-50 transition-colors hover:bg-red-100/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><RefreshCw className="mr-2 inline h-4 w-4" aria-hidden="true" />Retry detail</button></div>}
         {challenge && (
           <div className="space-y-5">
             <DetailGroup title="Owner and program"><DetailRow label="Recorded user" value={`${displayText(challenge.user.name)} · ${displayText(challenge.user.email)}`} /><DetailRow label="Program" value={displayText(challenge.program.name)} /><DetailRow label="Recorded status" value={displayText(challenge.legacyStatus)} /><DetailRow label="Recorded payment label" value={displayText(challenge.legacyPaymentStatus)} /></DetailGroup>

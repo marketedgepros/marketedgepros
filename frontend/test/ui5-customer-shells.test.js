@@ -16,6 +16,7 @@ const loadingAuthFixture = cache('loading-auth');
 const navigationFixture = cache('navigation');
 const bellFixture = cache('bell');
 const rolesFixture = cache('roles');
+const dialogFocus = new URL('../src/hooks/useDialogFocus.js', import.meta.url).href;
 const traderTarget = cache('trader-layout');
 const affiliateTarget = cache('affiliate-layout');
 const userLayoutTarget = cache('user-layout');
@@ -47,10 +48,12 @@ try {
     ["'../../store/authStore'", traderAuthFixture.href],
     ["'../notifications/NotificationBell'", bellFixture.href],
     ["'../../services/navigationService.js'", navigationFixture.href],
+    ["'../../hooks/useDialogFocus.js'", dialogFocus],
   ])).default;
   AffiliateLayout = (await compile(affiliateFile, affiliateTarget, [
     ["'../../store/authStore'", affiliateAuthFixture.href],
     ["'../notifications/NotificationBell'", bellFixture.href],
+    ["'../../hooks/useDialogFocus.js'", dialogFocus],
   ])).default;
   UserLayout = (await compile(userLayoutFile, userLayoutTarget, [
     ["'../../store/authStore'", loadingAuthFixture.href],
@@ -105,12 +108,12 @@ test('מעטפת המשתמש האמיתית מציגה מצב טעינה חי �
   assert.ok(!html.includes('Hidden while loading'), 'תוכן מוגן אינו נרנדר לפני שיש זהות');
 });
 
-test('מימוש התפריט הפעיל קושר Escape ומעביר focus בין כפתורי הפתיחה והסגירה', () => {
+test('מימוש התפריט הפעיל מאמץ useDialogFocus אמיתי ומבודד את התוכן מאחורי drawer פתוח', () => {
   for (const file of [traderFile, affiliateFile]) {
     const source = fs.readFileSync(file, 'utf8');
-    assert.ok(source.includes("event.key === 'Escape'"), `${file.pathname} מטפל ב־Escape`);
-    assert.ok(source.includes("document.addEventListener('keydown', handleKeyDown)"), `${file.pathname} קושר את מאזין המקלדת רק בעת פתיחה`);
-    assert.ok(source.includes('closeButtonRef.current?.focus()'), `${file.pathname} מעביר focus לסגירה בעת פתיחה`);
-    assert.ok(source.includes('menuButtonRef.current?.focus()'), `${file.pathname} מחזיר focus לכפתור הפתיחה בעת סגירה`);
+    assert.match(source, /useDialogFocus\(\{ open: sidebarOpen, onClose: closeSidebar \}\)/, `${file.pathname} משתמש ב-hook המשותף האמיתי ל־Escape, trap והחזרת focus`);
+    assert.match(source, /role=\{sidebarOpen \? 'dialog' : undefined\}/, `${file.pathname} מסמן drawer פתוח כדיאלוג`);
+    assert.match(source, /data-autofocus/, `${file.pathname} מספק יעד focus התחלתי בטוח`);
+    assert.match(source, /aria-hidden=\{sidebarOpen \? true : undefined\}/, `${file.pathname} מבודד את התוכן שמאחורי drawer פתוח`);
   }
 });

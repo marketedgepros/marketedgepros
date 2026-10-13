@@ -34,11 +34,13 @@ function AffiliateLandingContent() {
   const [program, setProgram] = useState(null);
   const [programState, setProgramState] = useState('loading');
   const [error, setError] = useState('');
+  const [availabilityRequest, setAvailabilityRequest] = useState(0);
   const [success, setSuccess] = useState('');
   const [registeredUrl, setRegisteredUrl] = useState(null);
   const [registering, setRegistering] = useState(false);
   const mountedRef = useRef(false);
   const identityRef = useRef(userIdentity);
+  const availabilityRequestRef = useRef(0);
   const registrationInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -51,18 +53,28 @@ function AffiliateLandingContent() {
     setRegisteredUrl(null);
   }, [userIdentity]);
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const requestId = availabilityRequestRef.current + 1;
+    const requestIdentity = userIdentity;
+    availabilityRequestRef.current = requestId;
+    const canPublishAvailability = () => (
+      mountedRef.current
+      && !controller.signal.aborted
+      && identityRef.current === requestIdentity
+      && availabilityRequestRef.current === requestId
+    );
+
     const fetchProgramInfo = async () => {
       setProgram(null);
       setProgramState('loading');
       setError('');
       try {
         const nextProgram = await loadAffiliateProgram();
-        if (cancelled || !mountedRef.current) return;
+        if (!canPublishAvailability()) return;
         setProgram(nextProgram);
         setProgramState(nextProgram.isActive ? 'ready' : 'inactive');
       } catch (requestError) {
-        if (cancelled || !mountedRef.current) return;
+        if (!canPublishAvailability()) return;
         setProgram(null);
         if (isAffiliateProgramInactiveError(requestError)) setProgramState('inactive');
         else {
@@ -72,8 +84,13 @@ function AffiliateLandingContent() {
       }
     };
     fetchProgramInfo();
-    return () => { cancelled = true; };
-  }, []);
+    return () => { controller.abort(); };
+  }, [availabilityRequest, userIdentity]);
+
+  const retryAvailability = () => {
+    if (programState !== 'error') return;
+    setAvailabilityRequest((request) => request + 1);
+  };
 
   const canRegister = programState === 'ready' && program?.isActive === true
     && !authLoading && !registering && (!success || user?.role === 'affiliate');
@@ -140,7 +157,13 @@ function AffiliateLandingContent() {
                 <Link to="/support/create-ticket" className="mt-3 block underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-cyan-300">Contact support about affiliate access</Link>
               </div>
             )}
-            {statusMessage && <p role="status" className="mt-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4 text-slate-300">{statusMessage}</p>}
+            {statusMessage && <p id="affiliate-availability-status" role="status" className="mt-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4 text-slate-300">{statusMessage}</p>}
+            {programState === 'error' && (
+              <button type="button" onClick={retryAvailability} aria-describedby="affiliate-availability-status"
+                className="mt-4 rounded-md border border-cyan-400/40 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/10 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950">
+                Retry availability check
+              </button>
+            )}
             <button type="button" onClick={handleRegister} disabled={!canRegister}
               className="mep-primary mt-8 px-6 py-3 font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
               {registrationLabel}

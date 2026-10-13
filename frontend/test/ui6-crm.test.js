@@ -111,12 +111,14 @@ const crmPage = await compilePage('src/pages/admin/CRM.jsx', 'CRM.mjs', [
   ['../../components/admin/AdminLayout', layoutStub],
   ['../../contexts/ToastContext', toastStub],
   ['../../hooks/useAdminClosureCrmIdentityGuard', identityStub],
+  ['../../hooks/useDialogFocus', pathToFileURL(path.join(repoFrontend, 'src/hooks/useDialogFocus.js')).href],
   ['../../store/authStore', authStub],
   ['../../services/adminClosureCrmService', crmStub],
 ]);
 const detailsPage = await compilePage('src/pages/admin/LeadDetails.jsx', 'LeadDetails.mjs', [
   ['../../contexts/ToastContext', toastStub],
   ['../../hooks/useAdminClosureCrmIdentityGuard', identityStub],
+  ['../../hooks/useDialogFocus', pathToFileURL(path.join(repoFrontend, 'src/hooks/useDialogFocus.js')).href],
   ['../../store/authStore', authStub],
   ['../../services/adminClosureCrmService', crmStub],
 ]);
@@ -395,6 +397,8 @@ test('UI6 CRM list DOM interactions keep the active owner bound and show only ac
     await waitFor(() => calls.filter(({ operation, request }) => operation === 'loadLeads' && request.page === 1).length >= 2, 'previous-page request');
 
     await setControlValue(harness.container.querySelector('input[placeholder="Search name, email, phone"]'), 'no result');
+    assert.doesNotMatch(harness.container.textContent, /No matching leads/, 'typing changes only the explicit-search draft');
+    await click(buttonByText(harness.container, 'Apply search'));
     await waitFor(() => /No matching leads/.test(harness.container.textContent), 'verified empty list state');
     await click(buttonByText(harness.container, 'Clear filters'));
     await waitFor(() => harness.container.textContent.includes('Ada Lead'), 'cleared filter result');

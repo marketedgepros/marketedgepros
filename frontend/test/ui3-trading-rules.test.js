@@ -10,7 +10,7 @@ test('trading rules page points visitors to program-specific settings without in
   assert.match(visibleCopy, /Program-specific settings are displayed in the catalog and on each program details page/);
   assert.match(visibleCopy, /not a blanket set of live trading rules/);
   assert.match(visibleCopy, /No general live trading rules are published here as approved policy/);
-  assert.match(visibleCopy, /href="\/programs"/);
+  assert.match(visibleCopy, /<Link to="\/programs"/);
 });
 
 test('trading rules page does not state unapproved thresholds, strategies, penalties, or capabilities', () => {
@@ -22,8 +22,11 @@ test('trading rules page does not state unapproved thresholds, strategies, penal
   assert.doesNotMatch(source, /mailto:/i);
 });
 
-test('page keeps accessible semantic hierarchy and keyboard-visible CTA focus styling', () => {
-  assert.match(source, /<main\b/);
+test('page keeps one shell main landmark, semantic hierarchy and keyboard-visible CTA focus styling', async () => {
+  const layout = await readFile(new URL('../src/components/layout/Layout.jsx', import.meta.url), 'utf8');
+  assert.match(source, /<Layout>/);
+  assert.match(layout, /<main\b/);
+  assert.doesNotMatch(source, /<main\b/);
   assert.match(source, /<h1\b/);
   assert.match(source, /aria-labelledby="program-settings-heading"/);
   assert.match(source, /focus-visible:outline/);

@@ -70,6 +70,7 @@ let pageCode = fs.readFileSync(src('pages', 'admin', 'KYCApprovalConnected.jsx')
 pageCode = replaceSpec(pageCode, '../../contexts/ToastContext', toastStub);
 pageCode = replaceSpec(pageCode, '../../store/authStore', authStub);
 pageCode = replaceSpec(pageCode, '../../hooks/useAdminClosureKyc.js', pathToFileURL(src('hooks', 'useAdminClosureKyc.js')).href);
+pageCode = replaceSpec(pageCode, '../../hooks/useDialogFocus.js', pathToFileURL(src('hooks', 'useDialogFocus.js')).href);
 pageCode = replaceSpec(pageCode, '../../services/adminClosureKycService.js', pathToFileURL(src('services', 'adminClosureKycService.js')).href);
 const page = await compile('KYCApprovalConnected.mjs', pageCode);
 

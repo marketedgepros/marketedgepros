@@ -100,12 +100,18 @@ const getStatusColor = (status) => {
     case 'pending':
       return 'border-amber-400/30 bg-amber-400/10 text-amber-100';
     case 'rejected':
-      return 'border-rose-900 bg-rose-950/40 text-rose-900';
+      return 'border-rose-400/50 bg-rose-950/60 text-rose-100';
     case 'not_uploaded':
       return 'border-slate-700 bg-slate-800 text-slate-200';
     default:
       return 'border-slate-700 bg-slate-800 text-slate-200';
   }
+};
+
+const formatRecordedUploadDate = (uploadedAt) => {
+  if (uploadedAt === null || typeof uploadedAt !== 'string' || !uploadedAt.trim()) return null;
+  const recordedAt = new Date(uploadedAt);
+  return Number.isNaN(recordedAt.getTime()) ? 'Unavailable' : recordedAt.toLocaleDateString();
 };
 
 const formatRecordedStatus = (status) => {
@@ -132,11 +138,13 @@ function DocumentsContent({ copy, principal }) {
   const [isLoading, setIsLoading] = useState(principal.ready);
   const [activeAction, setActiveAction] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [refreshError, setRefreshError] = useState(null);
   const [actionErrors, setActionErrors] = useState({});
   const operationGateRef = useRef(new KycOperationGate());
   const mountedRef = useRef(false);
   const activeControllersRef = useRef(new Set());
   const latestLoadRef = useRef(0);
+  const hasSuccessfulLoadRef = useRef(false);
 
   const beginRequest = useCallback(() => {
     const controller = new AbortController();
@@ -156,7 +164,10 @@ function DocumentsContent({ copy, principal }) {
     latestLoadRef.current = requestId;
 
     if (showLoading && mountedRef.current) setIsLoading(true);
-    if (mountedRef.current) setLoadError(null);
+    if (mountedRef.current) {
+      setLoadError(null);
+      setRefreshError(null);
+    }
 
     try {
       const response = await kycViewService.getDocuments({ signal: controller.signal });
@@ -168,6 +179,7 @@ function DocumentsContent({ copy, principal }) {
       setDocuments(data.documents);
       setStatistics(data.statistics);
       setOverallStatus(data.overallStatus);
+      hasSuccessfulLoadRef.current = true;
       return true;
     } catch (requestError) {
       if (!mountedRef.current || isRequestCancelled(requestError, controller.signal)
@@ -175,11 +187,13 @@ function DocumentsContent({ copy, principal }) {
         return false;
       }
 
-      // Do not retain stale status data or turn missing values into zero.
-      setDocuments(null);
-      setStatistics(null);
-      setOverallStatus(null);
-      setLoadError(getErrorMessage(requestError, 'Failed to load recorded document status. Please try again.'));
+      const message = getErrorMessage(requestError, 'Failed to load recorded document status. Please try again.');
+      if (hasSuccessfulLoadRef.current) {
+        // Keep the last confirmed record visible, but make its freshness explicit.
+        setRefreshError(message);
+      } else {
+        setLoadError(message);
+      }
       return false;
     } finally {
       finishRequest(controller);
@@ -198,6 +212,7 @@ function DocumentsContent({ copy, principal }) {
       setStatistics(null);
       setOverallStatus(null);
       setLoadError(principal.unavailableMessage);
+      setRefreshError(null);
       setIsLoading(false);
     }
 
@@ -249,7 +264,7 @@ function DocumentsContent({ copy, principal }) {
 
       const refreshed = await loadDocuments();
       if (mountedRef.current && !controller.signal.aborted && !refreshed) {
-        setLoadError('The document was submitted, but its recorded status could not be refreshed. Retry the status check; do not resubmit it yet.');
+        setRefreshError('The document was submitted, but its recorded status could not be refreshed. Retry the status check; do not resubmit it yet.');
       }
     } catch (requestError) {
       if (mountedRef.current && !isRequestCancelled(requestError, controller.signal)) {
@@ -337,10 +352,29 @@ function DocumentsContent({ copy, principal }) {
   }
 
   const recordedOverallStatus = overallStatus === 'not_submitted' ? 'Not submitted' : formatRecordedStatus(overallStatus);
+  const hasNoRecordedDocuments = documents.length === 0;
 
   return (
     <main>
       <Header {...copy} />
+      {refreshError && (
+        <section className="mb-5 rounded-2xl border border-amber-400/50 bg-amber-950/50 p-5 text-amber-50" role="alert" aria-labelledby="stale-document-status-heading">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <div>
+              <h2 id="stale-document-status-heading" className="mep-heading font-semibold">The displayed document status may be out of date</h2>
+              <p className="mt-1 text-sm">{refreshError}</p>
+              <button
+                type="button"
+                onClick={() => { void loadDocuments({ showLoading: true }); }}
+                className="mt-4 rounded-lg border border-amber-300/70 bg-slate-900 px-4 py-2 text-sm font-semibold text-amber-50 transition-colors hover:bg-amber-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 motion-reduce:transition-none"
+              >
+                Retry status check
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
       <button type="button" disabled={Boolean(activeAction)} onClick={() => { void loadDocuments({ showLoading: true }); }} className="mb-5 rounded-lg border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50">Refresh status</button>
 
       <section className="mep-panel mb-7 overflow-hidden rounded-2xl border shadow-sm" aria-labelledby="recorded-status-heading">
@@ -378,10 +412,17 @@ function DocumentsContent({ copy, principal }) {
         </dl>
       </section>
 
+      {hasNoRecordedDocuments ? (
+        <section className="mep-panel rounded-2xl border p-5 text-slate-200" role="status" aria-labelledby="no-recorded-documents-heading">
+          <h2 id="no-recorded-documents-heading" className="mep-heading font-semibold text-white">No recorded documents yet</h2>
+          <p className="mt-1 text-sm">The account service returned an empty document record. Reload the status before submitting or downloading a document.</p>
+        </section>
+      ) : (
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {documentTypes.map((documentType) => {
           const documentInfo = getDocumentInfo(documentType.type);
           const recordedStatus = documentInfo?.status ?? null;
+          const recordedUploadDate = formatRecordedUploadDate(documentInfo?.uploaded_at);
           const knownStatus = isKnownKycDocumentStatus(recordedStatus);
           const canUpload = Boolean(documentInfo)
             && (recordedStatus === 'not_uploaded' || recordedStatus === 'rejected');
@@ -432,7 +473,7 @@ function DocumentsContent({ copy, principal }) {
 
                   {knownStatus && recordedStatus !== 'not_uploaded' && (
                     <div className="mt-3 text-sm text-slate-300">
-                      {documentInfo.uploaded_at && <p>Recorded upload date: {new Date(documentInfo.uploaded_at).toLocaleDateString()}</p>}
+                      {recordedUploadDate && <p>Recorded upload date: {recordedUploadDate}</p>}
                       {documentInfo.notes && (
                         <p className={`mt-3 rounded-lg border p-3 ${recordedStatus === 'rejected'
                           ? 'border-rose-900 bg-rose-950/40 text-rose-100   '
@@ -486,6 +527,7 @@ function DocumentsContent({ copy, principal }) {
           );
         })}
       </div>
+      )}
     </main>
   );
 }

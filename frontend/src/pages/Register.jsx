@@ -4,6 +4,14 @@ import Layout from '../components/layout/Layout';
 import useAuthStore from '../store/authStore';
 import { UserPlus, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
 
+const meetsPasswordPolicy = (password) => (
+  typeof password === 'string'
+  && password.length >= 8
+  && /[A-Z]/.test(password)
+  && /[a-z]/.test(password)
+  && /\d/.test(password)
+);
+
 export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -39,6 +47,11 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!meetsPasswordPolicy(formData.password)) {
+      setValidationError('Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.');
+      return;
+    }
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
@@ -180,11 +193,12 @@ export default function Register() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
+                    aria-describedby="password-requirements"
                     className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500"
                     required
                   />
                 </div>
-                <p className="mt-2 text-xs text-slate-400">Use at least 8 characters with uppercase, lowercase and a number. A special character is recommended, not required.</p>
+                <p id="password-requirements" className="mt-2 text-xs text-slate-400">Use at least 8 characters with uppercase, lowercase and a number. A special character is recommended, not required.</p>
               </div>
 
               <div>

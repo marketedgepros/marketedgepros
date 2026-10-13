@@ -1,8 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw, Save, ShieldAlert } from "lucide-react";
 import useAuthStore from "../../store/authStore.js";
 import {
   adminClosureSettingsError,
+  isAdminClosureSettingsContactEmail,
   loadAdminClosureSettings,
   saveAdminClosureSettings,
 } from "../../services/adminClosureSettingsService.js";
@@ -18,8 +19,16 @@ const messageFor = (error, fallback) => (
 export function AdminClosureSettingsContent({ read }) {
   const tenant = read.draft;
   const disabled = read.loading || read.saving || !read.value;
+  const contactEmailRef = useRef(null);
+  const [contactEmailError, setContactEmailError] = useState(null);
   const save = async (event) => {
     event.preventDefault();
+    if (!isAdminClosureSettingsContactEmail(tenant.contact_email)) {
+      setContactEmailError("Enter a valid contact email address or leave this optional field blank.");
+      contactEmailRef.current?.focus();
+      return;
+    }
+    setContactEmailError(null);
     await read.saveDraft();
   };
 
@@ -107,10 +116,22 @@ export function AdminClosureSettingsContent({ read }) {
                   autoComplete="email"
                   maxLength={255}
                   disabled={disabled}
+                  ref={contactEmailRef}
                   value={tenant.contact_email ?? ""}
-                  onChange={(event) => read.editDraft((draft) => ({ ...draft, contact_email: event.target.value || null }))}
+                  aria-invalid={contactEmailError ? "true" : undefined}
+                  aria-describedby={contactEmailError ? "admin-closure-contact-email-error" : undefined}
+                  onChange={(event) => {
+                    const contactEmail = event.target.value === "" ? null : event.target.value;
+                    read.editDraft((draft) => ({ ...draft, contact_email: contactEmail }));
+                    if (isAdminClosureSettingsContactEmail(contactEmail)) setContactEmailError(null);
+                  }}
                   className={inputClass}
                 />
+                {contactEmailError && (
+                  <p id="admin-closure-contact-email-error" role="alert" className="mt-2 text-sm leading-6 text-rose-200">
+                    {contactEmailError}
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="admin-closure-contact-phone" className="text-sm font-medium text-slate-100">Contact phone <span className="text-slate-400">(optional)</span></label>

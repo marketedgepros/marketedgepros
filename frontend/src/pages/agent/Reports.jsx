@@ -36,7 +36,7 @@ export function AffiliateReportsView({ dashboard, loading, error, onRefresh }) {
         onRefresh={onRefresh}
         refreshing={loading}
       />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <AffiliateRecordBoundary />
         <div className="mt-6"><AffiliateRecordReadState loading={loading} error={error ? affiliateViewError(error) : null} onRetry={onRefresh} /></div>
 
@@ -100,7 +100,7 @@ export function AffiliateReportsView({ dashboard, loading, error, onRefresh }) {
             </section>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

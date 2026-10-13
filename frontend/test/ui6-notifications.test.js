@@ -73,6 +73,7 @@ const authUrl = sourceUrl('store', 'authStore.js');
 const notificationStoreUrl = sourceUrl('stores', 'notificationStore.js');
 const notificationViewUrl = sourceUrl('services', 'notificationViewService.js');
 const dateUtilsUrl = sourceUrl('utils', 'dateUtils.js');
+const tabNavigationUrl = sourceUrl('hooks', 'useTabNavigation.js');
 
 const dropdownModule = await compileSource('NotificationDropdown', ['components', 'notifications', 'NotificationDropdown.jsx'], [
   ["'../../store/authStore'", JSON.stringify(authUrl)],
@@ -92,6 +93,7 @@ const notificationsModule = await compileSource('Notifications', ['pages', 'Noti
   ["'../stores/notificationStore'", JSON.stringify(notificationStoreUrl)],
   ["'../services/notificationViewService'", JSON.stringify(notificationViewUrl)],
   ["'../utils/dateUtils'", JSON.stringify(dateUtilsUrl)],
+  ["'../hooks/useTabNavigation'", JSON.stringify(tabNavigationUrl)],
 ]);
 const settingsModule = await compileSource('NotificationSettings', ['pages', 'settings', 'NotificationSettings.jsx'], [
   ["'../../store/authStore'", JSON.stringify(authUrl)],

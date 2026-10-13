@@ -62,6 +62,7 @@ bootstrap.window.close();
 
 const programPageSource = fs.readFileSync(sourcePath('pages', 'admin', 'ProgramsManagement.jsx'), 'utf8')
   .replace("'../../store/authStore.js'", JSON.stringify(pathToFileURL(sourcePath('store', 'authStore.js')).href))
+  .replace("'../../hooks/useDialogFocus.js'", JSON.stringify(pathToFileURL(sourcePath('hooks', 'useDialogFocus.js')).href))
   .replace("'../../services/adminClosureProgramsService.js'", JSON.stringify(pathToFileURL(sourcePath('services', 'adminClosureProgramsService.js')).href));
 const ProgramsManagement = (await compile('ProgramsManagement.mjs', programPageSource)).default;
 
@@ -267,6 +268,9 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
   const originalAdapter = api.defaults.adapter;
   const requests = [];
   const reads = ['failure', 'list', 'empty', 'list', 'page2', 'list'];
+  let pageOneRecords = [rawProgram()];
+  const pageTwoRecords = [rawProgram({ id: 39, name: 'Second page program' })];
+  let catalogTotal = 21;
   let releaseInitialRead;
   const initialRead = new Promise((resolve) => { releaseInitialRead = resolve; });
   let createAttempt = 0;
@@ -285,12 +289,12 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
         throw new Error('Synthetic initial catalog failure');
       }
       if (mode === 'empty') return axiosResponse(config, listPayload(1, [], 0));
-      if (mode === 'page2') {
+      if (mode === 'page2' || config.params.page === '2') {
         assert.deepEqual(config.params, { page: '2', per_page: '20' });
-        return axiosResponse(config, listPayload(2, [rawProgram({ id: 39, name: 'Second page program' })]));
+        return axiosResponse(config, listPayload(2, pageTwoRecords, catalogTotal));
       }
       assert.deepEqual(config.params, { page: '1', per_page: '20' });
-      return axiosResponse(config, listPayload(1, [rawProgram()]));
+      return axiosResponse(config, listPayload(1, pageOneRecords, catalogTotal));
     }
     const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
     if (method === 'post' && config.url === '/admin/programs') {
@@ -301,14 +305,22 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
         price: '199.99', profit_split: null, profit_split_percentage: null,
         minimum_payout_amount: null, payout_mode: null, rules: {}, is_active: true,
       });
+      const created = rawProgram({ id: 20, name: 'Created Program', type: 'stored_type', account_size: '25000.00', max_daily_loss: null, price: '199.99', rules: {} });
+      if (createAttempt === 2) {
+        pageOneRecords = [created, ...pageOneRecords];
+        catalogTotal += 1;
+      }
       return axiosResponse(config, {
         owner_context: createAttempt === 1 ? { ...owner, user_id: 99 } : owner,
-        program: rawProgram({ id: 20, name: 'Created Program', type: 'stored_type', account_size: '25000.00', max_daily_loss: null, price: '199.99', rules: {} }),
+        program: created,
       });
     }
     if (method === 'put' && config.url === '/admin/programs/19') {
       updateAttempt += 1;
       assert.equal(body.name, 'Recorded Updated');
+      if (updateAttempt === 2) pageOneRecords = pageOneRecords.map((program) => (
+        program.id === 19 ? { ...program, name: 'Recorded Updated' } : program
+      ));
       return axiosResponse(config, {
         owner_context: owner,
         program: rawProgram({ id: updateAttempt === 1 ? 99 : 19, name: 'Recorded Updated' }),
@@ -317,6 +329,10 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
     if (method === 'delete' && config.url === '/admin/programs/19') {
       deleteAttempt += 1;
       assert.equal(body, undefined);
+      if (deleteAttempt === 2) {
+        pageOneRecords = pageOneRecords.filter((program) => program.id !== 19);
+        catalogTotal -= 1;
+      }
       return axiosResponse(config, { owner_context: owner, deleted_program_id: deleteAttempt === 1 ? 99 : 19 });
     }
     throw new Error(`Unexpected synthetic transport request: ${method} ${config.url}`);
@@ -367,7 +383,8 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
     assert.equal(harness.host.querySelectorAll('tbody tr').length, 1, 'rejected create does not mutate the program table');
     await submit(createForm);
     await waitFor(() => !dialog(harness.host) && bodyText(harness.host).includes('Created the server-confirmed program record.'), 'owner-acknowledged create');
-    assert.equal(harness.host.querySelectorAll('tbody tr').length, 2, 'created row appears only after the valid acknowledgement');
+    await waitFor(() => harness.host.querySelectorAll('tbody tr').length === 2, 'canonical created range');
+    assert.deepEqual([...harness.host.querySelectorAll('tbody tr td:nth-child(2) p:first-child')].map((node) => node.textContent), ['Created Program', 'Recorded Evaluation'], 'create refetches the current canonical server range instead of inserting a local row');
 
     await click(harness.host.querySelector('[aria-label="Edit Recorded Evaluation"]'));
     await waitFor(() => dialog(harness.host) && bodyText(dialog(harness.host)).includes('Edit persisted program'), 'edit dialog');
@@ -380,6 +397,7 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
     await submit(editForm);
     await waitFor(() => !dialog(harness.host) && bodyText(harness.host).includes('Saved the server-confirmed program record.'), 'matching update acknowledgement');
     assert.ok(bodyText(harness.host).includes('Recorded Updated'), 'mutated display comes from matching server acknowledgement');
+    assert.deepEqual([...harness.host.querySelectorAll('tbody tr td:nth-child(2) p:first-child')].map((node) => node.textContent), ['Created Program', 'Recorded Updated']);
 
     await click(harness.host.querySelector('[aria-label="Delete Recorded Updated"]'));
     await waitFor(() => dialog(harness.host)?.getAttribute('role') === 'alertdialog', 'delete dialog');
@@ -392,10 +410,11 @@ test('UI6 programs management DOM binds retry, dialogs, pagination and server-co
     assert.ok(bodyText(harness.host).includes('Recorded Updated'), 'rejected deletion leaves acknowledged row visible');
     await click(exactButton(dialog(harness.host), 'Confirm server deletion'));
     await waitFor(() => !dialog(harness.host) && bodyText(harness.host).includes('Deleted the server-confirmed program record.'), 'matching delete acknowledgement');
-    assert.equal(bodyText(harness.host).includes('Recorded Updated'), false, 'row disappears only after matching delete acknowledgement');
+    await waitFor(() => bodyText(harness.host).includes('21 scoped records'), 'canonical delete range');
+    assert.deepEqual([...harness.host.querySelectorAll('tbody tr td:nth-child(2) p:first-child')].map((node) => node.textContent), ['Created Program'], 'delete refetches the canonical server range and removes only the confirmed record');
 
     const readPages = requests.filter((request) => request.method === 'get').map((request) => request.params.page);
-    assert.deepEqual(readPages, ['1', '1', '1', '1', '2', '1'], 'retry, refresh and both pagination controls bind canonical page values');
+    assert.deepEqual(readPages, ['1', '1', '1', '1', '2', '1', '1', '1'], 'retry, refresh, pagination, create refetch, and delete refetch bind canonical page values');
     assert.equal(createAttempt, 2);
     assert.equal(updateAttempt, 2);
     assert.equal(deleteAttempt, 2);

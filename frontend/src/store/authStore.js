@@ -5,6 +5,18 @@ const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
 const TWO_FACTOR_CHALLENGE_TIMEOUT = 5 * 60 * 1000;
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 const INVALID_AUTH_RESPONSE = 'Authentication response was invalid. Please sign in again.';
+const STALE_AUTH_RESULT = Object.freeze({ stale: true });
+
+// Auth requests can finish after the visitor has cancelled, logged out, or started over.
+// Only the most recently begun auth operation is allowed to change session state or errors.
+let authOperationGeneration = 0;
+
+const beginAuthOperation = () => {
+  authOperationGeneration += 1;
+  return authOperationGeneration;
+};
+
+const isCurrentAuthOperation = (generation) => generation === authOperationGeneration;
 
 export const isJsonObject = (value) => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -117,6 +129,7 @@ const useAuthStore = create((set, get) => ({
   },
 
   cancel2FA: () => {
+    beginAuthOperation();
     get().clear2FAPending();
     set({ error: null });
   },
@@ -173,6 +186,7 @@ const useAuthStore = create((set, get) => ({
 
   // A cached user profile is only a hint to make a request; it is never trusted as authentication.
   init: async () => {
+    const generation = beginAuthOperation();
     set({ isLoading: true });
     const hasSessionHint = Boolean(
       localStorage.getItem('user')
@@ -181,12 +195,14 @@ const useAuthStore = create((set, get) => ({
     );
 
     if (!hasSessionHint) {
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       set({ user: null, isAuthenticated: false, isLoading: false });
       return;
     }
 
     try {
       const response = await authAPI.getCurrentUser();
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       const data = response?.data;
       if (!isJsonObject(data) || !isJsonObject(data.user)) {
         throw new Error(INVALID_AUTH_RESPONSE);
@@ -208,6 +224,7 @@ const useAuthStore = create((set, get) => ({
       get().updateActivity();
       addActivityListeners(get().updateActivity);
     } catch (error) {
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       // Do not revive a session from localStorage when validation with the server fails.
       const state = get();
       if (state.inactivityTimer) {
@@ -224,11 +241,13 @@ const useAuthStore = create((set, get) => ({
   },
 
   login: async (email, password) => {
+    const generation = beginAuthOperation();
     get().clear2FAPending();
-    set({ error: null });
+    set({ error: null, isLoading: false });
 
     try {
       const response = await authAPI.login({ email, password });
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       const data = response?.data;
       if (!isJsonObject(data)) {
         throw new Error(INVALID_AUTH_RESPONSE);
@@ -257,6 +276,7 @@ const useAuthStore = create((set, get) => ({
       get().activateAuthenticatedSession(data);
       return { success: true, user: data.user };
     } catch (error) {
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       get().clear2FAPending();
       const errorMessage = error.message === INVALID_AUTH_RESPONSE
         ? INVALID_AUTH_RESPONSE
@@ -269,6 +289,7 @@ const useAuthStore = create((set, get) => ({
   // Preserve the existing login2FA(userId, token) caller contract. The password-proof
   // challenge_token is supplied only from transient state and never from localStorage.
   login2FA: async (userId, token) => {
+    const generation = beginAuthOperation();
     const pending2FA = get().pending2FA;
     if (!pending2FA || pending2FA.userId !== userId || !isNonEmptyString(pending2FA.challengeToken)) {
       const errorMessage = 'Your two-factor sign-in request has expired. Please sign in again.';
@@ -285,9 +306,11 @@ const useAuthStore = create((set, get) => ({
         challenge_token: pending2FA.challengeToken,
       });
       const data = response?.data;
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       get().activateAuthenticatedSession(data);
       return { success: true, user: data.user };
     } catch (error) {
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       get().clear2FAPending();
       const errorMessage = error.message === INVALID_AUTH_RESPONSE
         ? INVALID_AUTH_RESPONSE
@@ -310,15 +333,19 @@ const useAuthStore = create((set, get) => ({
   },
 
   logout: async () => {
+    const generation = beginAuthOperation();
     try {
       await authAPI.logout();
     } catch (error) {
       // Local credentials are still cleared if the server is unavailable.
-      console.warn('[Auth] Logout request failed:', error.message);
+      if (isCurrentAuthOperation(generation)) {
+        console.warn('[Auth] Logout request failed:', error.message);
+      }
     } finally {
+      if (!isCurrentAuthOperation(generation)) return STALE_AUTH_RESULT;
       get().clear2FAPending();
       get().clearAuthenticatedSession();
-      set({ error: null });
+      set({ error: null, isLoading: false });
     }
   },
 

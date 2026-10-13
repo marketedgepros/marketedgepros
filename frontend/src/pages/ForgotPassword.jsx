@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Mail, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
@@ -12,6 +12,16 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const isMountedRef = useRef(false);
+  const redirectTimerRef = useRef(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,16 +30,19 @@ export default function ForgotPassword() {
 
     try {
       await api.post('/auth/password/reset-request', { email });
+      if (!isMountedRef.current) return;
       setSuccess(true);
       
       // Navigate to reset password page after 2 seconds
-      setTimeout(() => {
+      redirectTimerRef.current = setTimeout(() => {
+        if (!isMountedRef.current) return;
         navigate('/reset-password', { state: { email } });
       }, 2000);
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(err.response?.data?.error || 'Failed to send reset code. Please try again.');
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
     }
   };
 
