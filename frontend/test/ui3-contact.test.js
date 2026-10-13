@@ -26,7 +26,7 @@ test('contact page retains semantic landmarks, visible focus treatment and restr
   assert.match(source, /aria-labelledby="contact-title"/);
   assert.match(source, /aria-labelledby="options-title"/);
   assert.match(source, /focus-visible:ring-2 focus-visible:ring-cyan-300/);
-  assert.match(source, /bg-slate-950/);
+  assert.match(source, /mep-screen/);
   assert.match(source, /text-cyan-300/);
   assert.match(source, /motion-reduce:transition-none/);
 });

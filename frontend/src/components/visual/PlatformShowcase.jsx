@@ -16,7 +16,7 @@ export default function PlatformShowcase() {
     <section className="platform-showcase relative border-y border-white/5 bg-[#091322] py-20" aria-labelledby={`${id}-heading`}>
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
-          <div><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Inside MarketEdgePros</p><h2 id={`${id}-heading`} className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">A clearer view.<br /><span className="text-slate-400">A more connected workspace.</span></h2></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Inside MarketEdgePros</p><h2 id={`${id}-heading`} className="mep-heading mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">A clearer view.<br /><span className="text-slate-400">A more connected workspace.</span></h2></div>
           <p className="max-w-sm text-sm leading-6 text-slate-400">Explore the workspace below. Account screens require sign-in; this illustration contains no customer data.</p>
         </div>
         <div className="mb-8 flex flex-wrap gap-3" role="group" aria-label="Choose a workspace view">
@@ -30,11 +30,11 @@ export default function PlatformShowcase() {
             <Link to={view.link} className="mt-7 inline-flex min-h-12 items-center gap-3 rounded-xl border border-cyan-300/40 px-5 py-3 font-semibold text-cyan-200 hover:border-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">{view.action}<ArrowUpRight size={18} aria-hidden="true" /></Link>
             <p className="mt-4 text-xs text-slate-500">Live trading, payments and payouts are not enabled.</p>
           </div>
-          <div className="premium-workspace-frame min-w-0 overflow-hidden rounded-2xl border border-cyan-200/20 bg-slate-950 shadow-2xl shadow-cyan-950/30" aria-label="Illustrative workspace preview">
+          <div className="mep-panel premium-workspace-frame min-w-0 overflow-hidden rounded-2xl border shadow-2xl shadow-cyan-950/30" aria-label="Illustrative workspace preview">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4"><span className="flex items-center gap-2 text-xs font-semibold text-slate-300"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-cyan-300" />MarketEdgePros</span><span className="rounded-full border border-slate-600 px-3 py-1 text-[11px] text-slate-300">Illustrative preview · not live data</span></div>
             <div key={`workspace-${view.id}`} className="premium-switch-in p-5 sm:p-8">
               <div className="mb-7 flex items-start justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.18em] text-cyan-300">{view.label}</p><p className="mt-2 text-xl font-semibold">{view.accent}</p></div><view.Icon className="shrink-0 text-cyan-300" size={24} aria-hidden="true" /></div>
-              <div className="space-y-3">{view.items.map(([title, description]) => <div key={title} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-700/70 bg-slate-900/70 p-4"><span className="text-sm font-medium">{title}</span><span className="text-xs text-slate-400">{description}</span></div>)}</div>
+              <div className="space-y-3">{view.items.map(([title, description]) => <div key={title} className="mep-panel flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4"><span className="text-sm font-medium">{title}</span><span className="text-xs text-slate-400">{description}</span></div>)}</div>
               <div aria-hidden="true" className="premium-workspace-lines mt-7 flex h-14 items-end gap-2 overflow-hidden rounded-lg border border-cyan-400/10 bg-cyan-400/[0.03] p-3">{[32, 48, 36, 72, 55, 83, 65, 92, 78, 100, 88, 96].map((height, index) => <span key={index} style={{ height: `${height}%` }} className="w-full rounded-sm bg-cyan-300/15" />)}</div>
               <p className="mt-3 text-[11px] text-slate-500">Decorative layout only. No balance, performance or market feed.</p>
             </div>

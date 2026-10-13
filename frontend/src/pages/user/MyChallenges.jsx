@@ -152,7 +152,7 @@ export function MyChallengesContent({ principal }) {
   if (!principal.ready) {
     return (
       <section className="rounded-xl border border-amber-400/35 bg-amber-950/20 p-5 text-amber-50" role="status" aria-live="polite">
-        <h1 className="text-xl font-semibold">Recorded challenges unavailable</h1>
+        <h1 className="mep-heading text-xl font-semibold">Recorded challenges unavailable</h1>
         <p className="mt-2 max-w-2xl break-words text-sm text-amber-100">{principal.unavailableMessage}</p>
       </section>
     );
@@ -162,7 +162,7 @@ export function MyChallengesContent({ principal }) {
     <div className="mx-auto min-w-0 max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">My Challenges</h1>
+          <h1 className="mep-heading text-3xl font-bold text-white">My Challenges</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-300">
             Stored challenge records are shown for reference only. Status, payment, balance, and phase values are
             unverified legacy data and are not proof of payment, funding, rule approval, or live trading activity.
@@ -178,7 +178,7 @@ export function MyChallengesContent({ principal }) {
       </div>
 
       {isLoading && challenges === null && (
-        <div className="flex min-h-[18rem] items-center justify-center rounded-xl border border-white/10 bg-slate-800/50" role="status" aria-live="polite">
+        <div className="mep-panel flex min-h-[18rem] items-center justify-center rounded-xl border" role="status" aria-live="polite">
           <div className="text-center text-slate-300">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-400" />
             <p className="mt-3">Loading recorded challenges…</p>
@@ -191,7 +191,7 @@ export function MyChallengesContent({ principal }) {
           <div className="flex gap-3">
             <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <h2 className="font-semibold">Challenges could not be loaded</h2>
+              <h2 className="mep-heading font-semibold">Challenges could not be loaded</h2>
               <p className="mt-1 break-words text-sm text-red-200">{error}</p>
               <button
                 type="button"
@@ -207,8 +207,8 @@ export function MyChallengesContent({ principal }) {
       )}
 
       {!isLoading && !error && challenges?.length === 0 && (
-        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-12 text-center">
-          <h2 className="text-xl font-semibold text-white">
+        <div className="mep-panel rounded-xl border p-12 text-center">
+          <h2 className="mep-heading text-xl font-semibold text-white">
             {pagination.total > 0 ? 'No records on this page' : 'No recorded challenges'}
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-slate-300">
@@ -241,11 +241,11 @@ export function MyChallengesContent({ principal }) {
             {challenges.map((challenge) => (
               <article
                 key={challenge.id}
-                className="rounded-xl border border-white/10 bg-slate-800/50 p-5 shadow-lg shadow-slate-950/10"
+                className="mep-panel rounded-xl border p-5 shadow-lg shadow-slate-950/10"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="break-words text-lg font-semibold text-white">{challenge.program.name || 'Unnamed program'}</h2>
+                    <h2 className="mep-heading break-words text-lg font-semibold text-white">{challenge.program.name || 'Unnamed program'}</h2>
                     <p className="mt-1 text-xs font-medium uppercase tracking-wide text-cyan-300">Unverified legacy record</p>
                   </div>
                   <span className="max-w-[55%] break-words rounded-full border border-slate-600 bg-slate-900/60 px-2.5 py-1 text-right text-xs text-slate-200">
@@ -290,7 +290,7 @@ export function MyChallengesContent({ principal }) {
             ))}
           </div>
 
-          <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-slate-800/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mep-panel flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-300">
               Page {pagination.page} of {pagination.pages} · {currentPageCount} record{currentPageCount === 1 ? '' : 's'} on this page · {pagination.total} total records
             </p>

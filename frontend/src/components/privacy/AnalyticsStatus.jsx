@@ -7,13 +7,13 @@ export default function AnalyticsStatus() {
     <section
       id="analytics-status"
       aria-labelledby="analytics-status-heading"
-      className="scroll-mt-24 rounded-2xl border border-cyan-400/25 bg-slate-900 p-5 text-slate-200 sm:p-8"
+      className="mep-panel scroll-mt-24 rounded-2xl border p-5 text-slate-200 sm:p-8"
     >
       <div className="flex items-start gap-3">
         <ShieldCheck aria-hidden="true" className="mt-1 h-6 w-6 shrink-0 text-cyan-300" />
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">Technical collection status</p>
-          <h2 id="analytics-status-heading" className="mt-2 text-2xl font-semibold text-white">Optional analytics is off</h2>
+          <h2 id="analytics-status-heading" className="mep-heading mt-2 text-2xl font-semibold text-white">Optional analytics is off</h2>
           <p className="mt-3 text-sm leading-6 text-slate-300">
             This version does not load the Google Analytics integration. There is no analytics acceptance
             button because optional measurement is not enabled.

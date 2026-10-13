@@ -42,7 +42,7 @@ export default function RiskDisclosure() {
                 <AlertTriangle className="w-10 h-10 text-white" />
               </div>
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-8">
+            <h1 className="mep-heading text-5xl md:text-7xl font-bold mb-8">
               Risk{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
                 Disclosure
@@ -79,7 +79,7 @@ export default function RiskDisclosure() {
         {/* Risk Cards */}
         <section className="relative py-16">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-4xl font-bold mb-12 text-center">
+            <h2 className="mep-heading text-4xl font-bold mb-12 text-center">
               Key{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
                 Risk Factors

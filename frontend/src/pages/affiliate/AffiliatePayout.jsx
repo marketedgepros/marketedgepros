@@ -17,7 +17,7 @@ const requirements = [
 
 export default function AffiliatePayout() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="mep-screen min-h-screen text-white">
       <section className="border-b border-cyan-400/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-slate-950 to-slate-950">
         <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
           <Link to="/affiliate/dashboard" className={accountLink}>
@@ -27,7 +27,7 @@ export default function AffiliatePayout() {
           <div className="mt-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Affiliate account</p>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Payout status</h1>
+              <h1 className="mep-heading mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Payout status</h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
                 Payout execution is unavailable. This page explains the current limitation and outlines possible future checks.
               </p>
@@ -47,7 +47,7 @@ export default function AffiliatePayout() {
               <CircleAlert aria-hidden="true" className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0">
-              <h2 id="payout-availability" className="text-lg font-semibold text-amber-100 sm:text-xl">Payout execution is unavailable</h2>
+              <h2 id="payout-availability" className="mep-heading text-lg font-semibold text-amber-100 sm:text-xl">Payout execution is unavailable</h2>
               <p className="mt-2 text-sm leading-6 text-amber-50/80">
                 This page does not submit payouts, collect payout methods, or verify withdrawal eligibility. It does not show a verified withdrawable balance or payout history.
               </p>
@@ -58,10 +58,10 @@ export default function AffiliatePayout() {
           </div>
         </section>
 
-        <section aria-labelledby="payout-requirements" className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+        <section aria-labelledby="payout-requirements" className="mep-panel overflow-hidden rounded-2xl border">
           <div className="border-b border-white/10 p-5 sm:p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Conceptual outline</p>
-            <h2 id="payout-requirements" className="mt-2 text-xl font-semibold">Possible checks before a future payout service</h2>
+            <h2 id="payout-requirements" className="mep-heading mt-2 text-xl font-semibold">Possible checks before a future payout service</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
               These examples describe technical topics a future service might need to address. They are not approved program terms, binding eligibility requirements, account status, or a promise of payment.
             </p>
@@ -80,8 +80,8 @@ export default function AffiliatePayout() {
           </ol>
         </section>
 
-        <section aria-labelledby="commission-records" className="rounded-2xl border border-white/10 bg-slate-900/70 p-5 sm:p-6">
-          <h2 id="commission-records" className="text-xl font-semibold">Affiliate account links</h2>
+        <section aria-labelledby="commission-records" className="mep-panel rounded-2xl border p-5 sm:p-6">
+          <h2 id="commission-records" className="mep-heading text-xl font-semibold">Affiliate account links</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
             Open the commissions page to review the information available there. A displayed commission record is not confirmation that an amount is approved, payable, or withdrawable.
           </p>

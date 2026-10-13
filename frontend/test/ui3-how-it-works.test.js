@@ -35,7 +35,7 @@ test('public copy does not assert unsupported funding, payout, platform, split, 
 });
 
 test('page uses accessible focus styling and a restrained navy/cyan visual system', () => {
-  assert.match(source, /bg-slate-950/);
+  assert.match(source, /mep-screen/);
   assert.match(source, /text-cyan-300/);
   assert.match(source, /focus-visible:outline/);
   assert.match(source, /aria-labelledby="process-heading"/);

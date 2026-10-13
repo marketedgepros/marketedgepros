@@ -32,6 +32,6 @@ test('homepage explains catalog and quote limitations and exposes accessible foc
   assert.match(source, /displayed price and terms/);
   assert.match(source, /quote is not a payment/);
   assert.match(source, /payments are not enabled/);
-  assert.match(source, /focus:outline-none/);
-  assert.match(source, /focus:ring-2/);
+  assert.match(source, /focus-visible:outline-none/);
+  assert.match(source, /focus-visible:ring-2/);
 });

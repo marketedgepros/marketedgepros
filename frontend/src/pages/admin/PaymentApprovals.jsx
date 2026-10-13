@@ -23,7 +23,7 @@ export function PaymentApprovalsContent({ read, onPage }) {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Read-only record view</p>
-          <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Pending legacy payment requests</h1>
+          <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Pending legacy payment requests</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
             Pending legacy requests are displayed without a settlement or review action.
           </p>

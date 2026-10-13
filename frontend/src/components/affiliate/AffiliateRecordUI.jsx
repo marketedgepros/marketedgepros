@@ -2,7 +2,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Download, RefreshCw, ShieldAl
 import { Link } from 'react-router-dom';
 import { AFFILIATE_RECORD_PAGE_LIMIT } from '../../services/affiliateRecordViewService.js';
 
-export const affiliateRecordPanel = 'min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 shadow-lg shadow-slate-950/20';
+export const affiliateRecordPanel = 'mep-panel min-w-0 rounded-2xl border';
 export const affiliateRecordButton = 'inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none';
 
 export const affiliateRecordDisplay = (value) => value === null || value === undefined || value === '' ? 'Unavailable' : String(value);
@@ -36,7 +36,7 @@ export function AffiliateRecordHeader({ eyebrow, title, summary, onRefresh, refr
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">{eyebrow}</p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
+              <h1 className="mep-heading text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">{summary}</p>
             </div>
             <AffiliateRecordNavigation />
@@ -86,7 +86,7 @@ export function AffiliateRecordReadState({ loading, error, onRetry }) {
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-200" aria-hidden="true" />
           <div className="min-w-0">
-            <h2 className="font-semibold">Affiliate records could not be verified</h2>
+            <h2 className="mep-heading font-semibold">Affiliate records could not be verified</h2>
             <p className="mt-1 break-words text-sm leading-6 text-rose-100/85">{typeof error === 'string' ? error : 'No records are shown until a complete response matches your signed-in affiliate account.'}</p>
             <button type="button" onClick={onRetry} className={`${affiliateRecordButton} mt-4 border-rose-200/40 bg-rose-100/10 text-rose-50 hover:bg-rose-100/20`}>
               <RefreshCw className="h-4 w-4" aria-hidden="true" />Retry records

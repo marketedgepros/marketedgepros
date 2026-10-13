@@ -19,14 +19,14 @@ export default function LightningChallenge() {
               <Zap className="h-4 w-4" aria-hidden="true" />
               Lightning program
             </p>
-            <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-6xl">
+            <h1 className="mep-heading max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-6xl">
               Explore Lightning program options
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">
               Compare the current published catalog entries and review the settings shown for each program. Program terms are supplied by the catalog and may vary by listing.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <a href="#programs" className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 motion-reduce:transition-none">
+              <a href="#programs" className="mep-primary inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 motion-reduce:transition-none">
                 Browse listed programs <ArrowRight size={18} aria-hidden="true" />
               </a>
               <a href="#important-information" className="inline-flex items-center justify-center rounded-xl border border-slate-600 px-6 py-3 font-medium text-slate-100 transition-colors hover:border-cyan-300 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 motion-reduce:transition-none">
@@ -40,7 +40,7 @@ export default function LightningChallenge() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-10 max-w-3xl">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300">Current catalog</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Lightning listings</h2>
+              <h2 className="mep-heading mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Lightning listings</h2>
               <p className="mt-4 leading-relaxed text-slate-300">Review the published details on each listing. If none appear, current Lightning availability is not shown in the catalog.</p>
             </div>
             <CatalogPreview type="lightning" />
@@ -53,7 +53,7 @@ export default function LightningChallenge() {
               <ShieldCheck aria-hidden="true" />
             </div>
             <div className="max-w-3xl">
-              <h2 className="text-2xl font-semibold text-white">Review terms and availability carefully</h2>
+              <h2 className="mep-heading text-2xl font-semibold text-white">Review terms and availability carefully</h2>
               <p className="mt-4 leading-relaxed text-slate-300">
                 This page displays catalog information; it does not verify trading-rule enforcement, funding eligibility or timing, payout availability or timing, or provider connections. Check the published settings for an individual program before making a decision.
               </p>

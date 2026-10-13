@@ -114,10 +114,10 @@ export default function BlogPost() {
       <Layout>
         <div className="min-h-screen bg-black flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">{error || 'Post not found'}</h2>
+            <h2 className="mep-heading text-2xl font-bold text-white mb-4">{error || 'Post not found'}</h2>
             <button
               onClick={() => navigate('/blog')}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-xl text-white font-bold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300"
+              className="mep-primary px-6 py-3 font-bold transition-all duration-300"
             >
               Back to Blog
             </button>
@@ -168,7 +168,7 @@ export default function BlogPost() {
             )}
 
             {/* Title */}
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            <h1 className="mep-heading text-4xl md:text-5xl font-bold text-white mb-6">
               {post.title}
             </h1>
 
@@ -273,7 +273,7 @@ export default function BlogPost() {
           {/* Related Posts */}
           {relatedPosts.length > 0 && (
             <div>
-              <h2 className="text-3xl font-bold text-white mb-8">
+              <h2 className="mep-heading text-3xl font-bold text-white mb-8">
                 Related <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Articles</span>
               </h2>
               <div className="grid md:grid-cols-3 gap-6">

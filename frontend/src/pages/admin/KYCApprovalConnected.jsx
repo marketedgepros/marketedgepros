@@ -71,7 +71,7 @@ export function KycReviewNotice() {
 export function KycSubmissionList({ list, selectedUserId, onSelect, disabled }) {
   if (list.loading) {
     return (
-      <section className="rounded-2xl border border-slate-700 bg-slate-900 p-8" aria-busy="true" aria-label="Loading pending KYC submissions">
+      <section className="mep-panel rounded-2xl border p-8" aria-busy="true" aria-label="Loading pending KYC submissions">
         <div className="flex items-center gap-3 text-slate-200" role="status">
           <LoaderCircle className="h-5 w-5 animate-spin text-cyan-300" aria-hidden="true" />
           Loading recorded pending submissions…
@@ -85,7 +85,7 @@ export function KycSubmissionList({ list, selectedUserId, onSelect, disabled }) 
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div>
-            <h2 className="font-semibold">Pending submissions unavailable</h2>
+            <h2 className="mep-heading font-semibold">Pending submissions unavailable</h2>
             <p className="mt-1 text-sm">{errorMessage(list.error, 'The recorded KYC submissions could not be loaded. Try a manual refresh.')}</p>
           </div>
         </div>
@@ -94,17 +94,17 @@ export function KycSubmissionList({ list, selectedUserId, onSelect, disabled }) 
   }
   if (!list.value?.submissions.length) {
     return (
-      <section className="rounded-2xl border border-slate-700 bg-slate-900 p-8 text-center text-slate-300">
+      <section className="mep-panel rounded-2xl border p-8 text-center text-slate-300">
         <FileCheck2 className="mx-auto h-12 w-12 text-cyan-300/70" aria-hidden="true" />
-        <h2 className="mt-3 text-lg font-semibold text-white">No pending KYC submissions</h2>
+        <h2 className="mep-heading mt-3 text-lg font-semibold text-white">No pending KYC submissions</h2>
         <p className="mt-2 text-sm">No pending submissions are available to display.</p>
       </section>
     );
   }
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-sm" aria-labelledby="kyc-submissions-heading">
+    <section className="mep-panel overflow-hidden rounded-2xl border shadow-sm" aria-labelledby="kyc-submissions-heading">
       <div className="border-b border-slate-700 px-5 py-4 sm:px-6">
-        <h2 id="kyc-submissions-heading" className="text-lg font-semibold text-white">Pending recorded submissions</h2>
+        <h2 id="kyc-submissions-heading" className="mep-heading text-lg font-semibold text-white">Pending recorded submissions</h2>
         <p className="mt-1 text-sm text-slate-300">{list.value.pagination.total} pending record{list.value.pagination.total === 1 ? '' : 's'} in this scoped result.</p>
       </div>
       <div className="overflow-x-auto">
@@ -156,7 +156,7 @@ export function KycSubmissionList({ list, selectedUserId, onSelect, disabled }) 
 export function KycSubmissionDetail({ detail, onDownload, onReview, disabled }) {
   if (detail.loading) {
     return (
-      <section className="rounded-2xl border border-slate-700 bg-slate-900 p-6" aria-busy="true">
+      <section className="mep-panel rounded-2xl border p-6" aria-busy="true">
         <div className="flex items-center gap-3 text-slate-200" role="status">
           <LoaderCircle className="h-5 w-5 animate-spin text-cyan-300" aria-hidden="true" />
           Loading selected document record…
@@ -167,26 +167,26 @@ export function KycSubmissionDetail({ detail, onDownload, onReview, disabled }) 
   if (detail.error) {
     return (
       <section className="rounded-2xl border border-rose-900 bg-rose-950/40 p-5 text-rose-100" role="alert">
-        <h2 className="font-semibold">Selected submission unavailable</h2>
+        <h2 className="mep-heading font-semibold">Selected submission unavailable</h2>
         <p className="mt-1 text-sm">{errorMessage(detail.error, 'The selected document record could not be loaded. Return to the pending list and select it again.')}</p>
       </section>
     );
   }
   if (!detail.value) {
     return (
-      <section className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/60 p-6 text-sm text-slate-300" role="status">
+      <section className="mep-panel rounded-2xl border border-dashed p-6 text-sm text-slate-300" role="status">
         Select a pending submission to view its recorded documents. No document data is retained until a scoped detail response is returned.
       </section>
     );
   }
   const { user, documents, kycStatus, submittedAt } = detail.value;
   return (
-    <section className="rounded-2xl border border-slate-700 bg-slate-900 shadow-sm" aria-labelledby="kyc-detail-heading">
+    <section className="mep-panel rounded-2xl border shadow-sm" aria-labelledby="kyc-detail-heading">
       <div className="border-b border-slate-700 px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Selected recorded submission</p>
-            <h2 id="kyc-detail-heading" className="mt-1 break-words text-xl font-semibold text-white">{user.displayName} <span className="text-slate-400">· User #{user.id}</span></h2>
+            <h2 id="kyc-detail-heading" className="mep-heading mt-1 break-words text-xl font-semibold text-white">{user.displayName} <span className="text-slate-400">· User #{user.id}</span></h2>
             <p className="mt-1 text-sm text-slate-300">Submitted: {formatDate(submittedAt)}</p>
           </div>
           <KycStatusPill value={kycStatus} />
@@ -196,7 +196,7 @@ export function KycSubmissionDetail({ detail, onDownload, onReview, disabled }) 
         {documents.map((document) => {
           const canReview = document.status === 'pending' && Boolean(document.uploadedAt && document.downloadPath);
           return (
-            <article key={document.type} className="flex min-w-0 flex-col rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+            <article key={document.type} className="mep-panel flex min-w-0 flex-col rounded-xl border p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -260,11 +260,11 @@ export function KycDocumentReviewDialog({ review, onClose, onChange, onSubmit, i
     && !isSaving;
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-slate-950/80 p-4 sm:items-center sm:justify-center" role="presentation">
-      <section className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-600 bg-slate-900 p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="kyc-review-dialog-title">
+      <section className="mep-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="kyc-review-dialog-title">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Manual recorded review</p>
-            <h2 id="kyc-review-dialog-title" className="mt-1 text-xl font-semibold text-white">{review.status === 'approved' ? 'Record document approval' : 'Record document rejection'}</h2>
+            <h2 id="kyc-review-dialog-title" className="mep-heading mt-1 text-xl font-semibold text-white">{review.status === 'approved' ? 'Record document approval' : 'Record document rejection'}</h2>
           </div>
           <button type="button" disabled={isSaving} onClick={onClose} className="rounded-md p-1 text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50" aria-label="Close recorded document review dialog">
             <X className="h-5 w-5" aria-hidden="true" />
@@ -404,7 +404,7 @@ export function KYCApprovalContent({ user, isAuthenticated, service = kycAdminSe
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Administration · recorded review</p>
         <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">KYC document review</h1>
+            <h1 className="mep-heading text-3xl font-bold tracking-tight text-white">KYC document review</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Review pending document records within your tenant and hierarchy scope. Private files are downloaded through the authenticated document route.</p>
           </div>
           <button type="button" disabled={disabled || read.list.loading} onClick={read.refresh} className="inline-flex w-fit items-center gap-2 rounded-lg border border-cyan-500 px-4 py-2.5 text-sm font-semibold text-cyan-200 hover:bg-cyan-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">

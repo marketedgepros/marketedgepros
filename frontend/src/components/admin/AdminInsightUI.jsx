@@ -1,6 +1,6 @@
 import { AlertTriangle, BarChart3, Loader2, RefreshCw, ShieldAlert, Users } from "lucide-react";
 
-export const adminInsightPanel = "min-w-0 rounded-2xl border border-white/10 bg-slate-800/45 p-4 shadow-lg shadow-slate-950/20 sm:p-6";
+export const adminInsightPanel = "mep-panel min-w-0 rounded-2xl border p-4 sm:p-6";
 export const adminInsightButton = "inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/40 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-45";
 
 const labels = {
@@ -47,7 +47,7 @@ export function AdminInsightReadState({ loading, error, onRetry, empty, emptyTit
   if (error) {
     return (
       <div className="rounded-2xl border border-red-300/30 bg-red-950/25 p-5 text-red-100" role="alert">
-        <h2 className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-5 w-5" aria-hidden="true" />Recorded insights could not be loaded</h2>
+        <h2 className="mep-heading flex items-center gap-2 font-semibold"><AlertTriangle className="h-5 w-5" aria-hidden="true" />Recorded insights could not be loaded</h2>
         <p className="mt-2 text-sm leading-6">The service is unavailable or its response could not be validated. No count, status, date, amount, or empty result has been assumed.</p>
         <button type="button" onClick={onRetry} className={`${adminInsightButton} mt-4`}><RefreshCw className="h-4 w-4" aria-hidden="true" />Refresh records</button>
       </div>
@@ -56,7 +56,7 @@ export function AdminInsightReadState({ loading, error, onRetry, empty, emptyTit
   if (empty) {
     return (
       <section className={`${adminInsightPanel} py-10 text-center`} aria-labelledby="admin-insight-empty-title">
-        <h2 id="admin-insight-empty-title" className="text-lg font-semibold text-white">{emptyTitle}</h2>
+        <h2 id="admin-insight-empty-title" className="mep-heading text-lg font-semibold text-white">{emptyTitle}</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300">{emptyMessage}</p>
       </section>
     );
@@ -86,7 +86,7 @@ export function AdminInsightCountCards({ counts }) {
 export function AdminInsightDistribution({ title, rows, description }) {
   return (
     <section className={adminInsightPanel} aria-labelledby={`distribution-${title.replace(/\s+/g, "-").toLowerCase()}`}>
-      <h2 id={`distribution-${title.replace(/\s+/g, "-").toLowerCase()}`} className="text-base font-semibold text-white">{title}</h2>
+      <h2 id={`distribution-${title.replace(/\s+/g, "-").toLowerCase()}`} className="mep-heading text-base font-semibold text-white">{title}</h2>
       <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
       {rows.length === 0 ? (
         <p className="mt-5 text-sm text-slate-400">No recorded categories in this scope.</p>
@@ -146,5 +146,5 @@ export function AdminInsightDailyTable({ rows }) {
 
 export function AdminInsightSectionTitle({ id, icon = "users", title, description, action }) {
   const Icon = icon === "activity" ? BarChart3 : Users;
-  return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 id={id} className="flex items-center gap-2 text-xl font-bold text-white"><Icon className="h-5 w-5 text-cyan-300" aria-hidden="true" />{title}</h2><p className="mt-1 text-sm leading-6 text-slate-400">{description}</p></div>{action}</div>;
+  return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 id={id} className="mep-heading flex items-center gap-2 text-xl font-bold text-white"><Icon className="h-5 w-5 text-cyan-300" aria-hidden="true" />{title}</h2><p className="mt-1 text-sm leading-6 text-slate-400">{description}</p></div>{action}</div>;
 }

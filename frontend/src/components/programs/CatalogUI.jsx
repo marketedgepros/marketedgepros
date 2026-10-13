@@ -15,16 +15,16 @@ import {
 } from "../../services/programCatalogViewService";
 
 export const primaryAction =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 transition-colors duration-150 motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed";
+  "mep-primary inline-flex items-center justify-center gap-2 px-5 py-3 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 transition-colors duration-150 motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed";
 export const secondaryAction =
   "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 px-4 py-3 text-sm font-medium text-slate-200 hover:border-cyan-400 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 transition-colors duration-150 motion-reduce:transition-none";
 export const panelStyle =
-  "rounded-2xl border border-slate-700/70 bg-slate-900/80 p-5 sm:p-7 min-w-0";
+  "mep-panel rounded-2xl border p-5 sm:p-7 min-w-0";
 
 export function CatalogPage({ children }) {
   return (
     <Layout>
-      <div className="min-h-screen bg-[#0b1220] text-slate-100">
+      <div className="mep-screen min-h-screen text-slate-100">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
           {children}
         </div>
@@ -53,7 +53,7 @@ export function CatalogState({ loading, error, retry, empty = false }) {
       {loading ? (
         <>
           <FileText className="mx-auto mb-4 text-cyan-400" aria-hidden="true" />
-          <h2 className="text-xl font-semibold">Loading current catalog…</h2>
+          <h2 className="mep-heading text-xl font-semibold">Loading current catalog…</h2>
           <p className="mt-2 text-slate-400">
             Prices and terms are requested from the server.
           </p>
@@ -64,7 +64,7 @@ export function CatalogState({ loading, error, retry, empty = false }) {
             className="mx-auto mb-4 text-cyan-400"
             aria-hidden="true"
           />
-          <h2 className="text-xl font-semibold">
+          <h2 className="mep-heading text-xl font-semibold">
             {empty ? "No active programs available" : "Catalog unavailable"}
           </h2>
           <p
@@ -150,7 +150,7 @@ export function CatalogCard({ program }) {
       <span className="break-words [overflow-wrap:anywhere] text-xs uppercase tracking-widest text-cyan-300">
         {typeLabel(program.terms.type)}
       </span>
-      <h2 className="mt-4 break-words text-xl font-semibold">
+      <h2 className="mep-heading mt-4 break-words text-xl font-semibold">
         {program.terms.name}
       </h2>
       <p className="mt-2 text-sm text-slate-400">Program account size</p>
@@ -180,7 +180,7 @@ export function ConfiguredRules({ terms }) {
   const entries = Object.entries(terms.rules);
   return (
     <section className={panelStyle} aria-labelledby="additional-rules">
-      <h2 id="additional-rules" className="text-xl font-semibold">
+      <h2 id="additional-rules" className="mep-heading text-xl font-semibold">
         Additional catalog rules
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">

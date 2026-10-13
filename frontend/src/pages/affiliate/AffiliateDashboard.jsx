@@ -222,7 +222,7 @@ export function AffiliateDashboardView({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Affiliate account</p>
           <div className="mt-3 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div className="min-w-0">
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Performance overview</h1>
+              <h1 className="mep-heading text-3xl font-bold tracking-tight sm:text-4xl">Performance overview</h1>
               <p className="mt-3 max-w-2xl text-slate-300">
                 Read-only activity and legacy API categories reported for this affiliate account.
               </p>
@@ -257,7 +257,7 @@ export function AffiliateDashboardView({
         </div>
 
         {isLoading ? (
-          <div role="status" aria-live="polite" aria-busy="true" className="flex min-h-64 items-center justify-center rounded-2xl border border-white/10 bg-slate-900/60">
+          <div role="status" aria-live="polite" aria-busy="true" className="mep-panel flex min-h-64 items-center justify-center rounded-2xl border">
             <div className="text-center">
               <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-cyan-300/20 border-t-cyan-300 motion-reduce:animate-none" aria-hidden="true" />
               <p className="mt-4 text-sm text-slate-300">Loading affiliate account data...</p>
@@ -280,10 +280,10 @@ export function AffiliateDashboardView({
               <MetricCard label="Reported commission total" value={<ExactAmount value={stats.totalCommission} />} icon={<AlertTriangle className="h-5 w-5" aria-hidden="true" />} />
             </section>
 
-            <section aria-labelledby="legacy-commission-heading" className="mt-6 rounded-2xl border border-amber-300/20 bg-slate-900/70 p-5 shadow-xl shadow-cyan-950/10 sm:p-6">
+            <section aria-labelledby="legacy-commission-heading" className="mep-panel mt-6 rounded-2xl border border-amber-300/20 p-5 shadow-xl shadow-cyan-950/10 sm:p-6">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <div className="min-w-0">
-                  <h2 id="legacy-commission-heading" className="text-xl font-semibold">Legacy API commission categories</h2>
+                  <h2 id="legacy-commission-heading" className="mep-heading text-xl font-semibold">Legacy API commission categories</h2>
                   <p className="mt-1 max-w-3xl text-sm text-slate-400">
                     Pending, approved, and paid are legacy API labels only. They are not paid, verified, available, or withdrawable money.
                   </p>
@@ -299,10 +299,10 @@ export function AffiliateDashboardView({
               </div>
             </section>
 
-            <section aria-labelledby="affiliate-links-heading" className="mt-6 rounded-2xl border border-white/10 bg-slate-900/70 p-5 sm:p-6">
+            <section aria-labelledby="affiliate-links-heading" className="mep-panel mt-6 rounded-2xl border p-5 sm:p-6">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <div className="min-w-0">
-                  <h2 id="affiliate-links-heading" className="text-xl font-semibold">Server-provided referral links</h2>
+                  <h2 id="affiliate-links-heading" className="mep-heading text-xl font-semibold">Server-provided referral links</h2>
                   <p className="mt-1 text-sm text-slate-400">
                     Only canonical public HTTPS links returned by the account API are available to copy.
                   </p>
@@ -317,13 +317,13 @@ export function AffiliateDashboardView({
               </div>
 
               {safeLinks.length === 0 ? (
-                <div className="mt-5 rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-400">
+                <div className="mep-panel mt-5 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-slate-400">
                   No referral links were returned for this account.
                 </div>
               ) : (
                 <div className="mt-5 space-y-3">
                   {safeLinks.map((link) => (
-                    <article key={link.id} className="rounded-xl border border-white/10 bg-slate-950/45 p-4">
+                    <article key={link.id} className="mep-panel rounded-xl border p-4">
                       <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
@@ -375,9 +375,9 @@ export function AffiliateDashboardView({
               )}
             </section>
 
-            <section aria-labelledby="recent-referrals-heading" className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+            <section aria-labelledby="recent-referrals-heading" className="mep-panel mt-6 overflow-hidden rounded-2xl border">
               <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-                <h2 id="recent-referrals-heading" className="text-xl font-semibold">Recent referral activity</h2>
+                <h2 id="recent-referrals-heading" className="mep-heading text-xl font-semibold">Recent referral activity</h2>
                 <p className="mt-1 text-sm text-slate-400">At most ten identifier-only activity records are supplied. No referred-user details are displayed.</p>
               </div>
               {dashboard.recentReferrals.length === 0 ? (
@@ -409,7 +409,7 @@ export function AffiliateDashboardView({
             </section>
           </>
         ) : (
-          <div role="status" className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-center text-sm text-slate-400">
+          <div role="status" className="mep-panel rounded-2xl border p-8 text-center text-sm text-slate-400">
             Affiliate dashboard data is unavailable.
           </div>
         )}
@@ -441,7 +441,7 @@ function ExactAmount({ value, align = 'left' }) {
 
 function MetricCard({ label, value, icon }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-lg shadow-slate-950/20">
+    <div className="mep-panel min-w-0 rounded-2xl border p-5 shadow-lg shadow-slate-950/20">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm text-slate-400">{label}</p>
@@ -455,7 +455,7 @@ function MetricCard({ label, value, icon }) {
 
 function CommissionValue({ label, value }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/45 p-4">
+    <div className="mep-panel min-w-0 rounded-xl border p-4">
       <p className="text-sm text-slate-400">{label}</p>
       <div className="mt-2"><ExactAmount value={value} /></div>
     </div>

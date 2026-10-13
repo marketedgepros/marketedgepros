@@ -18,7 +18,7 @@ export function RecordedScalingDetail({ data }) {
       <RecordedMetric label="Legacy scale count" value={data.times_scaled} />
     </dl>
     <section className={tradingPanel} aria-label="Stored scaling metadata">
-      <h2 className="text-lg font-semibold text-white">Stored progression metadata</h2>
+      <h2 className="mep-heading text-lg font-semibold text-white">Stored progression metadata</h2>
       <p className="mt-2 text-sm text-slate-300">Targets and tier values below are historic records, not an approved scaling plan or eligibility decision.</p>
       <dl className="mt-5 grid gap-4 sm:grid-cols-2">
         {[
@@ -26,7 +26,7 @@ export function RecordedScalingDetail({ data }) {
           ['Stored next account size', data.next_account_size], ['Legacy target profit', data.target_profit],
           ['Stored progress percentage', data.progress_percentage === null ? null : `${data.progress_percentage}%`],
           ['Last recorded scale timestamp', data.last_scaled_at], ['Record created', data.created_at],
-        ].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-white/10 bg-slate-950/25 p-4">
+        ].map(([label, value]) => <div key={label} className="mep-panel min-w-0 rounded-xl border p-4">
           <dt className="text-xs text-slate-400">{label}</dt><dd className="mt-2 break-words font-mono text-sm text-slate-100">{recordedDisplay(value)}</dd>
         </div>)}
       </dl>
@@ -43,7 +43,7 @@ function ScalingContent({ principal }) {
   return <div className="mx-auto min-w-0 max-w-7xl space-y-6 p-4 text-slate-100 sm:p-6 lg:p-8">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account records</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">{admin ? 'Scoped scaling records' : 'Account scaling records'}</h1>
+        <h1 className="mep-heading mt-2 text-3xl font-semibold tracking-tight text-white">{admin ? 'Scoped scaling records' : 'Account scaling records'}</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{admin ? 'Review the historic records returned for your authorized management scope. This is not a list of all platform customers.' : 'Review stored progression metadata for your account. No provider-backed scale-up is available from this screen.'}</p>
       </div>
       <button type="button" className={tradingButton} onClick={retry} disabled={loading}><RefreshCw className="h-4 w-4" aria-hidden="true" />Refresh records</button>
@@ -53,8 +53,8 @@ function ScalingContent({ principal }) {
       emptyTitle={admin ? 'No scaling records on this page' : 'No recorded scaling plan'} />
     {view && !loading && !error && !admin && view.data && <RecordedScalingDetail data={view.data} />}
     {view && !loading && !error && admin && <>
-      {view.data.length > 0 && <section className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-800/40" aria-label="Scoped scaling records">
-        <div className="border-b border-white/10 p-5"><h2 className="font-semibold text-white">Current management page</h2>
+      {view.data.length > 0 && <section className="mep-panel min-w-0 overflow-hidden rounded-2xl border" aria-label="Scoped scaling records">
+        <div className="border-b border-white/10 p-5"><h2 className="mep-heading font-semibold text-white">Current management page</h2>
           <p className="mt-2 text-xs text-slate-300">{view.data.length} records on this page · eligibility unavailable · currency unspecified</p></div>
         <div className="max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-cyan-300" role="region" aria-label="Scrollable scaling table" tabIndex={0}>
           <table className="w-full min-w-[800px] text-left text-sm">
@@ -75,7 +75,7 @@ function ScalingContent({ principal }) {
       <RecordedPagination pagination={view.pagination} onPage={setPage} disabled={loading} />
     </>}
     <section className={`${tradingPanel} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
-      <div><h2 className="font-semibold text-white">Scale-up is not enabled</h2><p className="mt-2 text-sm text-slate-300">Verified trading evidence, approved rules and an authorized provider command are required before this can become an account action.</p></div>
+      <div><h2 className="mep-heading font-semibold text-white">Scale-up is not enabled</h2><p className="mt-2 text-sm text-slate-300">Verified trading evidence, approved rules and an authorized provider command are required before this can become an account action.</p></div>
       <Link className={`${tradingButton} shrink-0`} to="/support/my-tickets">My support tickets</Link>
     </section>
   </div>;
@@ -84,7 +84,7 @@ export default function ScalingProgress() {
   const user = useAuthStore((state) => state.user);
   const principal = recordedPrincipal(user);
   return <UserLayout>{!principal || (!isScalingAdmin(principal) && principal.tenant_id === null)
-    ? <section className={`${tradingPanel} m-4`} role="status"><h1 className="text-xl font-semibold text-white">Scaling records unavailable</h1>
+    ? <section className={`${tradingPanel} m-4`} role="status"><h1 className="mep-heading text-xl font-semibold text-white">Scaling records unavailable</h1>
       <p className="mt-2 text-sm text-slate-300">An authenticated account with a recorded scope is required.</p></section>
     : <ScalingContent key={recordedIdentityKey(principal)} principal={principal} />}</UserLayout>;
 }

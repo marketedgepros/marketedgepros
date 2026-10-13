@@ -26,12 +26,12 @@ const contactOptions = [
 export default function Contact() {
   return (
     <Layout>
-      <main className="min-h-screen bg-slate-950 text-slate-100">
+      <main className="mep-screen min-h-screen text-slate-100">
         <section aria-labelledby="contact-title" className="relative isolate overflow-hidden border-b border-cyan-300/10">
           <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(8,145,178,0.18),transparent_65%)]" />
           <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Contact</p>
-            <h1 id="contact-title" className="max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl">How can we help?</h1>
+            <h1 id="contact-title" className="mep-heading max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl">How can we help?</h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
               Choose a destination below to explore the information and support options available on this site.
             </p>
@@ -40,7 +40,7 @@ export default function Contact() {
 
         <section aria-labelledby="options-title" className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
           <div className="mb-8 max-w-2xl">
-            <h2 id="options-title" className="text-2xl font-semibold text-white sm:text-3xl">Explore available options</h2>
+            <h2 id="options-title" className="mep-heading text-2xl font-semibold text-white sm:text-3xl">Explore available options</h2>
             <p className="mt-3 leading-7 text-slate-300">
               Direct message submission is not available on this page. No message or personal details are submitted here.
             </p>

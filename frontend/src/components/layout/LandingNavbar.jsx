@@ -40,12 +40,12 @@ export default function LandingNavbar() {
   ];
 
   return (
-    <nav aria-label="Primary navigation" className="fixed top-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-white/10">
+    <nav aria-label="Primary navigation" className="mep-chrome fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex min-w-0 items-center space-x-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-            <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">M</div>
+            <div className="mep-brand-mark text-lg" aria-hidden="true">M</div>
             <span className="truncate text-xl font-bold text-white">MarketEdgePros</span>
           </Link>
 
@@ -103,7 +103,7 @@ export default function LandingNavbar() {
                 </Link>
                 <Link
                   to="/programs"
-                  className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full text-sm font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+                  className="mep-cta focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
                 >
                   View programs
                 </Link>
@@ -179,7 +179,7 @@ export default function LandingNavbar() {
                   </Link>
                   <Link
                     to="/programs"
-                    className="block px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg text-center text-white font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+                    className="mep-cta w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
                     onClick={closeMobileMenu}
                   >
                     View programs

@@ -24,7 +24,7 @@ const render = () => renderToStaticMarkup(React.createElement(MemoryRouter, null
 test('blog provides concise navy/cyan public presentation and truthful newsletter availability navigation', () => {
   const html = render();
   assert.match(html, /Trading articles/);
-  assert.match(html, /bg-slate-950/);
+  assert.match(html, /mep-screen/);
   assert.match(html, /focus:ring-cyan/);
   assert.match(html, /Newsletter subscriptions are not available/);
   assert.match(html, /href="\/contact"/);

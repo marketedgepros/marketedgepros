@@ -28,7 +28,7 @@ export function AdminClosureSettingsContent({ read }) {
       <header className="flex flex-col gap-4 border-b border-slate-700/80 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Administrator settings</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Tenant contact settings</h1>
+          <h1 className="mep-heading mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Tenant contact settings</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Only persisted tenant contact fields are shown. The server confirms both the session owner and tenant scope before returning or changing a value.</p>
         </div>
         <button
@@ -46,7 +46,7 @@ export function AdminClosureSettingsContent({ read }) {
         <div className="flex gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
           <div className="min-w-0">
-            <h2 id="settings-scope-heading" className="font-semibold text-cyan-50">Explicit tenant scope</h2>
+            <h2 id="settings-scope-heading" className="mep-heading font-semibold text-cyan-50">Explicit tenant scope</h2>
             <p className="mt-1 break-words text-sm leading-6 text-slate-200">{read.value ? `The server acknowledgement is scoped to tenant ${read.value.scope.tenantId}.` : "A configured platform-root session is required before any tenant setting can be loaded or saved."} This page never selects a tenant from a URL or form value.</p>
           </div>
         </div>
@@ -64,7 +64,7 @@ export function AdminClosureSettingsContent({ read }) {
           <div className="flex gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <h2 className="font-semibold">Persisted settings are unavailable</h2>
+              <h2 className="mep-heading font-semibold">Persisted settings are unavailable</h2>
               <p className="mt-1 break-words text-sm leading-6">{messageFor(read.error, adminClosureSettingsError())}</p>
             </div>
           </div>
@@ -75,7 +75,7 @@ export function AdminClosureSettingsContent({ read }) {
         <section className={panelClass} aria-labelledby="tenant-contact-heading">
           <div className="flex flex-col gap-2 border-b border-slate-700 pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 id="tenant-contact-heading" className="text-lg font-semibold text-white">Persisted tenant contact fields</h2>
+              <h2 id="tenant-contact-heading" className="mep-heading text-lg font-semibold text-white">Persisted tenant contact fields</h2>
               <p className="mt-1 text-sm leading-6 text-slate-300">Blank contact fields are stored as unavailable values, not inferred or replaced with examples.</p>
             </div>
             <span className="text-xs font-medium uppercase tracking-wide text-cyan-200">Tenant {read.value.scope.tenantId}</span>
@@ -140,7 +140,7 @@ export function AdminClosureSettingsContent({ read }) {
               <button
                 type="submit"
                 disabled={!read.dirty || disabled}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mep-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {read.saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
                 {read.saving ? "Saving persisted fields…" : "Save tenant contact fields"}
@@ -154,16 +154,16 @@ export function AdminClosureSettingsContent({ read }) {
         <div className="flex gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" aria-hidden="true" />
           <div className="min-w-0">
-            <h2 id="unavailable-settings-heading" className="text-lg font-semibold text-white">Unavailable configuration categories</h2>
+            <h2 id="unavailable-settings-heading" className="mep-heading text-lg font-semibold text-white">Unavailable configuration categories</h2>
             <p className="mt-1 text-sm leading-6 text-slate-300">These categories have no editable controls because this repository has no verified persistence contract for them. No value, connection, restart, or success state is simulated.</p>
           </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <article className="rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+          <article className="mep-panel rounded-lg border p-4">
             <h3 className="font-semibold text-slate-100">Global system settings</h3>
             <p className="mt-2 text-sm leading-6 text-slate-300">Missing capability: a persisted global-settings model and a root-only global configuration write contract. Environment-backed application configuration is not edited here.</p>
           </article>
-          <article className="rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+          <article className="mep-panel rounded-lg border p-4">
             <h3 className="font-semibold text-slate-100">Payment-provider configuration</h3>
             <p className="mt-2 text-sm leading-6 text-slate-300">Missing capability: an approved server-side provider-configuration persistence contract. Provider credentials, API keys, payout thresholds, enablement switches, and restart controls are intentionally not displayed or accepted.</p>
           </article>

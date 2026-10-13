@@ -142,6 +142,18 @@
   from { opacity: .55; transform: translate3d(0,8px,0); }
   to { opacity: 1; transform: translate3d(0,0,0); }
 }
+
+/* A manual pause is page-wide: reveal content rather than freeze it invisible. */
+.home-motion[data-visual-paused="true"] .scroll-reveal,
+.home-motion[data-visual-paused="true"] .home-motion__panel,
+.home-motion[data-visual-paused="true"] .premium-switch-in,
+.home-motion[data-visual-paused="true"] .program-selector-card {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 @media (max-width: 639px) {
   .premium-hero__grid { background-size: 48px 48px; }
   .premium-hero__beam { animation: none; }

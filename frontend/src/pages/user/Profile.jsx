@@ -339,11 +339,11 @@ function ProfileContent() {
     : 'Unavailable';
 
   return (
-    <main key={principal?.key || 'unauthenticated-profile'} className="min-h-screen bg-slate-950 text-slate-100">
+    <main key={principal?.key || 'unauthenticated-profile'} className="mep-screen min-h-screen text-slate-100">
       <header className="border-b border-slate-700/70 bg-slate-900/80 backdrop-blur-sm">
         <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account</p>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Profile settings</h1>
+          <h1 className="mep-heading text-2xl font-bold tracking-tight text-white sm:text-3xl">Profile settings</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">Manage the personal details and security settings for your account.</p>
         </div>
       </header>
@@ -351,7 +351,7 @@ function ProfileContent() {
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <InlineStatus id="profile-load-status" status={loadStatus} />
 
-        <section aria-labelledby="profile-photo-heading" className="rounded-xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg shadow-black/10 sm:p-6">
+        <section aria-labelledby="profile-photo-heading" className="mep-panel rounded-xl border p-4 shadow-lg shadow-black/10 sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-cyan-300/30 bg-gradient-to-br from-cyan-600 to-blue-800 text-2xl font-bold text-white">
               {avatarUrl ? (
@@ -362,10 +362,10 @@ function ProfileContent() {
               {isAvatarPending && <div aria-label="Profile photo request in progress" className="absolute inset-0 flex items-center justify-center bg-slate-950/70"><span className="h-7 w-7 animate-spin rounded-full border-2 border-cyan-200 border-t-transparent" /></div>}
             </div>
             <div className="min-w-0 flex-1">
-              <h2 id="profile-photo-heading" className="text-lg font-semibold text-white">Profile photo</h2>
+              <h2 id="profile-photo-heading" className="mep-heading text-lg font-semibold text-white">Profile photo</h2>
               <p className="mt-1 text-sm leading-6 text-slate-400">JPG, PNG, GIF, or WEBP. Maximum file size is 5 MiB.</p>
               <div className="mt-4 flex flex-col gap-2 xs:flex-row sm:flex-row">
-                <button type="button" onClick={handleAvatarClick} disabled={!profileReady || isMutationPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={handleAvatarClick} disabled={!profileReady || isMutationPending} className="mep-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
                   <Upload className="h-4 w-4" aria-hidden="true" />
                   {isAvatarPending ? 'Uploading…' : 'Upload new photo'}
                 </button>
@@ -382,7 +382,7 @@ function ProfileContent() {
           </div>
         </section>
 
-        <section aria-label="Profile settings forms" className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900/80 shadow-lg shadow-black/10">
+        <section aria-label="Profile settings forms" className="mep-panel overflow-hidden rounded-xl border shadow-lg shadow-black/10">
           <div className="overflow-x-auto border-b border-slate-700">
             <div role="tablist" aria-label="Profile setting categories" className="flex min-w-max px-2">
               <button id="profile-personal-tab" role="tab" type="button" aria-selected={activeTab === 'personal'} aria-controls="profile-personal-panel" onClick={() => setActiveTab('personal')} className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold outline-none transition focus:ring-2 focus:ring-inset focus:ring-cyan-300 ${activeTab === 'personal' ? 'border-cyan-400 text-cyan-200' : 'border-transparent text-slate-300 hover:text-white'}`}>
@@ -398,7 +398,7 @@ function ProfileContent() {
             {activeTab === 'personal' && (
               <form id="profile-personal-panel" role="tabpanel" aria-labelledby="profile-personal-tab" onSubmit={handlePersonalUpdate} className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Personal details</h2>
+                  <h2 className="mep-heading text-lg font-semibold text-white">Personal details</h2>
                   <p className="mt-1 text-sm text-slate-400">Only your name and phone number can be changed here.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -422,7 +422,7 @@ function ProfileContent() {
                 </div>
                 <InlineStatus id="personal-status" status={personalStatus} />
                 <div className="flex justify-end">
-                  <button type="submit" disabled={!profileReady || isMutationPending} className="min-h-11 rounded-lg bg-cyan-500 px-5 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="submit" disabled={!profileReady || isMutationPending} className="mep-primary min-h-11 px-5 py-2 font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
                     {isPersonalPending ? 'Saving…' : 'Save changes'}
                   </button>
                 </div>
@@ -432,7 +432,7 @@ function ProfileContent() {
             {activeTab === 'security' && (
               <form id="profile-security-panel" role="tabpanel" aria-labelledby="profile-security-tab" onSubmit={handlePasswordUpdate} className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Password</h2>
+                  <h2 className="mep-heading text-lg font-semibold text-white">Password</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-400">After a successful change, you will be signed out and asked to sign in again.</p>
                 </div>
                 <div>
@@ -450,7 +450,7 @@ function ProfileContent() {
                 </div>
                 <InlineStatus id="password-status" status={passwordStatus} />
                 <div className="flex justify-end">
-                  <button type="submit" disabled={!profileReady || isMutationPending} className="min-h-11 rounded-lg bg-cyan-500 px-5 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="submit" disabled={!profileReady || isMutationPending} className="mep-primary min-h-11 px-5 py-2 font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50">
                     {isPasswordPending ? 'Changing password…' : 'Change password'}
                   </button>
                 </div>
@@ -459,17 +459,17 @@ function ProfileContent() {
           </div>
         </section>
 
-        <section aria-labelledby="profile-status-heading" className="rounded-xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg shadow-black/10 sm:p-6">
+        <section aria-labelledby="profile-status-heading" className="mep-panel rounded-xl border p-4 shadow-lg shadow-black/10 sm:p-6">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-cyan-300" aria-hidden="true" />
-            <h2 id="profile-status-heading" className="text-lg font-semibold text-white">Account status</h2>
+            <h2 id="profile-status-heading" className="mep-heading text-lg font-semibold text-white">Account status</h2>
           </div>
           <div className="mt-4 space-y-3">
-            <div className="flex items-start gap-3 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+            <div className="mep-panel flex items-start gap-3 rounded-lg border p-3">
               {profileUser?.is_verified === true ? <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" aria-hidden="true" /> : <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />}
               <div><p className="font-medium text-white">Email verification</p><p className="mt-0.5 text-sm text-slate-400">{profileUser?.is_verified === true ? 'Verified' : profileReady ? 'Not verified' : 'Unavailable'}</p></div>
             </div>
-            <div className="flex items-start gap-3 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+            <div className="mep-panel flex items-start gap-3 rounded-lg border p-3">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
               <div><p className="font-medium text-white">KYC record</p><p className="mt-0.5 break-words text-sm capitalize text-slate-400">{profileReady ? kycRecord : 'Unavailable'}</p></div>
             </div>
@@ -485,8 +485,8 @@ function ProfileContent() {
 
       {isDeleteDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-slate-950/80 p-4 sm:items-center sm:justify-center" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="delete-avatar-heading" aria-describedby="delete-avatar-description" className="w-full max-w-md rounded-xl border border-slate-600 bg-slate-900 p-5 shadow-2xl">
-            <h2 id="delete-avatar-heading" className="text-lg font-semibold text-white">Delete profile photo?</h2>
+          <section role="dialog" aria-modal="true" aria-labelledby="delete-avatar-heading" aria-describedby="delete-avatar-description" className="mep-panel w-full max-w-md rounded-xl border p-5 shadow-2xl">
+            <h2 id="delete-avatar-heading" className="mep-heading text-lg font-semibold text-white">Delete profile photo?</h2>
             <p id="delete-avatar-description" className="mt-2 text-sm leading-6 text-slate-300">This will remove the current photo from your profile. This action cannot be undone from this screen.</p>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => setIsDeleteDialogOpen(false)} disabled={isMutationPending} className="min-h-11 rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">Cancel</button>

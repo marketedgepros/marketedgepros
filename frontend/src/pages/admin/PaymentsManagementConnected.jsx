@@ -21,7 +21,7 @@ export function PaymentsManagementContent({ read, status, type, onStatusChange, 
     <div className="space-y-5 p-4 sm:p-6">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Read-only record view</p>
-        <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Recorded payment records</h1>
+        <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Recorded payment records</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
           Browse server-scoped legacy payment records. Values are not converted, aggregated, or treated as settlement evidence.
         </p>
@@ -32,7 +32,7 @@ export function PaymentsManagementContent({ read, status, type, onStatusChange, 
       <section className={adminPaymentPanel} aria-labelledby="payment-record-filters-heading">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 id="payment-record-filters-heading" className="text-base font-semibold text-white">Record filters</h2>
+            <h2 id="payment-record-filters-heading" className="mep-heading text-base font-semibold text-white">Record filters</h2>
             <p className="mt-1 text-sm text-slate-400">Filters are applied by the server to this page of records.</p>
           </div>
           <button type="button" className={adminPaymentButton} onClick={read.refresh} disabled={read.loading}>

@@ -70,7 +70,7 @@ export default function TermsOfService() {
                 <FileText className="w-10 h-10 text-white" />
               </div>
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-8">
+            <h1 className="mep-heading text-5xl md:text-7xl font-bold mb-8">
               Terms of{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">
                 Service
@@ -105,7 +105,7 @@ export default function TermsOfService() {
                   key={index}
                   className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-300"
                 >
-                  <h2 className="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">
+                  <h2 className="mep-heading text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">
                     {section.title}
                   </h2>
                   <p className="text-gray-300 text-lg leading-relaxed">
@@ -122,7 +122,7 @@ export default function TermsOfService() {
               </p>
               <a
                 href="mailto:legal@marketedgepros.com"
-                className="inline-block px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full font-semibold transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/50"
+                className="mep-primary inline-block px-8 py-4 font-semibold transition-all duration-300 hover:scale-105"
               >
                 Contact Legal Team
               </a>

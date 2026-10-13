@@ -120,7 +120,7 @@ const displayStatistic = (statistics, key) => (
 const Header = ({ heading, intro }) => (
   <header className="mb-7 border-b border-cyan-900/30 pb-6">
     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account documents</p>
-    <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">{heading}</h1>
+    <h1 className="mep-heading mt-2 text-3xl font-bold tracking-tight text-white">{heading}</h1>
     <p className="mt-2 max-w-3xl text-slate-300">{intro}</p>
   </header>
 );
@@ -302,7 +302,7 @@ function DocumentsContent({ copy, principal }) {
     return (
       <main aria-busy="true">
         <Header {...copy} />
-        <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-cyan-900/30 bg-slate-950" role="status" aria-label="Loading documents">
+        <div className="mep-panel flex min-h-[300px] items-center justify-center rounded-2xl border" role="status" aria-label="Loading documents">
           <Loader className="h-8 w-8 animate-spin text-cyan-300" aria-hidden="true" />
           <span className="ml-3 text-sm font-medium text-slate-100">Loading recorded document status…</span>
         </div>
@@ -318,7 +318,7 @@ function DocumentsContent({ copy, principal }) {
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
             <div>
-              <h2 className="font-semibold">Recorded document status unavailable</h2>
+              <h2 className="mep-heading font-semibold">Recorded document status unavailable</h2>
               <p className="mt-1 text-sm">{loadError || 'Recorded document status is unavailable.'}</p>
               {principal.ready && (
                 <button
@@ -343,11 +343,11 @@ function DocumentsContent({ copy, principal }) {
       <Header {...copy} />
       <button type="button" disabled={Boolean(activeAction)} onClick={() => { void loadDocuments({ showLoading: true }); }} className="mb-5 rounded-lg border border-cyan-500 px-4 py-2 text-sm font-semibold text-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50">Refresh status</button>
 
-      <section className="mb-7 overflow-hidden rounded-2xl border border-cyan-900/40 bg-slate-950 shadow-sm" aria-labelledby="recorded-status-heading">
+      <section className="mep-panel mb-7 overflow-hidden rounded-2xl border shadow-sm" aria-labelledby="recorded-status-heading">
         <div className="border-b border-slate-700/70 px-5 py-5 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 id="recorded-status-heading" className="text-xl font-semibold text-white">Recorded document status</h2>
+              <h2 id="recorded-status-heading" className="mep-heading text-xl font-semibold text-white">Recorded document status</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-300">
                 These statuses reflect document records returned by the account service. They are not live identity evidence.
               </p>
@@ -393,7 +393,7 @@ function DocumentsContent({ copy, principal }) {
           const helpId =`${inputId}-help`;
 
           return (
-            <section key={documentType.type} className="rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-sm   sm:p-6" aria-labelledby={`${inputId}-title`}>
+            <section key={documentType.type} className="mep-panel rounded-2xl border p-5 shadow-sm sm:p-6" aria-labelledby={`${inputId}-title`}>
               <div className="flex items-start gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-950/60 text-cyan-200">
                   <FileText className="h-6 w-6" aria-hidden="true" />
@@ -408,13 +408,13 @@ function DocumentsContent({ copy, principal }) {
               </div>
 
               {!documentInfo ? (
-                <div className="mt-5 rounded-xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-200" role="status">
+                <div className="mep-panel mt-5 rounded-xl border p-4 text-sm text-slate-200" role="status">
                   <p className="font-medium">Recorded document status unavailable</p>
                   <p className="mt-1">Reload the status before uploading or downloading this document.</p>
                 </div>
               ) : (
                 <>
-                  <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3">
+                  <div className="mep-panel mt-5 flex items-center justify-between gap-3 rounded-xl border p-3">
                     <div className="min-w-0">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Recorded status</p>
                       <p className="truncate text-sm font-semibold text-slate-100">{documentInfo.name}</p>
@@ -505,7 +505,7 @@ export default function Documents({ mode = 'documents', intro }) {
   };
 
   return (
-    <div className="min-h-screen rounded-2xl bg-slate-950 p-4 text-slate-100 sm:p-6 lg:p-8">
+    <div className="mep-screen min-h-screen rounded-2xl p-4 text-slate-100 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-6xl">
         <DocumentsContent key={principal.key} copy={copy} principal={principal} />
       </div>

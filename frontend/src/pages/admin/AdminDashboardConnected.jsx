@@ -34,7 +34,7 @@ export function AdminDashboardInsightContent({ read }) {
       <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Administrator record view</p>
-          <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Recorded platform overview</h1>
+          <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Recorded platform overview</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">A server-scoped snapshot of record counts and recorded statuses. It contains no revenue, funding, conversion, ranking, or identity conclusion.</p>
         </div>
         <button type="button" className={adminInsightButton} onClick={read.refresh} disabled={read.loading}>Refresh records</button>

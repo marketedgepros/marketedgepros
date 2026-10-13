@@ -123,18 +123,18 @@ function AffiliateLandingContent() {
 
   return (
     <Layout>
-      <main className="min-h-screen bg-slate-950 text-slate-100">
+      <main className="mep-screen min-h-screen text-slate-100">
         <section className="relative overflow-hidden border-b border-cyan-400/15 px-4 pb-16 pt-28 sm:px-6 lg:px-8">
           <div aria-hidden="true" className="absolute -right-24 top-8 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" />
           <div className="relative mx-auto max-w-5xl">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300">MarketEdgePros · Affiliate</p>
-            <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl">Affiliate information and registration</h1>
+            <h1 className="mep-heading max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl">Affiliate information and registration</h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
               Find current availability and, when registration is available, submit a request for an affiliate link. Link registration is separate from commission creation and payout eligibility.
             </p>
             {error && <div role="alert" className="mt-6 rounded-xl border border-rose-400/30 bg-rose-950/40 p-4 text-rose-200">{error}</div>}
             {success && (
-              <div role="status" className="mt-6 rounded-xl border border-cyan-400/30 bg-slate-900 p-4 text-cyan-100">
+              <div role="status" className="mep-panel mt-6 rounded-xl border p-4 text-cyan-100">
                 <p>{success}</p>
                 {registeredUrl && <a className="mt-3 inline-block break-all underline decoration-cyan-400 underline-offset-4 focus:outline-none focus:ring-2 focus:ring-cyan-300" href={registeredUrl} target="_blank" rel="noreferrer">Open your affiliate link</a>}
                 <Link to="/support/create-ticket" className="mt-3 block underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-cyan-300">Contact support about affiliate access</Link>
@@ -142,7 +142,7 @@ function AffiliateLandingContent() {
             )}
             {statusMessage && <p role="status" className="mt-6 rounded-xl border border-slate-700 bg-slate-900/80 p-4 text-slate-300">{statusMessage}</p>}
             <button type="button" onClick={handleRegister} disabled={!canRegister}
-              className="mt-8 rounded-lg bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
+              className="mep-primary mt-8 px-6 py-3 font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
               {registrationLabel}
             </button>
             <p className="mt-3 max-w-xl text-sm text-slate-400">Program details and terms have not been independently verified here. Please contact support before relying on payable terms.</p>
@@ -150,19 +150,19 @@ function AffiliateLandingContent() {
         </section>
 
         <section className="mx-auto grid max-w-5xl gap-5 px-4 py-14 sm:px-6 md:grid-cols-2 lg:px-8">
-          <article className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
+          <article className="mep-panel rounded-2xl border p-6">
             <ShieldCheck aria-hidden="true" className="mb-4 h-7 w-7 text-cyan-300" />
-            <h2 className="text-xl font-semibold">Availability and terms</h2>
+            <h2 className="mep-heading text-xl font-semibold">Availability and terms</h2>
             <p className="mt-3 leading-7 text-slate-300">The current program status is shown above when available. Configured rates, cookie duration, thresholds, and terms are not presented as approved payable business terms on this page.</p>
           </article>
-          <article className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
+          <article className="mep-panel rounded-2xl border p-6">
             <Link2 aria-hidden="true" className="mb-4 h-7 w-7 text-cyan-300" />
-            <h2 className="text-xl font-semibold">A link is not a commission</h2>
+            <h2 className="mep-heading text-xl font-semibold">A link is not a commission</h2>
             <p className="mt-3 leading-7 text-slate-300">A link returned after registration may identify referrals. It does not itself create a commission, grant an affiliate role, or confirm payout eligibility.</p>
           </article>
-          <article className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 md:col-span-2">
+          <article className="mep-panel rounded-2xl border p-6 md:col-span-2">
             <CircleHelp aria-hidden="true" className="mb-4 h-7 w-7 text-cyan-300" />
-            <h2 className="text-xl font-semibold">Need current program information?</h2>
+            <h2 className="mep-heading text-xl font-semibold">Need current program information?</h2>
             <p className="mt-3 leading-7 text-slate-300">Contact support to ask about availability and current program terms. Registration requires a signed-in account; affiliate dashboard access is limited to accounts already authorized for that role.</p>
             <Link to="/support" className="mt-4 inline-flex rounded-md text-cyan-300 underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-cyan-300">Visit support</Link>
           </article>

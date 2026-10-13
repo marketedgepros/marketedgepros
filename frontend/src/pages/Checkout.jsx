@@ -178,7 +178,7 @@ export default function Checkout() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
               Program selection / Unpaid quote
             </p>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">
+            <h1 className="mep-heading mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">
               Review your program.
             </h1>
             <p className="mt-4 max-w-2xl leading-relaxed text-slate-300">
@@ -200,7 +200,7 @@ export default function Checkout() {
                     </p>
                     <h2
                       id="selection-program"
-                      className="mt-2 break-words text-xl font-semibold"
+                      className="mep-heading mt-2 break-words text-xl font-semibold"
                     >
                       {program.terms.name}
                     </h2>
@@ -231,7 +231,7 @@ export default function Checkout() {
                 </div>
               </section>
               <section className={panelStyle} aria-labelledby="select-addons">
-                <h2 id="select-addons" className="text-xl font-semibold">
+                <h2 id="select-addons" className="mep-heading text-xl font-semibold">
                   Optional add-ons
                 </h2>
                 <p className="mt-2 text-sm text-slate-400">
@@ -293,7 +293,7 @@ export default function Checkout() {
                     Server-priced quote
                   </p>
                 </div>
-                <h2 id="quote-summary" className="mt-3 text-2xl font-semibold">
+                <h2 id="quote-summary" className="mep-heading mt-3 text-2xl font-semibold">
                   Your quote summary
                 </h2>
                 <p className="mt-2 text-sm text-slate-400">
@@ -301,7 +301,7 @@ export default function Checkout() {
                 </p>
               </div>
               <div
-                className="rounded-xl border border-slate-700 bg-slate-950/40 p-4"
+                className="mep-panel rounded-xl border p-4"
                 aria-live="polite"
               >
                 <p className="text-xs uppercase tracking-wider text-slate-400">

@@ -32,16 +32,16 @@ const steps = [
 export default function HowItWorks() {
   return (
     <Layout>
-      <main className="min-h-screen bg-slate-950 text-slate-100">
+      <main className="mep-screen min-h-screen text-slate-100">
         <section className="relative overflow-hidden border-b border-cyan-300/10 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/50">
           <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-28 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="relative mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300">MarketEdgePros · Overview</p>
-            <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl">How it works</h1>
+            <h1 className="mep-heading max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-6xl">How it works</h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
               A practical guide to exploring available programs and reviewing their terms before making a decision.
             </p>
-            <a href="/programs" className="mt-9 inline-flex min-h-12 items-center gap-2 rounded-lg border border-cyan-300/50 bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200">
+            <a href="/programs" className="mep-primary mt-9 inline-flex min-h-12 items-center gap-2 border border-cyan-300/50 px-6 py-3 font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200">
               Browse current programs <ArrowUpRight aria-hidden="true" className="h-5 w-5" />
             </a>
           </div>
@@ -50,7 +50,7 @@ export default function HowItWorks() {
         <section aria-labelledby="process-heading" className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
           <div className="mb-10 max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">The evaluation journey</p>
-            <h2 id="process-heading" className="mt-3 text-3xl font-bold text-white sm:text-4xl">Four points to review</h2>
+            <h2 id="process-heading" className="mep-heading mt-3 text-3xl font-bold text-white sm:text-4xl">Four points to review</h2>
           </div>
           <ol className="grid gap-5 md:grid-cols-2">
             {steps.map(({ number, icon: Icon, title, description }) => (
@@ -73,7 +73,7 @@ export default function HowItWorks() {
         <section className="border-t border-slate-800 bg-slate-900/60">
           <div className="mx-auto flex max-w-6xl flex-col gap-5 px-5 py-12 sm:px-8 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white">Terms are program-specific</h2>
+              <h2 className="mep-heading text-2xl font-bold text-white">Terms are program-specific</h2>
               <p className="mt-2 max-w-2xl leading-7 text-slate-300">Use the current catalog and each program’s details as your reference. This overview does not promise evaluation outcomes, funding, trading-platform access, profit shares, or withdrawals.</p>
             </div>
             <a href="/programs" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-cyan-300/40 px-5 py-2.5 font-semibold text-cyan-200 transition-colors hover:bg-cyan-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200">

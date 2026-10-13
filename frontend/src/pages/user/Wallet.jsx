@@ -110,7 +110,7 @@ export function WalletView({
           <div className="min-w-0">
             <h2
               id="wallet-transactions-heading"
-              className="text-xl font-semibold text-white"
+              className="mep-heading text-xl font-semibold text-white"
             >
               Recorded wallet transactions
             </h2>
@@ -276,7 +276,7 @@ export default function Wallet() {
           </p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <h1 className="mep-heading flex items-center gap-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 <WalletCards
                   className="h-8 w-8 shrink-0 text-cyan-200"
                   aria-hidden="true"

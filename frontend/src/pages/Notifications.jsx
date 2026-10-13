@@ -84,7 +84,7 @@ function NotificationsView() {
     <div className="mx-auto max-w-6xl p-4 sm:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Notifications</h1>
+          <h1 className="mep-heading text-3xl font-bold text-white">Notifications</h1>
           <p className="mt-1 text-sm text-slate-300">Your recorded in-app notification history.</p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -97,13 +97,13 @@ function NotificationsView() {
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Mark all read
           </button>
           <button type="button" onClick={() => navigate('/settings/notifications')}
-            className="flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 font-medium text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-100">
+            className="mep-primary flex items-center gap-2 px-4 py-2 font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-100">
             <Settings className="h-4 w-4" aria-hidden="true" /> Settings
           </button>
         </div>
       </div>
 
-      <div className="mb-6 rounded-lg border border-cyan-300/20 bg-slate-800/70 p-1">
+      <div className="mep-panel mb-6 rounded-lg border p-1">
         <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Notification filters">
           {tabs.map((tab) => (
             <button type="button" key={tab.value} role="tab" aria-selected={activeTab === tab.value}
@@ -117,7 +117,7 @@ function NotificationsView() {
 
       {actionError && <div role="alert" className="mb-4 rounded-lg border border-red-400/50 bg-red-500/10 p-4 text-red-100">{actionError}</div>}
 
-      <div className="rounded-lg border border-cyan-300/15 bg-slate-800/60" aria-live="polite">
+      <div className="mep-panel rounded-lg border" aria-live="polite">
         {error && (
           <div role="alert" className="m-4 rounded-lg border border-red-400/50 bg-red-500/10 p-4 text-red-100">
             <p className="break-words">{error}</p>

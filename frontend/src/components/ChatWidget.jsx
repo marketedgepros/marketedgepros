@@ -205,7 +205,7 @@ export default function ChatWidget() {
               <button
                 onClick={sendMessage}
                 disabled={!inputMessage.trim() || isLoading}
-                className="shrink-0 px-4 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mep-primary shrink-0 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Send message"
               >
                 {isLoading ? (

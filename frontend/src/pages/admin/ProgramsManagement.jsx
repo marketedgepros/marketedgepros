@@ -60,7 +60,7 @@ const displayOptional = (value) => (value === null ? 'Not recorded' : value);
 function ProgramReadState({ state, error, onRetry }) {
   if (state === 'loading') {
     return (
-      <div className="rounded-xl border border-cyan-300/20 bg-slate-900/80 p-8 text-center" role="status" aria-live="polite" aria-busy="true">
+      <div className="mep-panel rounded-xl border p-8 text-center" role="status" aria-live="polite" aria-busy="true">
         <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-cyan-300" aria-hidden="true" />
         <p className="mt-3 text-sm text-slate-200">Loading the persisted program catalog…</p>
       </div>
@@ -69,7 +69,7 @@ function ProgramReadState({ state, error, onRetry }) {
   if (state === 'error') {
     return (
       <div className="rounded-xl border border-rose-400/50 bg-rose-950/30 p-6 text-rose-100" role="alert">
-        <h2 className="font-semibold">Program catalog unavailable</h2>
+        <h2 className="mep-heading font-semibold">Program catalog unavailable</h2>
         <p className="mt-1 break-words text-sm text-rose-100/90">{error}</p>
         <button type="button" onClick={onRetry} className="mt-4 rounded-md border border-rose-300/60 px-3 py-2 text-sm font-medium hover:bg-rose-900/40 focus:outline-none focus:ring-2 focus:ring-cyan-300">
           Retry catalog request
@@ -162,10 +162,10 @@ function ProgramEditor({ editor, pending, error, onClose, onSave, onChange }) {
   const title = isView ? 'Program record' : editor.program ? 'Edit persisted program' : 'Create persisted program';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4" role="presentation">
-      <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-cyan-300/25 bg-slate-900 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
+      <section className="mep-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
         <header className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
           <div>
-            <h2 id="program-editor-title" className="text-xl font-semibold text-white">{title}</h2>
+            <h2 id="program-editor-title" className="mep-heading text-xl font-semibold text-white">{title}</h2>
             <p className="mt-1 text-sm text-slate-400">Changes are submitted only after all stored fields validate.</p>
           </div>
           <button type="button" onClick={onClose} disabled={pending} className="rounded-md p-2 text-slate-300 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300" aria-label="Close program dialog">
@@ -180,7 +180,7 @@ function ProgramEditor({ editor, pending, error, onClose, onSave, onChange }) {
               {isView ? 'Close' : 'Cancel'}
             </button>
             {!isView ? (
-              <button type="submit" disabled={pending} className="inline-flex items-center gap-2 rounded-md bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-200">
+              <button type="submit" disabled={pending} className="mep-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-200">
                 {pending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                 {editor.program ? 'Save persisted changes' : 'Create program'}
               </button>
@@ -196,8 +196,8 @@ function DeleteProgramDialog({ program, pending, error, onClose, onConfirm }) {
   if (!program) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4" role="presentation">
-      <section className="w-full max-w-lg rounded-xl border border-rose-300/30 bg-slate-900 p-6 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description">
-        <h2 id="delete-program-title" className="text-xl font-semibold text-white">Delete program record?</h2>
+      <section className="mep-panel w-full max-w-lg rounded-xl border border-rose-300/30 p-6 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description">
+        <h2 id="delete-program-title" className="mep-heading text-xl font-semibold text-white">Delete program record?</h2>
         <p id="delete-program-description" className="mt-2 break-words text-sm text-slate-300">
           Delete <strong>{program.name}</strong> only if the server confirms it. The server can reject deletion when an active challenge exists.
         </p>
@@ -385,14 +385,14 @@ export default function ProgramsManagement() {
       <header className="flex flex-col gap-4 border-b border-cyan-300/15 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Administration / Catalog</p>
-          <h1 className="mt-2 text-3xl font-bold text-white">Programs management</h1>
+          <h1 className="mep-heading mt-2 text-3xl font-bold text-white">Programs management</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Review and edit persisted program schema fields. Prices and constraints are exact stored decimals; this screen does not execute payments, provider actions, or quote settlement.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <button type="button" onClick={retry} disabled={readState === 'loading' || mutationPending} className="inline-flex items-center gap-2 rounded-md border border-cyan-300/50 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-300">
             <RefreshCw className="h-4 w-4" aria-hidden="true" /> Refresh records
           </button>
-          <button type="button" onClick={() => openEditor('create')} disabled={!expectedOwner || mutationPending} className="inline-flex items-center gap-2 rounded-md bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-200">
+          <button type="button" onClick={() => openEditor('create')} disabled={!expectedOwner || mutationPending} className="mep-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-200">
             <Plus className="h-4 w-4" aria-hidden="true" /> Create program
           </button>
         </div>
@@ -402,17 +402,17 @@ export default function ProgramsManagement() {
       <ProgramReadState state={readState} error={readError} onRetry={retry} />
 
       {readState === 'ready' && programs.length === 0 ? (
-        <section className="rounded-xl border border-slate-700 bg-slate-900/70 p-8 text-center" aria-labelledby="empty-programs-title">
-          <h2 id="empty-programs-title" className="text-lg font-semibold text-white">No persisted program records</h2>
+        <section className="mep-panel rounded-xl border p-8 text-center" aria-labelledby="empty-programs-title">
+          <h2 id="empty-programs-title" className="mep-heading text-lg font-semibold text-white">No persisted program records</h2>
           <p className="mt-2 text-sm text-slate-300">The scoped catalog returned no records. Create a program only when its stored terms are available.</p>
         </section>
       ) : null}
 
       {readState === 'ready' && programs.length > 0 ? (
-        <section className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900/70" aria-labelledby="program-list-title">
+        <section className="mep-panel overflow-hidden rounded-xl border" aria-labelledby="program-list-title">
           <div className="flex flex-col gap-2 border-b border-slate-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 id="program-list-title" className="font-semibold text-white">Persisted program catalog</h2>
+              <h2 id="program-list-title" className="mep-heading font-semibold text-white">Persisted program catalog</h2>
               <p className="text-sm text-slate-400">{pagination.total} scoped record{pagination.total === 1 ? '' : 's'} · ordered by stored ID</p>
             </div>
             <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-100">Exact decimal fields</span>

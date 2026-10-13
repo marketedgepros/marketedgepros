@@ -83,14 +83,14 @@ export default function AdminLayout({ children }) {
   }, [isMobileMenuOpen]);
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
+    <div className="mep-shell flex h-screen text-white overflow-hidden">
       {/* Sidebar */}
       <aside
         id="admin-navigation"
         aria-label="Administration navigation"
         className={`
           fixed lg:static inset-y-0 left-0 z-40
-          w-72 bg-slate-800/30 backdrop-blur-xl border-r border-white/10
+          w-72 mep-chrome backdrop-blur-xl border-r
           transform transition-transform duration-200 ease-in-out motion-reduce:transition-none
           ${isMobileMenuOpen ? 'visible translate-x-0' : 'invisible lg:visible -translate-x-full lg:translate-x-0'}
           flex flex-col
@@ -152,11 +152,11 @@ export default function AdminLayout({ children }) {
                     onClick={closeMobileMenu}
                     aria-current={active ? 'page' : undefined}
                     className={`
-                      group flex items-center gap-3 px-4 py-3 rounded-xl
+                      mep-nav-item group flex items-center gap-3 px-4 py-3 rounded-xl
                       transition-all duration-200 motion-reduce:transition-none relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400
                       ${
                         active
-                          ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg shadow-cyan-500/30'
+                          ? 'bg-cyan-400/10 text-cyan-100'
                           : 'text-gray-300 hover:bg-slate-700/30 hover:text-white'
                       }
                     `}
@@ -182,7 +182,7 @@ export default function AdminLayout({ children }) {
           <button
             type="button"
             onClick={handleLogout}
-            className="group flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 w-full border border-transparent hover:border-red-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            className="mep-nav-item group flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 w-full border border-transparent hover:border-red-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             <LogOut className="w-5 h-5" />
             <span className="font-medium">Logout</span>
@@ -199,7 +199,7 @@ export default function AdminLayout({ children }) {
       {/* Main Content */}
       <main data-route-scroll-container className="min-w-0 flex-1 overflow-y-auto relative">
         {/* Top Bar */}
-        <div className="sticky top-0 z-20 bg-slate-800/50 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-4">
+        <div className="mep-chrome sticky top-0 z-20 backdrop-blur-xl border-b px-4 sm:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex items-center gap-2 sm:gap-4">
               <button
@@ -230,7 +230,7 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
         {/* Page Content */}
-        <div className="relative z-10">
+        <div className="mep-page relative z-10">
           {children}
         </div>
       </main>

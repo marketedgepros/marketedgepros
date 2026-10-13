@@ -62,7 +62,7 @@ export default function LandingFooter() {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <Link to="/" className="mb-4 flex items-center space-x-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-              <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg"></div>
+              <div className="mep-brand-mark text-lg" aria-hidden="true">M</div>
               <span className="break-words text-xl font-bold text-white">MarketEdgePros</span>
             </Link>
             <p className="text-gray-400 text-sm mb-6">
@@ -113,7 +113,7 @@ export default function LandingFooter() {
               <h3 className="text-white font-semibold mb-2">Stay Updated</h3>
               <p className="text-gray-400 text-sm">Newsletter subscriptions are not available. Contact us for current information.</p>
             </div>
-            <Link to="/contact" className="inline-flex max-w-full items-center rounded-lg bg-cyan-400 px-5 py-3 text-center text-sm font-semibold text-slate-950 hover:bg-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
+            <Link to="/contact" className="mep-cta max-w-full text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">
                 <Mail size={18} className="mr-2" />
                 Contact us
             </Link>

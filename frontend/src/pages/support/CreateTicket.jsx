@@ -43,8 +43,8 @@ const SupportUnavailable = () => (
   <Layout>
     <SEO title="Support" description="Access support resources for your account." />
     <main className="min-h-screen bg-black px-4 pt-28 sm:px-6 sm:pt-32">
-      <section className="mx-auto max-w-xl rounded-xl border border-slate-700 bg-slate-900/50 p-6 text-center sm:p-8" role="status">
-        <h1 className="text-2xl font-bold text-white">Support is unavailable</h1>
+      <section className="mep-panel mx-auto max-w-xl rounded-xl border p-6 text-center sm:p-8" role="status">
+        <h1 className="mep-heading text-2xl font-bold text-white">Support is unavailable</h1>
         <p className="mt-3 text-gray-400">Please sign in with a verified account context before creating a support ticket.</p>
       </section>
     </main>
@@ -112,14 +112,14 @@ export function CreateTicketView({ user, expectedOwner }) {
       <Layout>
         <SEO title="Support" description="Access support resources for your account." />
         <main className="min-h-screen bg-black px-4 py-16 sm:px-6 sm:py-20">
-          <section className="mx-auto max-w-2xl rounded-2xl border border-cyan-500/30 bg-slate-900/50 p-6 text-center sm:p-10">
+          <section className="mep-panel mx-auto max-w-2xl rounded-2xl border p-6 text-center sm:p-10">
             <CheckCircle className="mx-auto mb-5 h-12 w-12 text-cyan-400" aria-hidden="true" />
-            <h1 className="text-3xl font-bold text-white">Ticket created</h1>
+            <h1 className="mep-heading text-3xl font-bold text-white">Ticket created</h1>
             <p className="mt-4 text-gray-300">Your ticket number is:</p>
             <p className="mt-2 break-all font-mono text-2xl font-bold text-cyan-400">#{createdTicket.ticketNumber}</p>
             <p className="mt-5 text-gray-400">You can review this request and customer-visible replies in your ticket list.</p>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
-              <button type="button" onClick={() => navigate(`/support/ticket/${encodeURIComponent(createdTicket.ticketNumber)}`)} className="rounded-xl bg-cyan-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950">
+              <button type="button" onClick={() => navigate(`/support/ticket/${encodeURIComponent(createdTicket.ticketNumber)}`)} className="mep-primary px-6 py-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950">
                 View ticket
               </button>
               <button type="button" onClick={() => { setCreatedTicket(null); setDraft(EMPTY_DRAFT); setError(''); }} className="rounded-xl bg-slate-700 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950">
@@ -139,7 +139,7 @@ export function CreateTicketView({ user, expectedOwner }) {
         <header className="border-b border-slate-800 px-4 pb-8 pt-24 sm:px-6 sm:pb-10 sm:pt-28 lg:px-8">
           <div className="mx-auto max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-400">Support</p>
-            <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Create a support ticket</h1>
+            <h1 className="mep-heading mt-2 text-3xl font-bold text-white sm:text-4xl">Create a support ticket</h1>
             <p className="mt-3 max-w-2xl text-base text-gray-300 sm:text-lg">Describe an issue for the account you are signed in to. The support service associates the request with that account.</p>
           </div>
         </header>
@@ -186,7 +186,7 @@ export function CreateTicketView({ user, expectedOwner }) {
                 <textarea id="ticket-description" name="description" value={draft.description} onChange={handleChange} required rows={6} maxLength={20000} disabled={isSubmitting} className="w-full resize-none rounded-xl border border-slate-700 bg-black px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" placeholder="Please provide as much detail as possible about your issue..." />
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="submit" disabled={isSubmitting} className="mep-primary flex w-full items-center justify-center gap-2 px-6 py-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
                 {isSubmitting ? <><Loader className="h-5 w-5 animate-spin" aria-hidden="true" />Creating ticket…</> : <><Send className="h-5 w-5" aria-hidden="true" />Submit ticket</>}
               </button>
             </form>

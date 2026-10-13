@@ -124,7 +124,7 @@ const Article = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+        <div className="mep-screen min-h-screen from-black via-gray-900 to-black flex items-center justify-center">
           <div className="text-white text-xl" role="status" aria-live="polite">Loading...</div>
         </div>
       </Layout>
@@ -134,13 +134,13 @@ const Article = () => {
   if (error || !article) {
     return (
       <Layout>
-        <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+        <div className="mep-screen min-h-screen from-black via-gray-900 to-black flex items-center justify-center">
           <div className="text-center" role="alert">
-            <h1 className="text-4xl font-bold text-white mb-4">Unable to Load Article</h1>
+            <h1 className="mep-heading text-4xl font-bold text-white mb-4">Unable to Load Article</h1>
             <p className="text-gray-400 mb-8">We couldn't load this article. Please try again or browse the Support Hub.</p>
             <Link 
               to="/support" 
-              className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-3 rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              className="mep-primary px-6 py-3 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
             >
               Back to Support Hub
             </Link>
@@ -157,7 +157,7 @@ const Article = () => {
         <meta name="description" content={article.excerpt || article.title} />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black py-20">
+      <div className="mep-screen min-h-screen from-black via-gray-900 to-black py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Link */}
           <Link 
@@ -183,7 +183,7 @@ const Article = () => {
                 )}
               </div>
             )}
-            <h1 className="text-4xl font-bold text-white mb-4">{article.title}</h1>
+            <h1 className="mep-heading text-4xl font-bold text-white mb-4">{article.title}</h1>
             {article.excerpt && (
               <p className="text-xl text-gray-400">{article.excerpt}</p>
             )}
@@ -200,8 +200,8 @@ const Article = () => {
               <ReactMarkdown
                 className="prose prose-invert max-w-none"
                 components={{
-                  h1: ({ node, ...props }) => <h1 className="text-3xl font-bold text-white mb-4 mt-8" {...props} />,
-                  h2: ({ node, ...props }) => <h2 className="text-2xl font-bold text-white mb-3 mt-6" {...props} />,
+                  h1: ({ node, ...props }) => <h1 className="mep-heading text-3xl font-bold text-white mb-4 mt-8" {...props} />,
+                  h2: ({ node, ...props }) => <h2 className="mep-heading text-2xl font-bold text-white mb-3 mt-6" {...props} />,
                   h3: ({ node, ...props }) => <h3 className="text-xl font-bold text-cyan-400 mb-2 mt-4" {...props} />,
                   p: ({ node, ...props }) => <p className="text-gray-300 mb-4 leading-relaxed" {...props} />,
                   a: ({ node, ...props }) => <a className="text-cyan-400 hover:text-cyan-300 underline" {...props} />,
@@ -225,7 +225,7 @@ const Article = () => {
           {/* Related Articles */}
           {relatedArticles.length > 0 && (
             <div className="mb-12">
-              <h2 className="text-2xl font-bold text-white mb-6">Related Articles</h2>
+              <h2 className="mep-heading text-2xl font-bold text-white mb-6">Related Articles</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {relatedArticles.map((related) => (
                   <Link
@@ -251,14 +251,14 @@ const Article = () => {
 
           {/* Support CTA */}
           <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl p-8 text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">Still Need Help?</h2>
+            <h2 className="mep-heading text-2xl font-bold text-white mb-4">Still Need Help?</h2>
             <p className="text-gray-400 mb-6">
               Can't find what you're looking for? Contact us and we'll do our best to help.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
                 href="mailto:info@marketedgepros.com"
-                className="bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-3 rounded-lg transition-colors font-medium"
+                className="mep-primary px-8 py-3 transition-colors font-medium"
               >
                 Contact Support
               </a>

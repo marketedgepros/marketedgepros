@@ -25,7 +25,7 @@ test('careers page avoids unsupported recruiting promises, contact claims, and d
 
 test('careers layout retains navy/cyan styling and keyboard-visible link focus', () => {
   assert.match(source, /<Layout>/);
-  assert.match(source, /bg-slate-950/);
+  assert.match(source, /mep-screen/);
   assert.match(source, /text-cyan-300/);
   assert.match(source, /focus-visible:ring-2 focus-visible:ring-cyan-300/);
   assert.match(source, /aria-labelledby="open-positions"/);

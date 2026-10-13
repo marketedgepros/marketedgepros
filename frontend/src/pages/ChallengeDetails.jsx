@@ -150,7 +150,7 @@ export function ChallengeDetailsContent({ id, principal }) {
   if (!principal.ready) {
     return (
       <section className="rounded-xl border border-amber-400/35 bg-amber-950/20 p-5 text-amber-50" role="status" aria-live="polite">
-        <h1 className="text-xl font-semibold">Recorded challenge details unavailable</h1>
+        <h1 className="mep-heading text-xl font-semibold">Recorded challenge details unavailable</h1>
         <p className="mt-2 max-w-2xl break-words text-sm text-amber-100">{principal.unavailableMessage}</p>
       </section>
     );
@@ -158,7 +158,7 @@ export function ChallengeDetailsContent({ id, principal }) {
 
   if (isLoading || (view && String(view.challenge.id) !== id)) {
     return (
-      <div className="flex min-h-[20rem] items-center justify-center rounded-xl border border-white/10 bg-slate-800/50" role="status" aria-live="polite">
+      <div className="mep-panel flex min-h-[20rem] items-center justify-center rounded-xl border" role="status" aria-live="polite">
         <div className="text-center text-slate-300">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-cyan-400" />
           <p className="mt-3">Loading recorded challenge details…</p>
@@ -173,7 +173,7 @@ export function ChallengeDetailsContent({ id, principal }) {
         <div className="flex gap-3">
           <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <h1 className="font-semibold">Challenge details could not be loaded</h1>
+            <h1 className="mep-heading font-semibold">Challenge details could not be loaded</h1>
               <p className="mt-1 break-words text-sm text-red-200">{error}</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <button
@@ -216,13 +216,13 @@ export function ChallengeDetailsContent({ id, principal }) {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Unverified legacy record</p>
-            <h1 className="mt-2 break-words text-3xl font-bold text-white">{challenge.program.name || 'Unnamed program'}</h1>
+            <h1 className="mep-heading mt-2 break-words text-3xl font-bold text-white">{challenge.program.name || 'Unnamed program'}</h1>
             <p className="mt-2 text-sm text-slate-300">
               All values below are stored legacy metadata. This view does not verify payment, funding, challenge rules,
               trading evidence, or a live provider account.
             </p>
           </div>
-          <div className="rounded-lg border border-slate-600 bg-slate-900/60 px-4 py-3 text-sm">
+          <div className="mep-panel rounded-lg border px-4 py-3 text-sm">
             <p className="text-slate-400">Recorded status</p>
             <p className="mt-1 break-words font-medium text-slate-100">{displayRecordedStatus(challenge.legacy_status)}</p>
           </div>
@@ -240,19 +240,19 @@ export function ChallengeDetailsContent({ id, principal }) {
       </div>
 
       <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4" aria-label="Recorded challenge fields">
-        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+        <div className="mep-panel rounded-xl border p-5">
           <p className="text-sm text-slate-400">Recorded initial balance</p>
           <p className="mt-2 break-words font-mono text-xl font-semibold text-white">{displayRecordedValue(challenge.initial_balance)}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+        <div className="mep-panel rounded-xl border p-5">
           <p className="text-sm text-slate-400">Recorded current balance</p>
           <p className="mt-2 break-words font-mono text-xl font-semibold text-white">{displayRecordedValue(challenge.current_balance)}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+        <div className="mep-panel rounded-xl border p-5">
           <p className="text-sm text-slate-400">Observed drawdown</p>
           <p className="mt-2 break-words font-mono text-xl font-semibold text-white">{displayRecordedValue(challenge.max_drawdown_observed)}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-slate-800/50 p-5">
+        <div className="mep-panel rounded-xl border p-5">
           <p className="text-sm text-slate-400">Recorded profit/loss</p>
           <p className="mt-2 break-words font-mono text-xl font-semibold text-white">{displayRecordedValue(progress.profit_loss)}</p>
           <p className="mt-1 text-xs text-slate-400">Legacy estimated diagnostic, not approved live progress.</p>
@@ -260,8 +260,8 @@ export function ChallengeDetailsContent({ id, principal }) {
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-        <section className="rounded-xl border border-white/10 bg-slate-800/50 p-6 xl:col-span-2">
-          <h2 className="text-lg font-semibold text-white">Recorded challenge metadata</h2>
+        <section className="mep-panel rounded-xl border p-6 xl:col-span-2">
+          <h2 className="mep-heading text-lg font-semibold text-white">Recorded challenge metadata</h2>
           <dl className="mt-5 space-y-4 text-sm">
             <div className="flex justify-between gap-5 border-b border-white/10 pb-3">
               <dt className="text-slate-400">Recorded payment status</dt>
@@ -288,11 +288,11 @@ export function ChallengeDetailsContent({ id, principal }) {
           </dl>
         </section>
 
-        <section className="rounded-xl border border-white/10 bg-slate-800/50 p-6 xl:col-span-3">
+        <section className="mep-panel rounded-xl border p-6 xl:col-span-3">
           <div className="flex items-start gap-3">
             <Database className="mt-0.5 h-5 w-5 text-cyan-300" />
             <div>
-              <h2 className="text-lg font-semibold text-white">Stored MT5 metadata</h2>
+              <h2 className="mep-heading text-lg font-semibold text-white">Stored MT5 metadata</h2>
               <p className="mt-1 text-sm text-slate-300">Stored metadata is unverified and does not authenticate or connect to a provider.</p>
             </div>
           </div>

@@ -213,7 +213,7 @@ test('compiled layout keeps the public chrome and lets content shrink below fixe
   );
 
   assert.match(html, /data-shell="navbar"/);
-  assert.match(html, /<main class="min-w-0 flex-grow pt-16">/);
+  assert.match(html, /<main class="mep-page min-w-0 flex-grow pt-16">/);
   assert.match(html, /Public content/);
   assert.match(html, /data-shell="footer"/);
 });

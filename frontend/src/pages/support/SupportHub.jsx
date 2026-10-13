@@ -87,7 +87,7 @@ export default function SupportHub() {
       <section className="relative py-20 bg-black">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-teal-500/10"></div>
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
+          <h1 className="mep-heading text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
             How Can We <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Help You?</span>
           </h1>
           <p className="text-xl text-gray-400 mb-8">
@@ -145,7 +145,7 @@ export default function SupportHub() {
       {/* Categories */}
       <section className="py-20 bg-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-12 text-center">
+          <h2 className="mep-heading text-3xl md:text-4xl font-bold text-white mb-12 text-center">
             Browse by Category
           </h2>
           
@@ -154,7 +154,7 @@ export default function SupportHub() {
               <p className="text-gray-400 text-lg">Loading articles...</p>
             </div>
           ) : loadError ? (
-            <div className="rounded-xl border border-cyan-500/20 bg-slate-900/70 px-6 py-12 text-center" role="status">
+            <div className="mep-panel rounded-xl border px-6 py-12 text-center" role="status">
               <p className="text-gray-300 text-lg">Articles could not be loaded. Please try again later.</p>
             </div>
           ) : (
@@ -200,7 +200,7 @@ export default function SupportHub() {
       {/* Contact Support CTA */}
       <section className="py-20 bg-black border-t border-white/10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+          <h2 className="mep-heading text-3xl md:text-4xl font-bold text-white mb-6">
             Still Need Help?
           </h2>
           <p className="text-xl text-gray-400 mb-8">
@@ -209,7 +209,7 @@ export default function SupportHub() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to="/support/create-ticket"
-              className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white font-semibold rounded-lg hover:from-cyan-600 hover:to-teal-600 transition-all shadow-lg shadow-cyan-500/25"
+              className="mep-primary inline-flex items-center justify-center px-8 py-4 font-semibold transition-all"
             >
               <MessageCircle className="w-5 h-5 mr-2" />
               Contact Support

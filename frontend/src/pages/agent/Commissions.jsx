@@ -26,7 +26,7 @@ export function AffiliateCommissionsView({ view, loading, error, exportError, on
   const status = view?.filters?.status ?? null;
   const canExport = Boolean(view && !loading && !error);
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="mep-screen min-h-screen text-white">
       <AffiliateRecordHeader
         eyebrow="Affiliate records"
         title="Commission activity"
@@ -46,7 +46,7 @@ export function AffiliateCommissionsView({ view, loading, error, exportError, on
         <section className={`${affiliateRecordPanel} mt-6 p-4 sm:p-5`} aria-labelledby="commission-filter-heading">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 id="commission-filter-heading" className="font-semibold text-white">Server status filter</h2>
+              <h2 id="commission-filter-heading" className="mep-heading font-semibold text-white">Server status filter</h2>
               <p className="mt-1 text-sm text-slate-400">Changing the status starts again at page one. Export contains only the current verified page.</p>
             </div>
             <label className="flex shrink-0 items-center gap-3 text-sm text-slate-200" htmlFor="commission-status">
@@ -65,7 +65,7 @@ export function AffiliateCommissionsView({ view, loading, error, exportError, on
           <>
             <section className={`${affiliateRecordPanel} mt-6 overflow-hidden`} aria-labelledby="commission-records-heading">
               <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-                <h2 id="commission-records-heading" className="text-xl font-semibold">Commission records</h2>
+                <h2 id="commission-records-heading" className="mep-heading text-xl font-semibold">Commission records</h2>
                 <p className="mt-1 text-sm text-slate-400">Exact API strings are displayed without a currency, total, or payment inference.</p>
               </div>
               <div role="region" aria-label="Commission records table" tabIndex="0" className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-200">

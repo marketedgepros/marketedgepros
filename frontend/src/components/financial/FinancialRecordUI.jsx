@@ -13,7 +13,7 @@ import {
 } from "../../services/financialRecordViewService.js";
 
 export const financialPanel =
-  "min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 shadow-lg shadow-slate-950/20";
+  "mep-panel min-w-0 rounded-2xl border";
 export const financialButton =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
 export const financialDisplay = (value) =>
@@ -79,7 +79,7 @@ export function FinancialReadState({
             aria-hidden="true"
           />
           <div className="min-w-0">
-            <h2 className="font-semibold">
+            <h2 className="mep-heading font-semibold">
               Financial records could not be verified
             </h2>
             <p className="mt-1 break-words text-sm leading-6 text-rose-100/85">
@@ -116,7 +116,7 @@ export function WalletMissingState() {
           aria-hidden="true"
         />
         <div className="min-w-0">
-          <h2 className="font-semibold">No legacy wallet record was found</h2>
+          <h2 className="mep-heading font-semibold">No legacy wallet record was found</h2>
           <p className="mt-1 text-sm leading-6 text-amber-100/85">
             The service returned the canonical missing-wallet response. This is
             not a zero balance, an empty transaction history, or a financial

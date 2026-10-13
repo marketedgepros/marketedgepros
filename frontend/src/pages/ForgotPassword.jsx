@@ -36,13 +36,13 @@ export default function ForgotPassword() {
   if (success) {
     return (
       <Layout>
-        <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="mep-screen min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12">
           <div className="max-w-md w-full">
-            <div role="status" aria-live="polite" className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8 text-center">
+            <div role="status" aria-live="polite" className="mep-panel backdrop-blur-xl border rounded-2xl shadow-2xl p-8 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-full mb-4 border border-green-500/30">
                 <CheckCircle className="w-8 h-8 text-green-400" aria-hidden="true" />
               </div>
-              <h1 className="text-2xl font-bold text-white mb-2">Check Your Email</h1>
+              <h1 className="mep-heading text-2xl font-bold text-white mb-2">Check Your Email</h1>
               <p className="text-gray-400 mb-6">
                 If an account exists for <strong className="text-cyan-400">{email}</strong>, a password reset code has been requested. If eligible, check your inbox and enter the code on the next page.
               </p>
@@ -56,7 +56,7 @@ export default function ForgotPassword() {
 
   return (
     <Layout>
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="mep-screen min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full">
           {/* Decorative Background Elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -64,7 +64,7 @@ export default function ForgotPassword() {
             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="relative bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
+          <div className="mep-panel relative backdrop-blur-xl border rounded-2xl shadow-2xl p-8">
             <Link 
               to="/login" 
               className="inline-flex items-center gap-2 text-gray-400 hover:text-cyan-400 transition-colors mb-6"
@@ -77,7 +77,7 @@ export default function ForgotPassword() {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-full mb-4 shadow-lg shadow-cyan-500/30">
                 <Mail className="w-8 h-8 text-white" aria-hidden="true" />
               </div>
-              <h1 className="text-3xl font-bold text-white">Forgot Password?</h1>
+              <h1 className="mep-heading text-3xl font-bold text-white">Forgot Password?</h1>
               <p className="text-gray-400 mt-2">Enter your email to receive a reset code</p>
             </div>
 
@@ -112,7 +112,7 @@ export default function ForgotPassword() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-3 px-4 rounded-lg font-semibold hover:from-cyan-600 hover:to-teal-600 transition-all shadow-lg shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mep-primary w-full py-3 px-4 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Sending Code...' : 'Send Reset Code'}
               </button>

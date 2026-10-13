@@ -2,7 +2,7 @@ import { CircleAlert, ChevronLeft, ChevronRight, Loader2, RefreshCw, ShieldAlert
 import { PAGE_LIMIT } from '../../services/recordedTradingViewService.js';
 
 export const tradingButton = 'inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/40 px-4 py-2.5 text-sm font-semibold text-cyan-200 transition-colors hover:bg-cyan-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-40';
-export const tradingPanel = 'min-w-0 rounded-2xl border border-white/10 bg-slate-800/40 p-5 sm:p-6';
+export const tradingPanel = 'mep-panel min-w-0 rounded-2xl border p-5 sm:p-6';
 export const recordedDisplay = (value) => value === null || value === undefined || value === '' ? 'Unavailable' : String(value);
 
 export function RecordedBoundary({ scaling = false }) {
@@ -18,12 +18,12 @@ export function RecordedReadState({ loading, error, retry, empty, emptyTitle = '
     <p className="text-slate-200">Loading recorded data…</p>
   </div>;
   if (error) return <div className="rounded-2xl border border-red-400/30 bg-red-950/20 p-5 text-red-100" role="alert">
-    <h2 className="flex items-center gap-2 font-semibold"><CircleAlert className="h-5 w-5" aria-hidden="true" />Recorded data could not be loaded</h2>
+    <h2 className="mep-heading flex items-center gap-2 font-semibold"><CircleAlert className="h-5 w-5" aria-hidden="true" />Recorded data could not be loaded</h2>
     <p className="mt-2 text-sm">The service is unavailable or its response could not be validated. No zero balance or empty result has been assumed.</p>
     <button type="button" onClick={retry} className={`${tradingButton} mt-4`}><RefreshCw className="h-4 w-4" aria-hidden="true" />Retry recorded data</button>
   </div>;
   if (empty) return <section className={`${tradingPanel} py-10 text-center`}>
-    <h2 className="text-lg font-semibold text-white">{emptyTitle}</h2>
+    <h2 className="mep-heading text-lg font-semibold text-white">{emptyTitle}</h2>
     <p className="mx-auto mt-3 max-w-xl text-sm text-slate-300">{emptyMessage || 'The service returned no records for this view. This is not confirmation of provider activity or financial eligibility.'}</p>
   </section>;
   return null;

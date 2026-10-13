@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { ADMIN_PAYMENT_PAGE_LIMIT, ADMIN_PAYMENT_OFFSET_LIMIT } from "../../services/adminPaymentRecordViewService.js";
 
-export const adminPaymentPanel = "min-w-0 rounded-2xl border border-white/10 bg-slate-800/45 p-4 shadow-lg shadow-slate-950/20 sm:p-6";
+export const adminPaymentPanel = "mep-panel min-w-0 rounded-2xl border p-4 sm:p-6";
 export const adminPaymentButton = "inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/40 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-45";
 const knownPurpose = {
   challenge_purchase: "Challenge purchase",
@@ -52,7 +52,7 @@ export function AdminPaymentReadState({ loading, error, onRetry, empty, emptyTit
   if (error) {
     return (
       <div className="rounded-2xl border border-red-300/30 bg-red-950/25 p-5 text-red-100" role="alert">
-        <h2 className="flex items-center gap-2 font-semibold">
+        <h2 className="mep-heading flex items-center gap-2 font-semibold">
           <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           Recorded data could not be loaded
         </h2>
@@ -70,7 +70,7 @@ export function AdminPaymentReadState({ loading, error, onRetry, empty, emptyTit
   if (empty) {
     return (
       <section className={`${adminPaymentPanel} py-10 text-center`} aria-labelledby="admin-payment-empty-title">
-        <h2 id="admin-payment-empty-title" className="text-lg font-semibold text-white">{emptyTitle}</h2>
+        <h2 id="admin-payment-empty-title" className="mep-heading text-lg font-semibold text-white">{emptyTitle}</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-300">
           {emptyMessage || "The server returned no records for this page. This is not a financial or settlement conclusion."}
         </p>
@@ -222,7 +222,7 @@ export function ApprovalAccessRestricted() {
     <div className="space-y-5 p-4 sm:p-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Read-only record view</p>
-        <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Pending legacy payment requests</h1>
+        <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Pending legacy payment requests</h1>
       </div>
       <div className="flex gap-3 rounded-2xl border border-amber-300/25 bg-amber-950/20 p-5 text-sm leading-6 text-amber-100" role="alert">
         <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />

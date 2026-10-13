@@ -75,7 +75,7 @@ export default function FAQ() {
     const answerId = `faq-answer-${item.index}`;
     const link = answerLinks[item.index];
     return (
-      <article key={item.index} className="overflow-hidden rounded-2xl border border-cyan-900/70 bg-slate-900/80 transition-colors motion-reduce:transition-none hover:border-cyan-700">
+      <article key={item.index} className="mep-panel overflow-hidden rounded-2xl border transition-colors motion-reduce:transition-none hover:border-cyan-700">
         <button
           type="button"
           onClick={() => setOpenIndex(expanded ? null : item.index)}
@@ -104,14 +104,14 @@ export default function FAQ() {
   return (
     <Layout>
       <StructuredData type="faq" data={faqData} />
-      <main className="min-h-screen bg-slate-950 text-white">
+      <main className="mep-screen min-h-screen text-white">
         <section className="relative overflow-hidden border-b border-cyan-950 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/50 px-4 py-20 sm:py-28">
           <div className="relative mx-auto max-w-5xl text-center">
             <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-700/70 bg-cyan-950/60 text-cyan-300">
               <HelpCircle aria-hidden="true" className="h-7 w-7" />
             </div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">MarketEdgePros</p>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">Frequently Asked Questions</h1>
+            <h1 className="mep-heading text-4xl font-bold tracking-tight sm:text-6xl">Frequently Asked Questions</h1>
             <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-300">Find general information and where to check current program details.</p>
             <div className="relative mx-auto mt-9 max-w-2xl">
               <Search aria-hidden="true" className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -155,8 +155,8 @@ export default function FAQ() {
               </div>
             </div>
             {!filteredQuestions.length ? (
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-6">
-                <h2 className="text-xl font-semibold">Try another topic or search</h2>
+              <div className="mep-panel rounded-2xl border p-6">
+                <h2 className="mep-heading text-xl font-semibold">Try another topic or search</h2>
                 <p className="mt-3 leading-relaxed text-slate-300">Clear the search to see this topic, or reset filters to browse all questions. Program-specific details are in the current program listings.</p>
               </div>
             ) : hasSearch ? (
@@ -165,7 +165,7 @@ export default function FAQ() {
               <div className="space-y-12">
                 {categories.filter(({ name }) => selectedCategory === null || name === selectedCategory).map((category) => (
                   <section key={category.name}>
-                    <h2 className="mb-5 border-l-2 border-cyan-400 pl-4 text-2xl font-bold text-white">{category.name}</h2>
+                    <h2 className="mep-heading mb-5 border-l-2 border-cyan-400 pl-4 text-2xl font-bold text-white">{category.name}</h2>
                     <div className="space-y-3">{filteredQuestions.filter((item) => item.category === category.name).map((item) => renderQuestion(item))}</div>
                   </section>
                 ))}
@@ -175,10 +175,10 @@ export default function FAQ() {
         </section>
         <section className="border-t border-slate-800 bg-slate-900/60 px-4 py-14">
           <div className="mx-auto max-w-4xl text-center">
-            <h2 className="text-2xl font-bold sm:text-3xl">Need more information?</h2>
+            <h2 className="mep-heading text-2xl font-bold sm:text-3xl">Need more information?</h2>
             <p className="mt-3 text-slate-300">Visit the programs page for program-specific details, or see the contact options.</p>
             <div className="mt-7 flex flex-wrap justify-center gap-4">
-              <a href="/programs" className="rounded-lg bg-cyan-700 px-6 py-3 font-semibold text-white outline-none transition-colors hover:bg-cyan-600 focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">Explore programs</a>
+              <a href="/programs" className="mep-primary px-6 py-3 font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900">Explore programs</a>
               <a href="/contact" className="rounded-lg border border-slate-600 px-6 py-3 font-semibold text-white outline-none transition-colors hover:border-cyan-400 hover:text-cyan-200 focus-visible:ring-2 focus-visible:ring-cyan-300">Contact</a>
             </div>
           </div>

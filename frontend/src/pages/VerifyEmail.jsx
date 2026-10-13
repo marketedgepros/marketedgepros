@@ -74,14 +74,14 @@ export default function VerifyEmail() {
   if (success) {
     return (
       <Layout>
-        <main className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-slate-50 via-white to-cyan-50/70 px-4 py-12">
+        <main className="mep-screen min-h-[calc(100vh-200px)] via-white to-cyan-50/70 px-4 py-12">
           <div className="mx-auto flex min-h-[50vh] max-w-3xl items-center justify-center">
             <section className={panelClass + ' text-center'} aria-labelledby="verified-title">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100">
                 <CheckCircle className="h-8 w-8" aria-hidden="true" />
               </div>
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">Account verification</p>
-              <h1 id="verified-title" className="text-3xl font-bold tracking-tight text-slate-900">Email verified</h1>
+              <h1 id="verified-title" className="mep-heading text-3xl font-bold tracking-tight text-slate-900">Email verified</h1>
               <p className="mt-3 text-slate-600">Your email has been successfully verified. Redirecting to login…</p>
               <div className="mx-auto mt-7 h-1.5 w-24 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
                 <div className="h-full w-2/3 animate-pulse rounded-full bg-cyan-600 motion-reduce:animate-none" />
@@ -95,7 +95,7 @@ export default function VerifyEmail() {
 
   return (
     <Layout>
-      <main className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-slate-50 via-white to-cyan-50/70 px-4 py-12 sm:py-16">
+      <main className="mep-screen min-h-[calc(100vh-200px)] via-white to-cyan-50/70 px-4 py-12 sm:py-16">
         <div className="mx-auto flex max-w-5xl justify-center">
           <section className={panelClass} aria-labelledby="verify-title">
             <header className="mb-8">
@@ -103,7 +103,7 @@ export default function VerifyEmail() {
                 <Mail className="h-7 w-7" aria-hidden="true" />
               </div>
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">Account verification</p>
-              <h1 id="verify-title" className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Verify your email</h1>
+              <h1 id="verify-title" className="mep-heading text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Verify your email</h1>
               {emailFromState ? (
                 <p className="mt-3 leading-relaxed text-slate-600">Enter the 6-digit verification code for <span className="font-semibold text-slate-800">{email}</span>. If you need a new code, you can request one below.</p>
               ) : (

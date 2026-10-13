@@ -49,6 +49,6 @@ function NotificationBellView() {
       <Bell className="h-6 w-6" aria-hidden="true" />
       {knownUnreadCount > 0 && <span className="absolute right-1 top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-cyan-400 px-1 text-xs font-bold text-slate-950">{knownUnreadCount > 99 ? '99+' : knownUnreadCount}</span>}
     </button>
-    {isOpen && <div id="notification-dropdown" ref={dropdownRef} className="absolute right-0 z-50 mt-2 max-h-[600px] w-96 max-w-[calc(100vw-2rem)] rounded-lg border border-cyan-300/20 bg-slate-900 shadow-xl"><NotificationDropdown onClose={() => setIsOpen(false)} /></div>}
+    {isOpen && <div id="notification-dropdown" ref={dropdownRef} className="mep-panel absolute right-0 z-50 mt-2 max-h-[600px] w-96 max-w-[calc(100vw-2rem)] rounded-lg border shadow-xl"><NotificationDropdown onClose={() => setIsOpen(false)} /></div>}
   </div>;
 }

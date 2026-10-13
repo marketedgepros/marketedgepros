@@ -28,7 +28,7 @@ export function AffiliateReportsView({ dashboard, loading, error, onRefresh }) {
   const stats = dashboard?.stats;
   const referrals = dashboard?.recentReferrals ?? [];
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="mep-screen min-h-screen text-white">
       <AffiliateRecordHeader
         eyebrow="Affiliate reporting"
         title="Account reporting"
@@ -45,7 +45,7 @@ export function AffiliateReportsView({ dashboard, loading, error, onRefresh }) {
             <section aria-labelledby="report-overview-heading" className="mt-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h2 id="report-overview-heading" className="text-xl font-semibold">Dashboard record overview</h2>
+                  <h2 id="report-overview-heading" className="mep-heading text-xl font-semibold">Dashboard record overview</h2>
                   <p className="mt-1 text-sm text-slate-400">Only fields returned by the existing dashboard are shown; no rate or period comparison is inferred.</p>
                 </div>
                 <p className="text-sm text-amber-100">Verification: unverified legacy</p>
@@ -59,18 +59,18 @@ export function AffiliateReportsView({ dashboard, loading, error, onRefresh }) {
             </section>
 
             <section aria-labelledby="report-categories-heading" className={`${affiliateRecordPanel} mt-6 p-5 sm:p-6`}>
-              <h2 id="report-categories-heading" className="text-xl font-semibold">Legacy API commission categories</h2>
+              <h2 id="report-categories-heading" className="mep-heading text-xl font-semibold">Legacy API commission categories</h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Pending, approved, and paid are legacy labels only. They do not confirm payment, availability, or a payout entitlement.</p>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-white/10 bg-slate-950/45 p-4"><p className="text-sm text-slate-400">Pending</p><div className="mt-2"><AffiliateExactAmount value={stats.pendingCommission} /></div></div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/45 p-4"><p className="text-sm text-slate-400">Approved</p><div className="mt-2"><AffiliateExactAmount value={stats.approvedCommission} /></div></div>
-                <div className="rounded-xl border border-white/10 bg-slate-950/45 p-4"><p className="text-sm text-slate-400">Paid</p><div className="mt-2"><AffiliateExactAmount value={stats.paidCommission} /></div></div>
+                <div className="mep-panel rounded-xl border p-4"><p className="text-sm text-slate-400">Pending</p><div className="mt-2"><AffiliateExactAmount value={stats.pendingCommission} /></div></div>
+                <div className="mep-panel rounded-xl border p-4"><p className="text-sm text-slate-400">Approved</p><div className="mt-2"><AffiliateExactAmount value={stats.approvedCommission} /></div></div>
+                <div className="mep-panel rounded-xl border p-4"><p className="text-sm text-slate-400">Paid</p><div className="mt-2"><AffiliateExactAmount value={stats.paidCommission} /></div></div>
               </div>
             </section>
 
             <section className={`${affiliateRecordPanel} mt-6 overflow-hidden`} aria-labelledby="report-recent-heading">
               <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-                <h2 id="report-recent-heading" className="text-xl font-semibold">Recent referral activity</h2>
+                <h2 id="report-recent-heading" className="mep-heading text-xl font-semibold">Recent referral activity</h2>
                 <p className="mt-1 text-sm text-slate-400">At most ten identifier-only records are supplied by the dashboard. No person-level information is shown.</p>
               </div>
               <div role="region" aria-label="Recent referral activity table" tabIndex="0" className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-200">

@@ -54,7 +54,7 @@ export default function ProgramsNew() {
           <p className="mb-5 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
             Program catalog
           </p>
-          <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+          <h1 className="mep-heading max-w-2xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
             Your next challenge.
             <br />
             <span className="text-cyan-300">Know the rules first.</span>
@@ -119,7 +119,7 @@ export default function ProgramsNew() {
       >
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 id="catalog-heading" className="text-2xl font-semibold">
+            <h2 id="catalog-heading" className="mep-heading text-2xl font-semibold">
               Compare current programs
             </h2>
             <p className="mt-2 text-sm text-slate-400">

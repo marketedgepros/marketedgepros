@@ -26,7 +26,7 @@ export default function UserLayout({ children }) {
   // Loading state
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="mep-shell min-h-screen flex items-center justify-center">
         <div className="text-center" role="status" aria-live="polite">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
           <p className="text-gray-300 mt-4">Loading...</p>
@@ -44,7 +44,7 @@ export default function UserLayout({ children }) {
   if (ADMIN_ROLES.includes(role)) {
     return (
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="mep-shell min-h-screen flex items-center justify-center">
           <div className="text-center" role="status" aria-live="polite">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
             <p className="text-gray-300 mt-4">Loading...</p>
@@ -60,7 +60,7 @@ export default function UserLayout({ children }) {
   if (role === 'affiliate') {
     return (
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="mep-shell min-h-screen flex items-center justify-center">
           <div className="text-center" role="status" aria-live="polite">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
             <p className="text-gray-300 mt-4">Loading...</p>
@@ -75,7 +75,7 @@ export default function UserLayout({ children }) {
   // Trader role (default)
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="mep-shell min-h-screen flex items-center justify-center">
         <div className="text-center" role="status" aria-live="polite">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
           <p className="text-gray-300 mt-4">Loading...</p>

@@ -37,7 +37,7 @@ function CookiePolicy() {
                   <Cookie className="w-10 h-10 text-white" />
                 </div>
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold mb-6">
+              <h1 className="mep-heading text-5xl md:text-6xl font-bold mb-6">
                 Cookie <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Policy</span>
               </h1>
               <p className="text-xl text-gray-300 mb-8">
@@ -52,7 +52,7 @@ function CookiePolicy() {
           <div className="max-w-4xl mx-auto space-y-8">
             <AnalyticsStatus />
             <div className="rounded-2xl border border-amber-400/30 bg-amber-950/20 p-5 text-sm leading-6 text-amber-100 sm:p-8">
-              <h2 className="text-lg font-semibold">Cookie policy draft — awaiting approval</h2>
+              <h2 className="mep-heading text-lg font-semibold">Cookie policy draft — awaiting approval</h2>
               <p className="mt-2">
                 The policy wording below is retained for review and has not been confirmed as the
                 current collection configuration. In particular, the analytics category below does
@@ -62,7 +62,7 @@ function CookiePolicy() {
             </div>
             {/* What are cookies */}
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50">
-              <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              <h2 className="mep-heading text-3xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 What are cookies?
               </h2>
               <p className="text-gray-300 text-lg">
@@ -72,7 +72,7 @@ function CookiePolicy() {
 
             {/* How we use cookies */}
             <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50">
-              <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+              <h2 className="mep-heading text-3xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
                 How we use cookies
               </h2>
               <p className="text-gray-300 text-lg">
@@ -82,7 +82,7 @@ function CookiePolicy() {
 
             {/* Types of cookies */}
             <div>
-              <h2 className="text-3xl font-bold mb-8 text-center">Types of cookies we use</h2>
+              <h2 className="mep-heading text-3xl font-bold mb-8 text-center">Types of cookies we use</h2>
               <div className="grid md:grid-cols-3 gap-6">
                 {cookieTypes.map((type, index) => {
                   const Icon = type.icon;
@@ -101,7 +101,7 @@ function CookiePolicy() {
 
             {/* Your choices */}
             <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 rounded-2xl p-8 border border-cyan-500/30">
-              <h2 className="text-3xl font-bold mb-4">Your choices</h2>
+              <h2 className="mep-heading text-3xl font-bold mb-4">Your choices</h2>
               <p className="text-gray-300 text-lg mb-4">
                 You have the right to decide whether to accept or reject cookies. You can exercise your cookie preferences by setting or amending your web browser controls to accept or refuse cookies.
               </p>

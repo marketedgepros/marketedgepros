@@ -179,7 +179,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
         <div className="mb-8">
           <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h1 className="mb-2 text-3xl font-bold text-white sm:text-4xl">Challenge snapshots</h1>
+              <h1 className="mep-heading mb-2 text-3xl font-bold text-white sm:text-4xl">Challenge snapshots</h1>
               <p className="max-w-3xl text-gray-400">
                 Scoped recorded legacy data for administration. It is not provider-verified trading, funding, payment, or entitlement evidence.
               </p>
@@ -188,7 +188,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
               type="button"
               onClick={fetchChallenges}
               disabled={!principal || loading}
-              className="flex w-fit items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 px-4 py-2 font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mep-primary flex w-fit items-center gap-2 px-4 py-2 font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Manual refresh
@@ -244,7 +244,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
         </div>
 
         {!principal && (
-          <div className="mb-6 flex gap-3 rounded-xl border border-slate-600 bg-slate-800/70 p-4 text-slate-200" role="status" aria-live="polite">
+          <div className="mep-panel mb-6 flex gap-3 rounded-xl border p-4 text-slate-200" role="status" aria-live="polite">
             <ShieldAlert className="h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
             <p>{unavailableMessage}</p>
           </div>
@@ -256,7 +256,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
           </div>
         )}
 
-        <div className="overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm">
+        <div className="mep-panel overflow-hidden rounded-2xl border backdrop-blur-sm">
           <div className="overflow-x-auto">
             <table className="min-w-[1050px] w-full">
               <thead className="bg-slate-700/30">
@@ -283,7 +283,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
                     <td className="px-5 py-4"><div className="flex flex-col gap-1"><span className="text-gray-200">Phase: {formatPhase(challenge)}</span><span className="w-fit rounded border border-slate-600 bg-slate-700/60 px-2 py-0.5 text-xs text-gray-300">Recorded: {displayText(challenge.legacyStatus)}</span><span className="text-xs text-gray-500">Payment label: {displayText(challenge.legacyPaymentStatus)}</span></div></td>
                     <td className="px-5 py-4"><SnapshotBalances title="Challenge" balance={challenge.currentBalance} initialBalance={challenge.initialBalance} drawdown={challenge.maxDrawdownObserved} /></td>
                     <td className="px-5 py-4"><Mt5Snapshot challenge={challenge} /></td>
-                    <td className="px-5 py-4"><button type="button" onClick={() => openDetail(challenge.id)} className="inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><Eye className="h-4 w-4" aria-hidden="true" />View detail<ChevronRight className="h-4 w-4" aria-hidden="true" /></button></td>
+                    <td className="px-5 py-4"><button type="button" onClick={() => openDetail(challenge.id)} className="mep-primary inline-flex items-center gap-2 border border-cyan-500/40 px-3 py-2 text-sm font-semibold text-cyan-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><Eye className="h-4 w-4" aria-hidden="true" />View detail<ChevronRight className="h-4 w-4" aria-hidden="true" /></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -295,7 +295,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
               <p className="text-sm text-gray-400">Server page {pagination.page} of {totalPages}; {pagination.total} recorded rows in this scoped result.</p>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={loading || currentPage === 1} className="rounded-lg bg-slate-700/50 px-4 py-2 text-white transition-colors hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
-                <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={loading || totalPages === 0 || currentPage >= totalPages} className="rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 px-4 py-2 text-white transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+                <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={loading || totalPages === 0 || currentPage >= totalPages} className="mep-primary px-4 py-2 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
               </div>
             </div>
           )}
@@ -316,7 +316,7 @@ export function ChallengesManagementContent({ principal, authLoading = false }) 
 }
 
 function StatCard({ label, value, icon }) {
-  return <div className="rounded-2xl border border-slate-700/50 bg-slate-800/50 p-4 backdrop-blur-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-sm text-gray-400">{label}</p><p className="text-2xl font-bold text-white">{value}</p></div>{icon}</div></div>;
+  return <div className="mep-panel rounded-2xl border p-4 backdrop-blur-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-sm text-gray-400">{label}</p><p className="text-2xl font-bold text-white">{value}</p></div>{icon}</div></div>;
 }
 
 function SnapshotBalances({ title, balance, initialBalance, drawdown }) {
@@ -336,7 +336,7 @@ function ChallengeDetailPanel({ challenge, loading, error, onClose, selectedId }
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 p-0 backdrop-blur-sm" role="presentation">
       <section className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="challenge-detail-title">
         <div className="mb-6 flex items-start justify-between gap-4">
-          <div><p className="text-sm font-semibold uppercase tracking-wide text-cyan-300">Recorded snapshot</p><h2 id="challenge-detail-title" className="mt-1 text-2xl font-bold text-white">Challenge #{selectedId} detail</h2></div>
+          <div><p className="text-sm font-semibold uppercase tracking-wide text-cyan-300">Recorded snapshot</p><h2 id="challenge-detail-title" className="mep-heading mt-1 text-2xl font-bold text-white">Challenge #{selectedId} detail</h2></div>
           <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label="Close challenge detail"><X className="h-5 w-5" aria-hidden="true" /></button>
         </div>
         <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100"><strong>Read-only boundary.</strong> This detail does not establish a provider account, a funded result, a payment entitlement, or an evaluative outcome.</div>
@@ -356,7 +356,7 @@ function ChallengeDetailPanel({ challenge, loading, error, onClose, selectedId }
 }
 
 function DetailGroup({ title, children }) {
-  return <section className="rounded-xl border border-slate-700/70 bg-slate-800/50 p-4"><h3 className="mb-3 font-semibold text-cyan-200">{title}</h3><dl className="space-y-3">{children}</dl></section>;
+  return <section className="mep-panel rounded-xl border p-4"><h3 className="mb-3 font-semibold text-cyan-200">{title}</h3><dl className="space-y-3">{children}</dl></section>;
 }
 function DetailRow({ label, value, mono = false }) {
   return <div className="grid gap-1 sm:grid-cols-[11rem_1fr]"><dt className="text-sm text-slate-400">{label}</dt><dd className={`break-words text-sm text-slate-100 ${mono ? 'font-mono' : ''}`}>{value}</dd></div>;

@@ -56,7 +56,7 @@ export default function TraderLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="mep-shell min-h-screen">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -70,7 +70,7 @@ export default function TraderLayout({ children }) {
       <aside
         id={sidebarId}
         aria-label="Account navigation"
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-slate-800/95 backdrop-blur-sm border-r border-white/10 transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 h-full w-64 mep-chrome backdrop-blur-sm border-r transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -78,8 +78,8 @@ export default function TraderLayout({ children }) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
             <Link to={accountHome(user)} onClick={() => setSidebarOpen(false)} className="flex min-w-0 items-center space-x-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800">
-              <div className="w-8 h-8 shrink-0 bg-gradient-to-r from-cyan-400 to-cyan-500 rounded-lg flex items-center justify-center" aria-hidden="true">
-                <span className="text-white font-bold text-xl">M</span>
+              <div className="mep-brand-mark" aria-hidden="true">
+                <span className="font-bold text-xl">M</span>
               </div>
               <span className="min-w-0 truncate text-white font-bold text-lg">MarketEdgePros</span>
             </Link>
@@ -127,7 +127,7 @@ export default function TraderLayout({ children }) {
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`flex min-w-0 items-center gap-3 px-3 py-2.5 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 ${
+                  className={`mep-nav-item flex min-w-0 items-center gap-3 px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 ${
                     isActive
                       ? 'bg-cyan-400/10 text-white font-medium border border-cyan-400/30 shadow-lg shadow-cyan-400/10'
                       : 'text-gray-300 hover:bg-white/5 hover:text-white'
@@ -157,7 +157,7 @@ export default function TraderLayout({ children }) {
       {/* Main content */}
       <div className="min-w-0 lg:pl-64">
         {/* One header and one notification consumer at every viewport width. */}
-        <div className="sticky top-0 z-30 flex items-center justify-between lg:justify-end h-16 px-4 bg-slate-800/95 backdrop-blur-sm border-b border-white/10">
+        <div className="sticky top-0 z-30 flex items-center justify-between lg:justify-end h-16 px-4 mep-chrome backdrop-blur-sm border-b">
           <button
             ref={menuButtonRef}
             type="button"
@@ -170,8 +170,8 @@ export default function TraderLayout({ children }) {
             <Menu className="w-6 h-6" aria-hidden="true" />
           </button>
           <Link to={accountHome(user)} className="lg:hidden flex min-w-0 items-center space-x-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800">
-            <div className="w-8 h-8 shrink-0 bg-gradient-to-r from-cyan-400 to-cyan-500 rounded-lg flex items-center justify-center" aria-hidden="true">
-              <span className="text-white font-bold text-xl">M</span>
+            <div className="mep-brand-mark" aria-hidden="true">
+              <span className="font-bold text-xl">M</span>
             </div>
             <span className="min-w-0 truncate text-white font-bold text-lg">MarketEdgePros</span>
           </Link>
@@ -179,7 +179,7 @@ export default function TraderLayout({ children }) {
         </div>
 
         {/* Page content */}
-        <main className="min-w-0 min-h-screen bg-slate-900">{children}</main>
+        <main className="mep-page min-w-0 min-h-screen">{children}</main>
       </div>
     </div>
   );

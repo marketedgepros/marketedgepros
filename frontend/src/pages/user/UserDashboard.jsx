@@ -83,11 +83,11 @@ export function AccountGettingStarted({ dashboard }) {
     { title: 'Find support', to: '/support/my-tickets', detail: 'Review your tickets or open the support area when you need help.' },
   ];
   return (
-    <section className="mt-7 min-w-0 rounded-2xl border border-cyan-300/25 bg-slate-900/65 p-5 sm:p-6" aria-labelledby="getting-started-heading">
+    <section className="mep-panel mt-7 min-w-0 rounded-2xl border p-5 sm:p-6" aria-labelledby="getting-started-heading">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Your next steps</p>
-          <h2 id="getting-started-heading" className="mt-2 text-xl font-semibold text-white">Make this workspace yours</h2>
+          <h2 id="getting-started-heading" className="mep-heading mt-2 text-xl font-semibold text-white">Make this workspace yours</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">A guide to the areas available in your account, not a verification or completion checklist.</p>
         </div>
         <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-controls="account-starting-guide"
@@ -96,7 +96,7 @@ export function AccountGettingStarted({ dashboard }) {
         </button>
       </div>
       {expanded && <div id="account-starting-guide" className="mt-5 grid gap-3 sm:grid-cols-2">
-        {actions.map((action) => <article key={action.to} className="min-w-0 rounded-xl border border-white/10 bg-slate-950/50 p-4">
+        {actions.map((action) => <article key={action.to} className="mep-panel min-w-0 rounded-xl border p-4">
           <Link to={action.to} className="inline-flex items-center gap-2 rounded font-semibold text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
             {action.title}<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
           </Link>
@@ -109,7 +109,7 @@ export function AccountGettingStarted({ dashboard }) {
 
 export function DashboardChallengeCards({ challenges }) {
   return <div className="space-y-3 p-4 md:hidden" aria-label="Latest recorded challenge cards">
-    {challenges.map((challenge) => <article key={challenge.id} className="min-w-0 rounded-xl border border-white/10 bg-slate-950/55 p-4">
+    {challenges.map((challenge) => <article key={challenge.id} className="mep-panel min-w-0 rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Link to={`/challenges/${challenge.id}`} className="min-w-0 break-words rounded font-semibold text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">{challenge.programName || 'Program name unavailable'}</Link>
         <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-xs text-amber-100">{humanizeStatus(challenge.status)}</span>
@@ -128,7 +128,7 @@ export function DashboardChallengeCards({ challenges }) {
 export function DashboardReadState({ state, onRetry }) {
   if (state === 'loading') {
     return (
-      <section className="flex min-h-72 items-center justify-center rounded-2xl border border-white/10 bg-slate-900/70" role="status" aria-live="polite" aria-busy="true">
+      <section className="mep-panel flex min-h-72 items-center justify-center rounded-2xl border" role="status" aria-live="polite" aria-busy="true">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-cyan-300/20 border-t-cyan-300 motion-reduce:animate-none" aria-hidden="true" />
           <p className="mt-4 text-sm text-slate-300">Loading your recorded account data…</p>
@@ -143,7 +143,7 @@ export function DashboardReadState({ state, onRetry }) {
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-200" aria-hidden="true" />
           <div>
-            <h2 className="font-semibold">Your dashboard could not be verified</h2>
+            <h2 className="mep-heading font-semibold">Your dashboard could not be verified</h2>
             <p className="mt-1 text-sm leading-6 text-rose-100/85">
               No account records are shown until a complete response matches your signed-in account.
             </p>
@@ -203,7 +203,7 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Account records</p>
           <div className="mt-3 grid items-start gap-6 lg:grid-cols-[1.4fr_0.8fr] lg:gap-10">
             <div className="min-w-0">
-              <h1 className="break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <h1 className="mep-heading break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 {user.firstName ? `${user.firstName}’s challenge overview` : 'Challenge overview'}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
@@ -215,7 +215,7 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
                 <DashboardLink to="/support/my-tickets">Support</DashboardLink>
               </div>
             </div>
-            <aside className="min-w-0 rounded-2xl border border-cyan-300/20 bg-slate-900/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.35)]" aria-label="Account workspace summary">
+            <aside className="mep-panel min-w-0 rounded-2xl border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.35)]" aria-label="Account workspace summary">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Your recorded workspace</p>
               <p className="mt-3 text-4xl font-semibold tabular-nums text-white">{countLabel(statusCounts.total)} <span className="text-sm font-normal text-slate-400">challenge records</span></p>
               <p className="mt-3 text-sm leading-6 text-slate-400">{hasRecords ? 'Open a record to inspect its recorded status and available details.' : 'No challenge records in this account summary. Start by reviewing the current catalog.'}</p>
@@ -261,10 +261,10 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
 
         <AccountGettingStarted key={`${dashboard.owner.userId}:${dashboard.owner.tenantId}:${user.role}`} dashboard={dashboard} />
 
-        <section className="mt-7 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
+        <section className="mep-panel mt-7 overflow-hidden rounded-2xl border shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
           <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
-              <h2 id="latest-records-heading" className="text-xl font-semibold tracking-tight text-white">Latest recorded challenges</h2>
+              <h2 id="latest-records-heading" className="mep-heading text-xl font-semibold tracking-tight text-white">Latest recorded challenges</h2>
               <p className="mt-1 text-sm leading-6 text-slate-400">Up to five most recent records returned for your account.</p>
             </div>
             <span className="text-sm font-medium text-cyan-200">{recentChallenges.length} of 5 records</span>
@@ -397,7 +397,7 @@ export default function UserDashboard() {
     return (
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="rounded-2xl border border-rose-300/30 bg-rose-950/30 p-5 text-rose-50" role="alert">
-          <h1 className="font-semibold">Your account context is unavailable</h1>
+          <h1 className="mep-heading font-semibold">Your account context is unavailable</h1>
           <p className="mt-1 text-sm leading-6 text-rose-100/85">Sign in again before viewing account records.</p>
         </section>
       </div>

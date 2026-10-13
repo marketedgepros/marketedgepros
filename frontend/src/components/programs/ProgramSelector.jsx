@@ -79,7 +79,7 @@ export default function ProgramSelector({ programs }) {
 
   return (
     <section
-      className="rounded-2xl border border-cyan-400/35 bg-[#0c1729] p-5 shadow-[0_0_0_1px_rgba(34,211,238,0.05),0_20px_50px_rgba(2,6,23,0.35)] sm:p-7"
+      className="mep-panel rounded-2xl border p-5 shadow-[0_0_0_1px_rgba(34,211,238,0.05),0_20px_50px_rgba(2,6,23,0.35)] sm:p-7"
       aria-labelledby={headingId}
       data-program-selector="true"
     >
@@ -88,7 +88,7 @@ export default function ProgramSelector({ programs }) {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
             Current catalog
           </p>
-          <h2 id={headingId} className="mt-2 text-2xl font-semibold">
+          <h2 id={headingId} className="mep-heading mt-2 text-2xl font-semibold">
             Choose a program
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
@@ -192,7 +192,7 @@ export default function ProgramSelector({ programs }) {
 
       <article
         key={`${selectedProgram.tenantId}:${selectedProgram.id}`}
-        className="program-selector-card rounded-xl border border-cyan-300 bg-slate-950/55 p-5 shadow-[0_0_24px_rgba(34,211,238,0.08)] transition-colors duration-150 motion-reduce:transition-none sm:p-6"
+        className="mep-panel program-selector-card rounded-xl border p-5 shadow-[0_0_24px_rgba(34,211,238,0.08)] transition-colors duration-150 motion-reduce:transition-none sm:p-6"
         aria-label={`Selected program: ${selectedProgram.terms.name}`}
         data-selected-program-id={selectedProgram.id}
       >

@@ -76,7 +76,7 @@ export default function ProgramComparison({ programs }) {
       <div className="program-comparison__heading">
         <div>
           <p className="program-comparison__eyebrow">Published values only</p>
-          <h2 id={headingId}>Compare selected programs</h2>
+          <h2 className="mep-heading" id={headingId}>Compare selected programs</h2>
           <p className="program-comparison__intro" id={instructionsId}>
             Select up to three distinct catalog programs. Choose at least two to
             compare their published values side by side.

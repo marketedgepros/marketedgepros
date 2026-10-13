@@ -42,7 +42,7 @@ export function AdminWithdrawalsView({
           <div className="min-w-0">
             <h2
               id="admin-withdrawals-heading"
-              className="text-xl font-semibold text-white"
+              className="mep-heading text-xl font-semibold text-white"
             >
               Scoped withdrawal records
             </h2>
@@ -228,7 +228,7 @@ export default function WithdrawalManagement() {
           </p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <h1 className="mep-heading flex items-center gap-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 <ShieldCheck
                   className="h-8 w-8 shrink-0 text-cyan-200"
                   aria-hidden="true"

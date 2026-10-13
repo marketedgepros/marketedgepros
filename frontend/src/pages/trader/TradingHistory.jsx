@@ -47,7 +47,7 @@ function HistoryContent({ principal }) {
   return <div className="mx-auto max-w-7xl min-w-0 space-y-6 p-4 text-slate-100 sm:p-6 lg:p-8">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account records</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Trading history</h1>
+        <h1 className="mep-heading mt-2 text-3xl font-semibold tracking-tight text-white">Trading history</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Review stored trade records, filter them on the server and export the current page. Recorded figures are not live trading evidence.</p></div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={tradingButton} onClick={retry} disabled={loading}><RefreshCw className="h-4 w-4" aria-hidden="true" />Refresh records</button>
@@ -88,9 +88,9 @@ function HistoryContent({ principal }) {
         <RecordedMetric label="Rows with negative stored P/L" value={view.statistics.losing_trades} />
         <RecordedMetric label="Stored P/L sum" value={view.statistics.total_profit} hint="Currency not recorded; incomplete P/L remains unavailable." />
       </dl>
-      {view.trades.length > 0 && <section className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-800/40" aria-label="Recorded trades">
+      {view.trades.length > 0 && <section className="mep-panel min-w-0 overflow-hidden rounded-2xl border" aria-label="Recorded trades">
         <div className="flex flex-col gap-2 border-b border-white/10 p-5 sm:flex-row sm:justify-between">
-          <h2 className="font-semibold text-white">Current recorded page</h2><p className="text-xs text-slate-300">{view.trades.length} rows · currency unspecified · unverified legacy</p>
+          <h2 className="mep-heading font-semibold text-white">Current recorded page</h2><p className="text-xs text-slate-300">{view.trades.length} rows · currency unspecified · unverified legacy</p>
         </div>
         <div className="max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-cyan-300" role="region" aria-label="Scrollable recorded trade table" tabIndex={0}>
           <table className="w-full min-w-[900px] text-left text-sm">
@@ -120,7 +120,7 @@ export default function TradingHistory() {
   const user = useAuthStore((state) => state.user);
   const principal = recordedPrincipal(user);
   if (!principal || principal.role !== 'trader' || principal.tenant_id === null) return <section className={`${tradingPanel} m-4`} role="status">
-    <h1 className="text-xl font-semibold text-white">Trading history unavailable</h1><p className="mt-2 text-sm text-slate-300">A signed-in trader account with a recorded brand is required.</p>
+    <h1 className="mep-heading text-xl font-semibold text-white">Trading history unavailable</h1><p className="mt-2 text-sm text-slate-300">A signed-in trader account with a recorded brand is required.</p>
   </section>;
   return <HistoryContent key={recordedIdentityKey(principal)} principal={principal} />;
 }

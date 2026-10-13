@@ -43,7 +43,7 @@ export default function ProgramDetails() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
               {typeLabel(program.terms.type)} / Program overview
             </p>
-            <h1 className="mt-4 break-words text-3xl font-semibold tracking-tight sm:text-5xl">
+            <h1 className="mep-heading mt-4 break-words text-3xl font-semibold tracking-tight sm:text-5xl">
               {program.terms.name}
             </h1>
             <p className="mt-4 max-w-2xl leading-relaxed text-slate-300">
@@ -71,7 +71,7 @@ export default function ProgramDetails() {
           <div className="grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
             <div className="space-y-6">
               <section className={panelStyle} aria-labelledby="program-rules">
-                <h2 id="program-rules" className="mb-4 scroll-mt-28 text-xl font-semibold">
+                <h2 id="program-rules" className="mep-heading mb-4 scroll-mt-28 text-xl font-semibold">
                   Published program settings
                 </h2>
                 <ProgramRules terms={program.terms} />
@@ -97,7 +97,7 @@ export default function ProgramDetails() {
               <section className={panelStyle} aria-labelledby="program-addons">
                 <h2
                   id="program-addons"
-                  className="flex scroll-mt-28 items-center gap-2 text-xl font-semibold"
+                  className="mep-heading flex scroll-mt-28 items-center gap-2 text-xl font-semibold"
                 >
                   <Layers size={20} className="text-cyan-300" aria-hidden="true" />
                   Optional add-ons
@@ -164,7 +164,7 @@ export default function ProgramDetails() {
               </p>
               <PaymentBoundary />
               <div className="border-t border-slate-700 pt-5">
-                <h2 className="text-base font-semibold">Need more context?</h2>
+                <h2 className="mep-heading text-base font-semibold">Need more context?</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-400">
                   Browse general questions or view contact options for details
                   not specified in this listing.
