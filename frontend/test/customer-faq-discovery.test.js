@@ -33,7 +33,7 @@ restoreBootstrap();
 bootstrap.window.close();
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-faq-'));
 let compiled = source
-  .replace(/from ['"][^'"]+standardEvaluationPolicy\.js['"]/, 'from '+JSON.stringify('file:///home/ubuntu/marketedgepros-work/frontend/src/services/standardEvaluationPolicy.js'))
+  .replace(/from ['"][^'"]+standardEvaluationPolicy\.js['"]/, 'from '+JSON.stringify(pathToFileURL(path.join(frontend, 'src/services/standardEvaluationPolicy.js')).href))
   .replace(/import Layout from ['"][^'"]+['"];?/, 'const Layout = ({ children }) => <>{children}</>;')
   .replace(/import StructuredData from ['"][^'"]+['"];?/, 'const StructuredData = ({ data }) => <script type="application/ld+json" data-faq-schema>{JSON.stringify(data)}</script>;');
 for (const name of ['react', 'react-router-dom', 'lucide-react']) {
