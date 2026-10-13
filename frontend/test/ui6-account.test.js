@@ -557,7 +557,8 @@ test('UI6 account: documents failure retry is a new read, never a successful syn
 
 test('UI6 account: user dashboard links and refresh/retry controls change Router state or invoke only their supplied retry callback', async () => {
   const dashboard = {
-    user: { firstName: 'Ada' },
+    owner: { userId: 41, tenantId: 7 },
+    user: { id: 41, tenantId: 7, role: 'user', firstName: 'Ada' },
     statistics: { statusCounts: { total: 1, active: 1, passed: 0, failed: 0, funded: 0 }, successRate: null },
     recentChallenges: [{ id: 10, programName: 'Recorded challenge', phase: 1, totalPhases: 2, status: 'active', statusDataStatus: 'recorded', currentBalance: '1000.00', profit: '0.00', profitDataStatus: 'recorded', progressDataStatus: 'unavailable', createdAt: '2026-02-28T12:00:00Z' }],
   };

@@ -38,7 +38,7 @@ const humanizeStatus = (value) => (
 
 function MetricCard({ label, value, description, icon: Icon }) {
   return (
-    <article className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-lg shadow-slate-950/20">
+    <article className="min-w-0 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/70 to-slate-900/90 p-5 shadow-lg shadow-slate-950/20 transition-colors hover:border-cyan-300/30 motion-reduce:transition-none">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-300">{label}</p>
@@ -64,6 +64,65 @@ function DashboardLink({ to, children, primary = false }) {
       {children}
     </Link>
   );
+}
+
+export function AccountGettingStarted({ dashboard }) {
+  const [expanded, setExpanded] = useState(true);
+  const hasRecords = dashboard.statistics.statusCounts.total > 0;
+  const profileContext = dashboard.user.firstName === null
+    ? 'Your first name was not returned. Review your profile; completeness has not been checked.'
+    : 'A first name is recorded. Review your contact details; profile completeness has not been checked.';
+  const actions = [
+    { title: 'Review your profile', to: '/profile', detail: profileContext },
+    { title: hasRecords ? 'Explore your challenge records' : 'Explore current programs',
+      to: hasRecords ? '/challenges' : '/programs',
+      detail: hasRecords
+        ? `${countLabel(dashboard.statistics.statusCounts.total)} challenge records were returned in the account summary. Recorded status is not live activity.`
+        : 'The account summary contains no challenge records. You can compare the current catalog; payment and activation are not enabled.' },
+    { title: 'Review your documents', to: '/documents', detail: 'Open your document records to check their status. Identity verification is not confirmed by this dashboard.' },
+    { title: 'Find support', to: '/support/my-tickets', detail: 'Review your tickets or open the support area when you need help.' },
+  ];
+  return (
+    <section className="mt-7 min-w-0 rounded-2xl border border-cyan-300/25 bg-slate-900/65 p-5 sm:p-6" aria-labelledby="getting-started-heading">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Your next steps</p>
+          <h2 id="getting-started-heading" className="mt-2 text-xl font-semibold text-white">Make this workspace yours</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">A guide to the areas available in your account, not a verification or completion checklist.</p>
+        </div>
+        <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} aria-controls="account-starting-guide"
+          className="rounded-lg border border-white/20 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-cyan-300 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+          {expanded ? 'Hide getting-started guide' : 'Show getting-started guide'}
+        </button>
+      </div>
+      {expanded && <div id="account-starting-guide" className="mt-5 grid gap-3 sm:grid-cols-2">
+        {actions.map((action) => <article key={action.to} className="min-w-0 rounded-xl border border-white/10 bg-slate-950/50 p-4">
+          <Link to={action.to} className="inline-flex items-center gap-2 rounded font-semibold text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
+            {action.title}<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+          </Link>
+          <p className="mt-2 text-sm leading-6 text-slate-400">{action.detail}</p>
+        </article>)}
+      </div>}
+    </section>
+  );
+}
+
+export function DashboardChallengeCards({ challenges }) {
+  return <div className="space-y-3 p-4 md:hidden" aria-label="Latest recorded challenge cards">
+    {challenges.map((challenge) => <article key={challenge.id} className="min-w-0 rounded-xl border border-white/10 bg-slate-950/55 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Link to={`/challenges/${challenge.id}`} className="min-w-0 break-words rounded font-semibold text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">{challenge.programName || 'Program name unavailable'}</Link>
+        <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-xs text-amber-100">{humanizeStatus(challenge.status)}</span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-400">Phase {challenge.phase === null ? 'unavailable' : challenge.phase}{challenge.totalPhases === null ? '' : ` of ${challenge.totalPhases}`} · {formatRecordedDate(challenge.createdAt)}</p>
+      <dl className="mt-4 space-y-3 text-sm">
+        <div><dt className="text-slate-400">Recorded balance</dt><dd className="mt-1 break-all font-mono tabular-nums text-slate-100">{formatRecordedAmount(challenge.currentBalance)}</dd><dd className="text-xs text-slate-400">Currency unavailable</dd></div>
+        <div><dt className="text-slate-400">Recorded change</dt><dd className="mt-1 break-all font-mono tabular-nums text-slate-100">{formatRecordedAmount(challenge.profit)}</dd><dd className="text-xs text-slate-400">{humanizeStatus(challenge.profitDataStatus)}</dd></div>
+        <div><dt className="text-slate-400">Progress</dt><dd className="mt-1 text-slate-300">Unavailable</dd><dd className="text-xs text-slate-400">{humanizeStatus(challenge.progressDataStatus)}</dd></div>
+      </dl>
+      <p className="mt-4 border-t border-white/10 pt-3 text-xs text-slate-400">{humanizeStatus(challenge.statusDataStatus)} · not a confirmation of live trading or funding.</p>
+    </article>)}
+  </div>;
 }
 
 export function DashboardReadState({ state, onRetry }) {
@@ -108,6 +167,7 @@ export function DashboardReadState({ state, onRetry }) {
 export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) {
   const { user, statistics, recentChallenges } = dashboard;
   const { statusCounts } = statistics;
+  const hasRecords = statusCounts.total > 0;
   const recordedRatio = statistics.successRate === null ? 'Unavailable' : `${statistics.successRate}%`;
   const metrics = [
     {
@@ -138,10 +198,10 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
 
   return (
     <>
-      <section className="border-b border-cyan-300/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-slate-950 to-slate-950">
+      <section className="border-b border-cyan-300/15 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-cyan-500/15 via-slate-950 to-slate-950">
         <div className="mx-auto max-w-7xl px-4 py-9 sm:px-6 lg:px-8 lg:py-11">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Account records</p>
-          <div className="mt-3 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div className="mt-3 grid items-start gap-6 lg:grid-cols-[1.4fr_0.8fr] lg:gap-10">
             <div className="min-w-0">
               <h1 className="break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 {user.firstName ? `${user.firstName}’s challenge overview` : 'Challenge overview'}
@@ -149,14 +209,22 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
                 Review the latest locally recorded challenge statuses for this account. This page does not verify provider activity or financial outcomes.
               </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <DashboardLink to={hasRecords ? '/challenges' : '/programs'} primary>{hasRecords ? 'All challenges' : 'Explore programs'} <ArrowRight className="h-4 w-4" aria-hidden="true" /></DashboardLink>
+                <DashboardLink to="/profile">Profile</DashboardLink>
+                <DashboardLink to="/support/my-tickets">Support</DashboardLink>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <DashboardLink to="/challenges" primary>All challenges <ArrowRight className="h-4 w-4" aria-hidden="true" /></DashboardLink>
-              <DashboardLink to="/programs">Programs</DashboardLink>
-              <DashboardLink to="/documents">Documents</DashboardLink>
-              <DashboardLink to="/support/my-tickets">Support</DashboardLink>
-              <DashboardLink to="/profile">Profile</DashboardLink>
-            </div>
+            <aside className="min-w-0 rounded-2xl border border-cyan-300/20 bg-slate-900/80 p-5 shadow-[0_20px_60px_rgba(2,6,23,0.35)]" aria-label="Account workspace summary">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Your recorded workspace</p>
+              <p className="mt-3 text-4xl font-semibold tabular-nums text-white">{countLabel(statusCounts.total)} <span className="text-sm font-normal text-slate-400">challenge records</span></p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">{hasRecords ? 'Open a record to inspect its recorded status and available details.' : 'No challenge records in this account summary. Start by reviewing the current catalog.'}</p>
+              <nav className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4" aria-label="Workspace resources">
+                <DashboardLink to="/programs">Programs</DashboardLink>
+                <DashboardLink to="/documents">Documents</DashboardLink>
+                {!hasRecords && <DashboardLink to="/challenges">All challenges</DashboardLink>}
+              </nav>
+            </aside>
           </div>
         </div>
       </section>
@@ -191,6 +259,8 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
           </p>
         </section>
 
+        <AccountGettingStarted key={`${dashboard.owner.userId}:${dashboard.owner.tenantId}:${user.role}`} dashboard={dashboard} />
+
         <section className="mt-7 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-slate-950/20" aria-labelledby="latest-records-heading">
           <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
@@ -206,7 +276,9 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
               <p className="mt-2 text-sm text-slate-400">You can review available programs or contact support if you expected a record here.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300" tabIndex="0" aria-label="Latest recorded challenges table">
+            <>
+            <DashboardChallengeCards challenges={recentChallenges} />
+            <div className="hidden overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300 md:block" tabIndex="0" aria-label="Latest recorded challenges table">
               <table className="w-full min-w-[920px] text-left text-sm">
                 <caption className="sr-only">Latest recorded challenges for the signed-in account</caption>
                 <thead className="bg-slate-950/45 text-xs uppercase tracking-[0.14em] text-slate-400">
@@ -252,6 +324,7 @@ export function DashboardOverview({ dashboard, onRefresh, refreshing = false }) 
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </section>
       </main>

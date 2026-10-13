@@ -17,6 +17,7 @@ import {
   secondaryAction,
 } from "../components/programs/CatalogUI";
 import ProgramSelector from "../components/programs/ProgramSelector";
+import ProgramComparison from "../components/programs/ProgramComparison";
 
 export default function ProgramsNew() {
   const catalog = useProgramCatalog();
@@ -45,6 +46,7 @@ export default function ProgramsNew() {
     activeType === "all"
       ? programs
       : programs.filter((program) => program.terms.type === activeType);
+  const catalogReady = !catalog.loading && !catalog.error && programs.length > 0;
   return (
     <CatalogPage>
       <header className="mb-12 grid items-start gap-8 lg:grid-cols-[1.35fr_1fr]">
@@ -102,13 +104,16 @@ export default function ProgramsNew() {
           </ol>
         </aside>
       </header>
-      {!catalog.loading && !catalog.error && programs.length > 0 && (
+      {catalogReady && (
         <section className="mb-10" aria-label="Program chooser">
           <ProgramSelector programs={programs} />
         </section>
       )}
+      {catalogReady && (
+        <ProgramComparison key={catalog.key} programs={programs} />
+      )}
       <section
-        id="program-comparison"
+        id="program-catalog"
         className="scroll-mt-24"
         aria-labelledby="catalog-heading"
       >
@@ -123,7 +128,7 @@ export default function ProgramsNew() {
             </p>
           </div>
         </div>
-        {!catalog.loading && !catalog.error && programs.length > 0 && (
+        {catalogReady && (
           <div className="mb-7">
             <p className="mb-3 text-sm font-medium text-slate-300">
               Filter the full comparison

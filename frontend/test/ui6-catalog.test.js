@@ -99,6 +99,11 @@ selectorSource = replaceModule(selectorSource, '../../services/programCatalogVie
 const ProgramSelector = (await compile('program-selector', selectorSource)).default;
 const selectorUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-selector-')))).href;
 
+let comparisonSource = fs.readFileSync(src('components', 'programs', 'ProgramComparison.jsx'), 'utf8').replace(/import ['"][^'"]+\.css['"];?/, '');
+comparisonSource = replaceModule(comparisonSource, '../../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
+const ProgramComparison = (await compile('program-comparison', comparisonSource)).default;
+const comparisonUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-comparison-')))).href;
+
 let previewSource = fs.readFileSync(src('components', 'programs', 'CatalogPreview.jsx'), 'utf8');
 previewSource = replaceModule(previewSource, '../../hooks/useProgramCatalog', hookUrl);
 previewSource = replaceModule(previewSource, './CatalogUI', catalogUiUrl);
@@ -111,6 +116,7 @@ programsSource = replaceModule(programsSource, '../hooks/useProgramCatalog', hoo
 programsSource = replaceModule(programsSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
 programsSource = replaceModule(programsSource, '../components/programs/CatalogUI', catalogUiUrl);
 programsSource = replaceModule(programsSource, '../components/programs/ProgramSelector', selectorUrl);
+programsSource = replaceModule(programsSource, '../components/programs/ProgramComparison', comparisonUrl);
 const ProgramsNew = (await compile('programs-new', programsSource)).default;
 
 let detailsSource = fs.readFileSync(src('pages', 'ProgramDetails.jsx'), 'utf8');
@@ -286,7 +292,7 @@ test('UI6 catalog: Programs DOM loads via a signal-bound synthetic catalog, filt
     await click(button(comparisonFilter, 'Two phase'));
     assert.equal(harness.host.querySelector('[data-location]').textContent, '/programs?filter=two_phase');
     assert.equal(button(comparisonFilter, 'Two phase').getAttribute('aria-pressed'), 'true');
-    assert.equal(harness.host.textContent.includes('Lightning synthetic'), false, 'filter changes the rendered cards rather than a source-only value');
+    assert.equal(harness.host.querySelector('#program-catalog').textContent.includes('Lightning synthetic'), false, 'filter changes the rendered cards rather than a source-only value');
 
     const detail = anchor(harness.host, 'View rules & options');
     assert.equal(detail.getAttribute('href'), '/programs/12');
