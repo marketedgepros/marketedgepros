@@ -8,17 +8,22 @@ import { compilePaymentHarness, purchaseRecordsFixture } from './paymentHarness.
 import { mapOrderQuoteResponse, normalizeQuoteContext } from '../src/services/orderQuoteViewService.js';
 import * as service from '../src/services/orderPaymentViewService.js';
 
+const policyModuleUrl = new URL('../src/services/programEvaluationPolicy.js', import.meta.url).href;
+const policyOverride = {
+  'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(policyModuleUrl)};`,
+};
 const principal = { id: 2, tenant_id: 1, role: 'trader' };
 const orderId = '00000000-0000-4000-8000-000000000012';
 const address = 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb';
 const terms = { name: 'Synthetic program', type: 'one_phase', description: null, account_size: '10000.00', profit_target: null, max_daily_loss: null, max_total_loss: null, profit_split: null, profit_split_percentage: null, minimum_payout_amount: null, payout_mode: null, rules: {} };
-const quotePayload = () => ({ replayed: false, order: { id: orderId, user_id: 2, tenant_id: 1, program_id: 12, amount_minor: '1999', amount: '19.99', currency: 'USD', state: 'quoted', paid: false, snapshot_hash: 'a'.repeat(64), snapshot: { schema: 1, kind: 'purchase_quote', program_id: 12, user_id: 2, tenant_id: 1, currency: 'USD', amount: '19.99', base_amount: '19.99', entitlement: false, addons: [], terms } } });
+const instantTerms = { ...terms, name: 'Instant Funding historical record', type: 'instant_funding', profit_target: '0.00', max_daily_loss: '5.00', max_total_loss: '10.00', profit_split: '90.00', profit_split_percentage: '90.00', rules: { drawdown_type: 'static' } };
+const quotePayload = ({ programId = 12, quoteTerms = terms } = {}) => ({ replayed: false, order: { id: orderId, user_id: 2, tenant_id: 1, program_id: programId, amount_minor: '1999', amount: '19.99', currency: 'USD', state: 'quoted', paid: false, snapshot_hash: 'a'.repeat(64), snapshot: { schema: 1, kind: 'purchase_quote', program_id: programId, user_id: 2, tenant_id: 1, currency: 'USD', amount: '19.99', base_amount: '19.99', entitlement: false, addons: [], terms: quoteTerms } } });
 const quote = () => mapOrderQuoteResponse(quotePayload(), normalizeQuoteContext(12, []));
 const cap = (enabled = true, owner = principal) => ({ schema_version: 1, owner_context: { user_id: owner.id, tenant_id: owner.tenant_id, role: owner.role }, enabled, reason: enabled ? null : 'PILOT_DISABLED', quote_currency: 'USD', currencies: enabled ? [{ code: 'usdttrc20', label: 'USDT', network: 'TRC20', decimals: 6 }] : [], fee_paid_by_user: enabled ? false : null, policy_version: enabled ? 'synthetic-v1' : null, live_trading_enabled: false });
 const projection = (state = 'not_started', owner = principal) => ({ schema_version: 1, owner_context: { user_id: owner.id, tenant_id: owner.tenant_id, role: owner.role }, order_id: orderId, program_id: 12, quote_amount_minor: '1999', quote_currency: 'USD', state, paid: state === 'paid', recorded_purchase: state === 'paid', review_required: state === 'manual_review', creation_attempted: state !== 'not_started', can_create: state === 'not_started', can_refresh: !['not_started', 'creation_uncertain'].includes(state), provider_status: state === 'paid' ? 'finished' : state === 'awaiting_payment' ? 'waiting' : state === 'processing' ? 'confirming' : null, payment: ['not_started', 'creation_uncertain'].includes(state) ? null : { provider: 'nowpayments', provider_payment_id: '123456789', pay_amount: '20.000000', pay_currency: 'usdttrc20', label: 'USDT', network: 'TRC20', decimals: 6, pay_address: address, memo: null, expires_at: '2030-01-01T00:00:00Z', actually_paid: state === 'paid' ? '20.000000' : null, outcome_amount: state === 'paid' ? '19.800000' : null, outcome_currency: state === 'paid' ? 'usdttrc20' : null, fee_paid_by_user: false }, reason: null, policy_version: 'synthetic-v1', updated_at: '2026-10-13T10:00:00Z', replayed: false });
 const purchaseRow = () => ({ order_id: orderId, program_id: 12, program_name: 'Synthetic program', user_id: 2, tenant_id: 1, state: 'paid', paid: true, recorded_purchase: true, review_required: false, quote_amount_minor: '1999', quote_currency: 'USD', provider_payment_id: '123456789', pay_currency: 'usdttrc20', network: 'TRC20', actually_paid: '20.000000', outcome_amount: '19.800000', outcome_currency: 'usdttrc20', updated_at: '2026-10-13T10:00:00Z' });
 const records = () => ({ ...purchaseRecordsFixture(2, 1, 'trader'), records: [purchaseRow()], pagination: { page: 1, per_page: 20, total: 1, pages: 1, has_next: false, has_prev: false } });
-const catalog = () => ({ id: 12, tenant_id: 1, currency: 'USD', is_active: true, price: '19.99', ...terms, terms, addons: [] });
+const catalog = (id = 12, programTerms = terms) => ({ id, tenant_id: 1, currency: 'USD', is_active: true, price: '19.99', ...programTerms, terms: programTerms, addons: [] });
 
 for (const mutate of [x => x.owner_context.user_id++, x => x.owner_context.tenant_id++, x => x.owner_context.role = 'affiliate', x => x.enabled = 'true', x => x.live_trading_enabled = true, x => x.currencies[0].network = 'ERC20', x => x.fee_paid_by_user = true]) {
   test(`payment capability refuses mismatched or unapproved contract ${mutate.toString()}`, () => { const payload = cap(); mutate(payload); assert.throws(() => service.mapPaymentCapabilities(payload, principal), service.OrderPaymentContractError); });
@@ -52,9 +57,9 @@ test('collections enforce own owner and tenant, preserve absent source rather th
   const duplicate = records(); duplicate.records.push(purchaseRow()); duplicate.pagination.total = 2; assert.throws(() => service.mapPurchaseRecords(duplicate, principal));
 });
 
-const panelBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), { prefix: 'payment-panel-contract' });
-const recordsBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'payment-record-contract' });
-const checkoutBuild = await compilePaymentHarness(new URL('../src/pages/Checkout.jsx', import.meta.url), { prefix: 'payment-checkout-contract' });
+const panelBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), { prefix: 'payment-panel-contract', overrides: policyOverride });
+const recordsBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'payment-record-contract', overrides: policyOverride });
+const checkoutBuild = await compilePaymentHarness(new URL('../src/pages/Checkout.jsx', import.meta.url), { prefix: 'payment-checkout-contract', overrides: policyOverride });
 const Panel = panelBuild.module.default, Records = recordsBuild.module.default, Checkout = checkoutBuild.module.default;
 const bootstrap = new JSDOM('<body></body>');
 Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: bootstrap.window }); Object.defineProperty(globalThis, 'document', { configurable: true, writable: true, value: bootstrap.window.document });
@@ -113,6 +118,48 @@ test('normal checkout requests one frozen quote, does not create payment automat
   globalThis.__payment_auth = { user: principal, isAuthenticated: true, isLoading: false };
   globalThis.__payment_client = { get: async url => { calls.push(['GET', url]); return { data: url === '/programs/12' ? catalog() : url.includes('capabilities') ? cap(false) : projection() }; }, post: async url => { calls.push(['POST', url]); assert.equal(url, '/orders/'); return { data: quotePayload() }; } };
   try { await h.render(router()); await click(button(h.host, 'Request server quote')); assert.equal(calls.filter(x => x[0] === 'POST').length, 1); assert.equal(document.activeElement?.id, 'order-payment-title'); assert.match(h.host.textContent, /Quotes only\. Payments are not enabled/); assert.equal(h.host.querySelector('[aria-current="step"]').textContent.includes('Server quote'), true); } finally { await h.close(); }
+});
+test('direct Instant Funding checkout is Coming soon with no displayed price, quote request or payment creation', async () => {
+  const h = harness('/programs/3711/checkout'), calls = [];
+  globalThis.__payment_auth = { user: principal, isAuthenticated: true, isLoading: false };
+  globalThis.__payment_client = {
+    get: async (url) => { calls.push(['GET', url]); assert.equal(url, '/programs/3711'); return { data: catalog(3711, instantTerms) }; },
+    post: async (url) => { calls.push(['POST', url]); throw new Error('Instant Funding must not post'); },
+  };
+  try {
+    await h.render(router());
+    assert.match(h.host.textContent, /Instant Funding/);
+    assert.match(h.host.textContent, /Coming soon/);
+    assert.match(h.host.textContent, /not available for purchase, quote requests or new payments/);
+    assert.doesNotMatch(h.host.textContent, /USD 19\.99|Request server quote|Create payment details/);
+    assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+    assert.deepEqual(calls, [['GET', '/programs/3711']]);
+  } finally { await h.close(); }
+});
+test('saved Instant Funding quote remains an immutable historical read with old values and no new payment provider request', async () => {
+  const h = harness(`/programs/3711/checkout?order=${orderId}`), calls = [];
+  globalThis.__payment_auth = { user: principal, isAuthenticated: true, isLoading: false };
+  globalThis.__payment_client = {
+    get: async (url) => {
+      calls.push(['GET', url]);
+      if (url === '/programs/3711') return { data: catalog(3711, instantTerms) };
+      if (url.includes('/payment')) throw new Error('A historical Instant quote must not ask a provider for payment details');
+      return { data: quotePayload({ programId: 3711, quoteTerms: instantTerms }) };
+    },
+    post: async (url) => { calls.push(['POST', url]); throw new Error('Historical Instant Funding must not post'); },
+  };
+  try {
+    await h.render(router());
+    await act(async () => { await Promise.resolve(); });
+    assert.match(h.host.textContent, /Immutable quote summary/);
+    assert.match(h.host.textContent, /Instant Funding historical record/);
+    assert.match(h.host.textContent, /USD 19\.99/);
+    assert.match(h.host.textContent, /No new payment is available for Instant Funding/);
+    assert.match(h.host.textContent, /0%/);
+    assert.equal(button(h.host, 'Create payment details'), undefined);
+    assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+    assert.equal(calls.some(([, url]) => url.includes('/payment')), false);
+  } finally { await h.close(); }
 });
 test('guest login preserves the exact saved-order path rather than fabricating purchase status', async () => {
   const h = harness(`/programs/12/checkout?order=${orderId}`);

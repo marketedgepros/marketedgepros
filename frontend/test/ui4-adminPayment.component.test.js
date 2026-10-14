@@ -14,8 +14,15 @@ const approvalsFile = new URL("../src/pages/admin/PaymentApprovals.jsx", import.
 const paymentsTarget = new URL(`../node_modules/.ui4-admin-payments-page-${process.pid}.mjs`, import.meta.url);
 const approvalsTarget = new URL(`../node_modules/.ui4-admin-approvals-page-${process.pid}.mjs`, import.meta.url);
 const absolute = (path) => new URL(path, import.meta.url).href;
+const policyModuleUrl = new URL('../src/services/programEvaluationPolicy.js', import.meta.url).href;
+const policyOverride = {
+  'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(policyModuleUrl)};`,
+};
 
-const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui4-adminPayment-payment' });
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), {
+  prefix: 'ui4-adminPayment-payment',
+  overrides: policyOverride,
+});
 const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
 test.after(() => purchaseBuild.cleanup());
 const compilePage = async (file, target) => {

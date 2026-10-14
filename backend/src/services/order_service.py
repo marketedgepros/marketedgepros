@@ -14,6 +14,7 @@ from src.models.trading_program import TradingProgram, ProgramAddOn
 from src.models.user import User
 from src.middleware.tenant_middleware import get_tenant_from_request
 from src.services.program_catalog_service import CatalogValidationError, program_price, program_terms
+from src.services.program_evaluation_policy import is_coming_soon_program_type
 from src.utils.hierarchy_scoping import without_hierarchy_scope
 
 
@@ -173,6 +174,12 @@ class OrderService:
                                            TradingProgram.is_active.is_(True)).with_for_update(read=True).execution_options(populate_existing=True)).scalar_one_or_none()
         if program is None:
             raise OrderError('Program is unavailable', 'PROGRAM_UNAVAILABLE', 404)
+        # An existing immutable order was returned above before this mutable
+        # catalog lookup.  Direct links and current row metadata therefore
+        # cannot create a new Instant Funding quote, but cannot erase a stored
+        # historical quote replay either.
+        if program.type == 'instant_funding' or is_coming_soon_program_type(program.type):
+            raise OrderError('Program is coming soon', 'PROGRAM_COMING_SOON', 409)
         try:
             # Catalog and quote snapshots share the same stored-term validation
             # and exact-cent base price representation; neither coerces a row.

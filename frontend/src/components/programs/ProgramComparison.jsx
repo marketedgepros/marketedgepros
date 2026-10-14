@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
+import { evaluationPolicyForTerms, isProgramComingSoon } from "../../services/programEvaluationPolicy.js";
 import {
   formatCatalogMoney,
   formatCatalogPercent,
@@ -13,7 +14,12 @@ const comparisonRows = [
   ["Catalog base fee", (program) => formatCatalogMoney(program.price)],
   ["Account size", (program) => formatCatalogMoney(program.terms.account_size)],
   ["Program type", (program) => typeLabel(program.terms.type)],
-  ["Profit target", (program) => formatCatalogPercent(program.terms.profit_target)],
+  ["Profit target", (program) => {
+    const result = evaluationPolicyForTerms(program.terms);
+    return result.status === "matched"
+      ? result.policy.phase_targets.map((value, index) => `Phase ${index + 1}: ${formatCatalogPercent(value)}`).join(" · ")
+      : formatCatalogPercent(program.terms.profit_target);
+  }],
   [
     "Maximum daily loss",
     (program) => formatCatalogPercent(program.terms.max_daily_loss),
@@ -31,7 +37,8 @@ const programLabel = (program) => `${program.terms.name} #${program.id}`;
  * Compares only the normalized catalog list passed by its parent. It keeps IDs,
  * rather than program objects, so a refreshed list always supplies current values.
  */
-export default function ProgramComparison({ programs }) {
+export default function ProgramComparison({ programs: catalogPrograms }) {
+  const programs = useMemo(() => catalogPrograms.filter((program) => !isProgramComingSoon(program.terms)), [catalogPrograms]);
   const headingId = useId();
   const instructionsId = useId();
   const limitId = useId();
@@ -206,7 +213,7 @@ export default function ProgramComparison({ programs }) {
           </div>
           <div>
             <dt>Profit target, daily loss and total loss</dt>
-            <dd>Published percentage values; missing values are shown as Not specified.</dd>
+            <dd>Stage targets come from a full recorded policy. A legacy single target is not assumed to repeat in every stage. Missing values are shown as Not specified.</dd>
           </div>
           <div>
             <dt>Profit split</dt>

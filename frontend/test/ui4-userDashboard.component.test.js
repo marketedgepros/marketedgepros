@@ -12,8 +12,15 @@ const uiTarget = new URL('../node_modules/.cache-ui4-user-dashboard.mjs', import
 const guideTarget = new URL('../node_modules/.cache-ui4-account-setup.mjs', import.meta.url);
 const profileServiceUrl = new URL('../src/services/profileViewService.js', import.meta.url).href;
 const setupServiceUrl = new URL('../src/services/accountSetupViewService.js', import.meta.url).href;
+const policyModuleUrl = new URL('../src/services/programEvaluationPolicy.js', import.meta.url).href;
+const policyOverride = {
+  'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(policyModuleUrl)};`,
+};
 const service = await import(serviceUrl);
-const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui4-userDashboard-payment' });
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), {
+  prefix: 'ui4-userDashboard-payment',
+  overrides: policyOverride,
+});
 const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
 test.after(() => purchaseBuild.cleanup());
 let ui;

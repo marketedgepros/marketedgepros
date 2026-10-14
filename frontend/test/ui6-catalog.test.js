@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = (...parts) => path.join(frontend, 'src', ...parts);
 const srcUrl = (...parts) => pathToFileURL(src(...parts)).href;
+const policyUrl = srcUrl('services', 'programEvaluationPolicy.js');
 const jsdomPackage = JSON.parse(fs.readFileSync(require.resolve('jsdom/package.json'), 'utf8'));
 assert.equal(jsdomPackage.version, '28.1.0', 'UI6 catalog DOM evidence requires the pinned jsdom 28.1.0 package');
 
@@ -87,21 +88,29 @@ hookSource = replaceModule(hookSource, '../store/authStore', authStub);
 const hookModule = await compile('use-program-catalog', hookSource);
 const hookUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('use-program-catalog-')))).href;
 
+let comingSoonSource = fs.readFileSync(src('components', 'programs', 'ComingSoonProgram.jsx'), 'utf8');
+const ComingSoonProgram = (await compile('coming-soon-program', comingSoonSource)).default;
+const comingSoonUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('coming-soon-program-')))).href;
 let uiSource = fs.readFileSync(src('components', 'programs', 'CatalogUI.jsx'), 'utf8');
 uiSource = uiSource
   .replace(/import Layout from ['"]\.\.\/layout\/Layout['"];?/, 'const Layout = ({ children }) => <main data-ui6-layout="catalog">{children}</main>;')
-  .replace(/['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/, JSON.stringify(srcUrl('services', 'programCatalogViewService.js')));
+  .replace(/['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/, JSON.stringify(srcUrl('services', 'programCatalogViewService.js')))
+  .replace(/['"]\.\.\/\.\.\/services\/programEvaluationPolicy\.js['"]/, JSON.stringify(policyUrl));
+uiSource = replaceModule(uiSource, './ComingSoonProgram', comingSoonUrl);
 const catalogUi = await compile('catalog-ui', uiSource);
 const catalogUiUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('catalog-ui-')))).href;
 
 let selectorSource = fs.readFileSync(src('components', 'programs', 'ProgramSelector.jsx'), 'utf8').replace(/import ['"][^'"]+\.css['"];?/, '');
 selectorSource = replaceModule(selectorSource, './CatalogUI', catalogUiUrl);
 selectorSource = replaceModule(selectorSource, '../../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
+selectorSource = replaceModule(selectorSource, '../../services/programEvaluationPolicy.js', policyUrl);
+selectorSource = replaceModule(selectorSource, './ComingSoonProgram', comingSoonUrl);
 const ProgramSelector = (await compile('program-selector', selectorSource)).default;
 const selectorUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-selector-')))).href;
 
 let comparisonSource = fs.readFileSync(src('components', 'programs', 'ProgramComparison.jsx'), 'utf8').replace(/import ['"][^'"]+\.css['"];?/, '');
 comparisonSource = replaceModule(comparisonSource, '../../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
+comparisonSource = replaceModule(comparisonSource, '../../services/programEvaluationPolicy.js', policyUrl);
 const ProgramComparison = (await compile('program-comparison', comparisonSource)).default;
 const comparisonUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-comparison-')))).href;
 
@@ -115,6 +124,8 @@ const previewUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find
 let programsSource = fs.readFileSync(src('pages', 'ProgramsNew.jsx'), 'utf8');
 programsSource = replaceModule(programsSource, '../hooks/useProgramCatalog', hookUrl);
 programsSource = replaceModule(programsSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
+programsSource = replaceModule(programsSource, '../services/programEvaluationPolicy.js', policyUrl);
+programsSource = replaceModule(programsSource, '../components/programs/ComingSoonProgram', comingSoonUrl);
 programsSource = replaceModule(programsSource, '../components/programs/CatalogUI', catalogUiUrl);
 programsSource = replaceModule(programsSource, '../components/programs/ProgramSelector', selectorUrl);
 programsSource = replaceModule(programsSource, '../components/programs/ProgramComparison', comparisonUrl);
@@ -125,18 +136,22 @@ detailsSource = replaceModule(detailsSource, '../store/authStore', authStub);
 detailsSource = replaceModule(detailsSource, '../hooks/useProgramCatalog', hookUrl);
 detailsSource = replaceModule(detailsSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
 detailsSource = replaceModule(detailsSource, '../services/programRuleFamilies.js', srcUrl('services', 'programRuleFamilies.js'));
+detailsSource = replaceModule(detailsSource, '../services/programEvaluationPolicy.js', policyUrl);
+detailsSource = replaceModule(detailsSource, '../components/programs/ComingSoonProgram', comingSoonUrl);
 detailsSource = replaceModule(detailsSource, '../components/programs/CatalogUI', catalogUiUrl);
 const ProgramDetails = (await compile('program-details', detailsSource)).default;
 
 let familySource = fs.readFileSync(src('components', 'programs', 'ProgramRuleFamily.jsx'), 'utf8');
 familySource = replaceModule(familySource, '../../services/programCatalogViewService.js', srcUrl('services', 'programCatalogViewService.js'));
+familySource = replaceModule(familySource, '../../services/programEvaluationPolicy.js', policyUrl);
+familySource = replaceModule(familySource, './ComingSoonProgram', comingSoonUrl);
 familySource = replaceModule(familySource, './CatalogUI', catalogUiUrl);
 await compile('program-rule-family', familySource);
 const familyUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-rule-family-')))).href;
 let rulesSource = fs.readFileSync(src('pages', 'TradingRules.jsx'), 'utf8');
 rulesSource = rulesSource.replace(/import Layout from ['"][^'"]+['"];?/, 'const Layout = ({ children }) => <main>{children}</main>;');
 rulesSource = replaceModule(rulesSource, '../hooks/useProgramCatalog', hookUrl);
-rulesSource = replaceModule(rulesSource, '../services/standardEvaluationPolicy.js', srcUrl('services', 'standardEvaluationPolicy.js'));
+rulesSource = replaceModule(rulesSource, '../services/programEvaluationPolicy.js', policyUrl);
 rulesSource = replaceModule(rulesSource, '../services/programRuleFamilies.js', srcUrl('services', 'programRuleFamilies.js'));
 rulesSource = replaceModule(rulesSource, '../components/programs/ProgramRuleFamily', familyUrl);
 rulesSource = replaceModule(rulesSource, '../components/programs/CatalogUI', catalogUiUrl);
@@ -149,7 +164,13 @@ loginSource = replaceModule(loginSource, '../store/authStore', authStub);
 loginSource = replaceModule(loginSource, '../services/navigationService.js', srcUrl('services', 'navigationService.js'));
 const Login = (await compile('login-return', loginSource)).default;
 
-const paymentBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), { prefix: 'ui6-catalog-payment', overrides: { 'services/api.js': `export { default } from ${JSON.stringify(srcUrl('services', 'api.js'))};` } });
+const paymentBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), {
+  prefix: 'ui6-catalog-payment',
+  overrides: {
+    'services/api.js': `export { default } from ${JSON.stringify(srcUrl('services', 'api.js'))};`,
+    'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(policyUrl)};`,
+  },
+});
 const paymentBuildUrl = paymentBuild.targets.get(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url).pathname);
 test.after(() => paymentBuild.cleanup());
 let checkoutSource = fs.readFileSync(src('pages', 'Checkout.jsx'), 'utf8');
@@ -158,6 +179,8 @@ checkoutSource = replaceModule(checkoutSource, '../hooks/useProgramCatalog', hoo
 checkoutSource = replaceModule(checkoutSource, '../constants/roles', srcUrl('constants', 'roles.js'));
 checkoutSource = replaceModule(checkoutSource, '../services/programCatalogViewService', srcUrl('services', 'programCatalogViewService.js'));
 checkoutSource = replaceModule(checkoutSource, '../services/orderQuoteViewService', srcUrl('services', 'orderQuoteViewService.js'));
+checkoutSource = replaceModule(checkoutSource, '../services/programEvaluationPolicy.js', policyUrl);
+checkoutSource = replaceModule(checkoutSource, '../components/programs/ComingSoonProgram', comingSoonUrl);
 checkoutSource = replaceModule(checkoutSource, '../components/programs/CatalogUI', catalogUiUrl);
 checkoutSource = replaceModule(checkoutSource, '../components/payments/OrderPaymentPanel', paymentBuildUrl);
 checkoutSource = replaceModule(checkoutSource, '../services/orderPaymentViewService.js', srcUrl('services', 'orderPaymentViewService.js'));
@@ -863,7 +886,7 @@ function ruleFamiliesFixture() {
   })) };
 }
 
-test('four rule categories: one bounded catalog read, family-isolated selection, missing values and working hash/detail destinations', { concurrency: false }, async () => {
+test('four rule categories: three legacy evaluation selectors stay isolated while Instant Funding remains Coming soon', { concurrency: false }, async () => {
   const previousAdapter = api.defaults.adapter;
   const harness = installDom('/trading-rules');
   const calls = [];
@@ -876,11 +899,19 @@ test('four rule categories: one bounded catalog read, family-isolated selection,
   try {
     globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
     await renderRouter(harness, h(TradingRules), '/trading-rules', 'rules-families');
-    await waitFor(() => harness.host.querySelectorAll('[data-family-program]').length === 4, 'four selected family rules');
-    assert.equal(calls.length, 1);assert.equal(harness.host.querySelectorAll('select').length, 4);
+    await waitFor(() => harness.host.querySelectorAll('[data-family-program]').length === 3, 'three selected evaluation family rules');
+    assert.equal(calls.length, 1);assert.equal(harness.host.querySelectorAll('select').length, 3);
     const ids = [...harness.host.querySelectorAll('[id]')].map(node => node.id);assert.equal(new Set(ids).size, ids.length);
     for (const [index, family] of PROGRAM_RULE_FAMILIES.entries()) {
       const section = harness.host.querySelector('#'+family.anchor);
+      if (family.type === 'instant_funding') {
+        assert.equal(section.querySelector('select'), null);
+        assert.equal(section.querySelector('[data-family-program]'), null);
+        assert.match(section.textContent, /Coming soon/);
+        assert.match(section.textContent, /not available for purchase, quote requests or new payments/);
+        assert.equal(section.querySelector('a[href^="/programs/"]'), null);
+        continue;
+      }
       const select = section.querySelector('select');assert.equal(select.options.length, 2);
       const target = String(101 + index * 10);
       await act(async () => { select.value = target;select.dispatchEvent(new window.Event('change', { bubbles: true }));await settle(); });
@@ -891,14 +922,15 @@ test('four rule categories: one bounded catalog read, family-isolated selection,
       await click(jump);assert.equal(harness.host.querySelector('[data-location]').textContent, '/trading-rules#'+family.anchor);
     }
     assert.equal(calls.length, 1, 'selection and category navigation reuse the loaded catalog');
-    assert.deepEqual([...harness.host.querySelectorAll('[data-standard-model] dd')].map(node=>node.textContent), ['1','10%','5%','10%','90%','10%']);
+    assert.deepEqual([...harness.host.querySelectorAll('[data-shared-risk-policy] dd')].map(node=>node.textContent), ['5%','10%','90%','10%']);
+    assert.match(harness.host.textContent, /Catalog assignment pending/);
     assert.equal(JSON.stringify(fixture), before, 'neither selection nor rendering writes catalog terms');
     await click(harness.host.querySelector('#two-phase-rules a'));
     assert.equal(harness.host.querySelector('[data-location]').textContent, '/programs/111');
   } finally { api.defaults.adapter = previousAdapter;await harness.close(); }
 });
 
-test('four rule categories: failed read and identity change hide old rules; manual retry alone rereads the catalog', { concurrency: false }, async () => {
+test('four rule categories: failed read and identity change hide old evaluation rules; manual retry alone rereads the catalog', { concurrency: false }, async () => {
   const previousAdapter = api.defaults.adapter;
   const harness = installDom('/trading-rules');
   let mode = 'failure';const calls=[];
@@ -914,7 +946,7 @@ test('four rule categories: failed read and identity change hide old rules; manu
     assert.equal(harness.host.querySelectorAll('nav[aria-label="Program rule categories"] a').length,4);
     assert.doesNotMatch(harness.host.textContent,/No active program is currently listed/);
     mode='success';await click(button(harness.host,'Try again'));
-    await waitFor(()=>harness.host.querySelectorAll('[data-family-program]').length===4,'rules retry');
+    await waitFor(()=>harness.host.querySelectorAll('[data-family-program]').length===3,'rules retry');
     assert.equal(calls.length,2);
     mode='failure';globalThis.__ui6CatalogAuth={user:{id:41,tenant_id:1},isAuthenticated:true,isLoading:false};
     await renderRouter(harness,h(TradingRules),'/trading-rules','rules-failure');

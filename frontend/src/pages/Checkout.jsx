@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { FileText, RefreshCw, ArrowRight } from "lucide-react";
 import useAuthStore from "../store/authStore";
 import useProgramCatalog from "../hooks/useProgramCatalog";
+import { isProgramComingSoon } from "../services/programEvaluationPolicy.js";
+import ComingSoonProgram from "../components/programs/ComingSoonProgram";
 import { ADMIN_ROLES } from "../constants/roles";
 import { addonPriceLabel, formatCatalogMoney, mapQuotedCatalog } from "../services/programCatalogViewService";
 import {
@@ -11,7 +13,7 @@ import {
 } from "../services/orderQuoteViewService";
 import { normalizePaymentOrderId, paymentErrorMessage, readStoredPurchaseQuote } from "../services/orderPaymentViewService";
 import OrderPaymentPanel, { PurchaseProgress } from "../components/payments/OrderPaymentPanel";
-import { CatalogPage, CatalogState, BackToPrograms, ProgramRules, PaymentBoundary, primaryAction, secondaryAction, panelStyle } from "../components/programs/CatalogUI";
+import { CatalogPage, CatalogState, BackToPrograms, ProgramRules, ConfiguredRules, PaymentBoundary, primaryAction, secondaryAction, panelStyle } from "../components/programs/CatalogUI";
 
 const idle = () => ({ key: "", state: "idle", quote: null, catalogQuote: null, error: "" });
 const storedCatalog = (quote, principal) => {
@@ -29,6 +31,7 @@ export default function Checkout() {
   const [search, setSearch] = useSearchParams();
   const catalog = useProgramCatalog(programId);
   const program = catalog.data;
+  const instantComingSoon = isProgramComingSoon(program?.terms);
   const isAdmin = Boolean(user && ADMIN_ROLES.includes(user.role));
   const ownerKey = isAuthenticated && user ? `${user.id}:${user.tenant_id}:${user.role}:${programId}` : `guest:${programId}`;
   const currentOwner = useRef(ownerKey); currentOwner.current = ownerKey;
@@ -133,7 +136,7 @@ export default function Checkout() {
   };
   const requestQuote = async () => {
     if (savedOrderId) { await loadSavedQuote(); return; }
-    if (!program || !user || !isAuthenticated || isAdmin || locked || quoteRequest.current.pending) return;
+    if (!program || instantComingSoon || !user || !isAuthenticated || isAdmin || locked || quoteRequest.current.pending) return;
     const key = selectionKey, scope = ownerKey;
     const controller = new AbortController(), id = quoteRequest.current.id + 1;
     quoteRequest.current = { id, controller, pending: true };
@@ -152,7 +155,9 @@ export default function Checkout() {
   };
 
   if (authLoading || !isAuthenticated || !user || isAdmin) return <CatalogPage><CatalogState loading /></CatalogPage>;
-  const displayedTerms = program?.terms ?? quotedCatalog?.terms;
+  if (instantComingSoon && !savedOrderId) return <CatalogPage><BackToPrograms /><h1 className="mep-heading mb-7 text-3xl font-semibold sm:text-5xl">Instant Funding</h1><ComingSoonProgram showTitle={false} />{invalidSavedOrder && <p role="alert" className="mt-5 text-amber-100">The saved order reference is invalid. No order or payment has been requested.</p>}</CatalogPage>;
+  const displayedTerms = savedOrderId ? quotedCatalog?.terms : (program?.terms ?? quotedCatalog?.terms);
+  const instantReadOnly = instantComingSoon || isProgramComingSoon(quotedCatalog?.terms);
   const stage = visible.quote ? (progress.key === selectionKey ? progress.stage : 1) : 0;
   return <CatalogPage>
     <BackToPrograms />
@@ -169,14 +174,14 @@ export default function Checkout() {
         <div className="space-y-6">
           <section className={panelStyle} aria-labelledby="selection-program">
             <div className="flex flex-wrap items-start justify-between gap-4"><div>
-              <p className="text-xs uppercase tracking-wider text-slate-400">{program ? "Current catalog" : "Stored program settings"}</p>
+              <p className="text-xs uppercase tracking-wider text-slate-400">{savedOrderId || !program ? "Stored program settings" : "Current catalog"}</p>
               <h2 id="selection-program" className="mep-heading mt-2 break-words text-xl font-semibold">{displayedTerms?.name ?? "Loading stored program information"}</h2>
             </div>{program && <Link to={`/programs/${program.id}`} className="rounded text-sm text-cyan-200 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">View all rules<ArrowRight className="ml-1 inline" size={14} aria-hidden="true" /></Link>}</div>
-            <div className="mt-5 border-l-2 border-cyan-400 pl-4"><p className="text-sm text-slate-400">{program ? "Catalog base fee" : "Recorded base fee"}</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-cyan-200">{program || quotedCatalog ? formatCatalogMoney(program?.price ?? quotedCatalog.baseAmount) : "Awaiting stored record"}</p>
+            <div className="mt-5 border-l-2 border-cyan-400 pl-4"><p className="text-sm text-slate-400">{savedOrderId || !program ? "Recorded base fee" : "Catalog base fee"}</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-cyan-200">{savedOrderId ? (quotedCatalog ? formatCatalogMoney(quotedCatalog.baseAmount) : "Awaiting stored record") : program || quotedCatalog ? formatCatalogMoney(program?.price ?? quotedCatalog.baseAmount) : "Awaiting stored record"}</p>
               <p className="mt-2 text-xs text-slate-400">Not a final total or payment request.</p>
             </div>
-            {displayedTerms && <div className="mt-5"><ProgramRules terms={displayedTerms} /></div>}
+            {displayedTerms && <div className="mt-5"><ProgramRules terms={displayedTerms} historical={Boolean(savedOrderId)} /></div>}
             {!program && savedOrderId && <p className="mt-4 text-xs leading-relaxed text-slate-400">The current catalog is unavailable. Only stored order terms are shown; no current-catalog comparison is assumed.</p>}
           </section>
           <section className={panelStyle} aria-labelledby="select-addons">
@@ -212,7 +217,15 @@ export default function Checkout() {
               <div className="flex flex-wrap justify-between gap-3 border-t border-slate-700 pt-4"><dt className="font-semibold">Quoted total</dt><dd className="text-2xl font-semibold tabular-nums text-cyan-200">{formatUsdFromMinorUnits(visible.quote.order.amountMinor)}</dd></div>
             </dl>
             {quotedCatalog.comparedWithCatalog && quotedCatalog.differsFromCatalog && <p role="status" className="mt-4 rounded-lg border border-amber-300/30 p-3 text-sm text-amber-100">The quoted price or terms differ from the catalog shown when you selected this program. Review the recorded terms below. This quote is not a payment receipt.</p>}
-            <details className="mt-5 rounded-lg border border-slate-700 p-3"><summary className="cursor-pointer text-sm text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Recorded program settings</summary><h3 className="mt-4 break-words font-semibold">{quotedCatalog.terms.name}</h3><ProgramRules terms={quotedCatalog.terms} /><pre className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-relaxed text-slate-400">{JSON.stringify(quotedCatalog.terms, null, 2)}</pre></details>
+            <details className="mt-5 rounded-lg border border-slate-700 p-3">
+              <summary className="cursor-pointer text-sm text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Recorded program settings</summary>
+              <h3 className="mt-4 break-words font-semibold">{quotedCatalog.terms.name}</h3>
+              <ProgramRules terms={quotedCatalog.terms} historical />
+              {quotedCatalog.terms.description && <p className="mt-4 break-words text-sm leading-relaxed text-slate-400">Recorded description — not a current availability promise: {quotedCatalog.terms.description}</p>}
+              <p className="mt-4 text-xs leading-relaxed text-slate-400">Recorded payout settings below are historical catalog information, not confirmation of eligibility or an active payout service.</p>
+              <dl className="mt-3 space-y-2 text-sm"><div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-400">Recorded minimum payout amount</dt><dd>{quotedCatalog.terms.minimum_payout_amount === null ? "Not specified" : formatCatalogMoney(quotedCatalog.terms.minimum_payout_amount)}</dd></div><div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-400">Recorded payout mode</dt><dd>{quotedCatalog.terms.payout_mode === null ? "Not specified" : quotedCatalog.terms.payout_mode.replaceAll("_", " ")}</dd></div></dl>
+              <div className="mt-5"><ConfiguredRules terms={quotedCatalog.terms} headingId="recorded-program-additional" headingTag="h3" /></div>
+            </details>
           </div>}
           <button type="button" onClick={requestQuote} disabled={visible.state === "loading" || invalidSavedOrder || (locked && !savedOrderId)} className={`${primaryAction} w-full`}>
             {visible.state === "error" ? <RefreshCw size={18} aria-hidden="true" /> : <FileText size={18} aria-hidden="true" />}
@@ -223,7 +236,7 @@ export default function Checkout() {
           <Link to="/support/create-ticket" className={`${secondaryAction} w-full`}>Ask about availability</Link>
         </section>
       </div>
-      {visible.quote && <div ref={paymentHost} className="mt-7"><OrderPaymentPanel quote={visible.quote} principal={user} initialCreationAttempted={search.getAll("payment-requested").length === 1 && search.get("payment-requested") === "1"} onPersistOrder={onPersistOrder} onLockSelection={onLockSelection} onStageChange={onStageChange} /></div>}
+      {visible.quote && (instantReadOnly ? <div className="mt-7"><ComingSoonProgram /><p className="mt-4 text-sm text-slate-400">This saved order remains a historical read-only record. No new payment is available for Instant Funding.</p></div> : <div ref={paymentHost} className="mt-7"><OrderPaymentPanel quote={visible.quote} principal={user} initialCreationAttempted={search.getAll("payment-requested").length === 1 && search.get("payment-requested") === "1"} onPersistOrder={onPersistOrder} onLockSelection={onLockSelection} onStageChange={onStageChange} /></div>)}
     </>}
   </CatalogPage>;
 }

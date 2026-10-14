@@ -12,6 +12,9 @@ const require = createRequire(import.meta.url);
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = (relative) => path.join(frontend, 'src', relative);
 const sourceUrl = (relative) => pathToFileURL(src(relative)).href;
+const policyOverride = {
+  'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(sourceUrl('services/programEvaluationPolicy.js'))};`,
+};
 const jsdomPackage = require.resolve('jsdom/package.json');
 assert.equal(JSON.parse(fs.readFileSync(jsdomPackage, 'utf8')).version, '28.1.0');
 const { JSDOM } = await import(pathToFileURL(require.resolve('jsdom')).href);
@@ -97,7 +100,10 @@ const TraderWithdrawals = (await compile('trader-withdrawals', 'pages/trader/Wit
 const AdminWithdrawals = (await compile('admin-withdrawals', 'pages/admin/WithdrawalManagement.jsx', (text) => financialPageRewrite(
   text, financialUi.url, 'FINANCIAL_RECORD_PAGE_SIZE, FINANCIAL_WITHDRAWAL_STATUSES',
 ))).module.default;
-const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui6-financial-payment' });
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), {
+  prefix: 'ui6-financial-payment',
+  overrides: policyOverride,
+});
 const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
 test.after(() => purchaseBuild.cleanup());
 const Payments = (await compile('payments', 'pages/admin/PaymentsManagementConnected.jsx', (text) => text

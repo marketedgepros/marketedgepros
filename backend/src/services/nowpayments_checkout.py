@@ -67,6 +67,22 @@ _ROLE_ALIASES = {"user": "trader", "trader": "trader"}
 _NETWORK_ALIASES = {"TRC20": frozenset({"TRC20", "TRON-TRC20", "TRX"})}
 
 
+def _instant_bound_quote(order: PurchaseOrder) -> bool:
+    """Identify only an immutable Instant Funding quote snapshot.
+
+    This deliberately never consults the mutable program catalog: an old quote
+    remains historical evidence even after a catalog row changes.  A malformed
+    snapshot is handled by the existing order-integrity gate before callers use
+    this predicate.
+    """
+    try:
+        snapshot = json.loads(order.snapshot_json)
+        terms = snapshot.get("terms") if isinstance(snapshot, dict) else None
+        return isinstance(terms, dict) and terms.get("type") == "instant_funding"
+    except (TypeError, ValueError):
+        return False
+
+
 class CheckoutError(ValueError):
     def __init__(self, message: str, code: str = "CHECKOUT_INVALID", status: int = 400):
         super().__init__(message)
@@ -784,7 +800,8 @@ class NowPaymentsCheckoutService:
         except CheckoutError as exc:
             policy_reason = exc.code
         creation_attempted = intent is not None
-        can_create = enabled and intent is None and grant is None
+        coming_soon = _instant_bound_quote(order)
+        can_create = enabled and intent is None and grant is None and not coming_soon
         can_refresh = bool(enabled and binding is not None and intent is not None and (
             intent.last_refresh_at is None or (datetime.now(timezone.utc) - (intent.last_refresh_at if intent.last_refresh_at.tzinfo is not None else intent.last_refresh_at.replace(tzinfo=timezone.utc))).total_seconds() >= policy.refresh_min_seconds
         ))
@@ -807,7 +824,7 @@ class NowPaymentsCheckoutService:
                 "outcome_currency": observation.outcome_currency if observation else None,
                 "fee_paid_by_user": binding.fee_paid_by_user,
             }
-        reason = state_reason or (None if (can_create or can_refresh or state not in {"not_started", "unavailable"}) else policy_reason)
+        reason = state_reason or ("PROGRAM_COMING_SOON" if coming_soon and intent is None else (None if (can_create or can_refresh or state not in {"not_started", "unavailable"}) else policy_reason))
         return {
             "schema_version": 1,
             "owner_context": {"user_id": user.id, "tenant_id": tenant.id, "role": _normal_role(user.role)},
@@ -847,6 +864,8 @@ class NowPaymentsCheckoutService:
             if existing.command_key != command_key or existing.pay_currency != currency.code:
                 raise CheckoutError("A checkout command already exists for this order", "CHECKOUT_COMMAND_CONFLICT", 409)
             return existing, False
+        if _instant_bound_quote(locked):
+            raise CheckoutError("Program is coming soon", "PROGRAM_COMING_SOON", 409)
         request_body = {"order_id": locked.id, "currency": currency.code, "policy_version": policy.version, "merchant_context": policy.merchant_context}
         digest = hashlib.sha256(json.dumps(request_body, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
         intent = CheckoutIntent(
@@ -913,6 +932,11 @@ class NowPaymentsCheckoutService:
             OrderService._integrity(order)
         except OrderError:
             raise CheckoutError("Stored order integrity failed", "ORDER_INTEGRITY_FAILED", 503) from None
+        # A command from before the catalog closure must never reach the
+        # provider either.  Existing local projections and signed IPN handling
+        # use different read/reconciliation paths and remain available.
+        if _instant_bound_quote(order):
+            raise CheckoutError("Program is coming soon", "PROGRAM_COMING_SOON", 409)
         payload = cls._create_request(intent, order, policy)
         now = datetime.now(timezone.utc)
         intent.state, intent.dispatch_reserved_at, intent.updated_at = "creating", now, now

@@ -18,6 +18,10 @@ const serviceUrl = new URL('../src/services/userDashboardViewService.js', import
 const profileServiceUrl = new URL('../src/services/profileViewService.js', import.meta.url).href;
 const accountSetupServiceUrl = new URL('../src/services/accountSetupViewService.js', import.meta.url).href;
 const guideSourceUrl = new URL('../src/components/account/AccountSetupGuide.jsx', import.meta.url);
+const policyModuleUrl = new URL('../src/services/programEvaluationPolicy.js', import.meta.url).href;
+const policyOverride = {
+  'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(policyModuleUrl)};`,
+};
 const external = Object.fromEntries(['react', 'react/jsx-runtime', 'lucide-react', 'react-router-dom'].map((name) => [name, pathToFileURL(require.resolve(name)).href]));
 const resolve = (text) => Object.entries(external).reduce((s, [name, url]) => s.replaceAll(`from '${name}'`, `from ${JSON.stringify(url)}`).replaceAll(`from "${name}"`, `from ${JSON.stringify(url)}`), text);
 const guideSource = fs.readFileSync(guideSourceUrl, 'utf8')
@@ -26,7 +30,10 @@ const guideCode = await transformWithEsbuild(resolve(guideSource), guideSourceUr
 const guidePath = path.join(tmp, 'account-setup-guide.mjs');
 fs.writeFileSync(guidePath, resolve(guideCode.code));
 const guideUrl = pathToFileURL(guidePath).href;
-const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'customer-dashboard-payment' });
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), {
+  prefix: 'customer-dashboard-payment',
+  overrides: policyOverride,
+});
 const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
 test.after(() => purchaseBuild.cleanup());
 const source = fs.readFileSync(sourceUrl, 'utf8')

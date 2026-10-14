@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import useProgramCatalog from "../hooks/useProgramCatalog";
 import { typeLabel } from "../services/programCatalogViewService";
+import { isProgramComingSoon } from "../services/programEvaluationPolicy.js";
+import ComingSoonProgram from "../components/programs/ComingSoonProgram";
 import {
   CatalogPage,
   CatalogState,
@@ -37,15 +39,16 @@ export default function ProgramsNew() {
     setSearchParams(next);
   };
   const programs = catalog.data || [];
-  const types = [...new Set(programs.map((program) => program.terms.type))];
+  const evaluationPrograms = programs.filter((program) => !isProgramComingSoon(program.terms));
+  const types = [...new Set([...programs.map((program) => program.terms.type), "instant_funding"])];
   const activeType =
     selectedType === "all" || types.includes(selectedType)
       ? selectedType
       : "all";
   const visible =
     activeType === "all"
-      ? programs
-      : programs.filter((program) => program.terms.type === activeType);
+      ? evaluationPrograms
+      : evaluationPrograms.filter((program) => program.terms.type === activeType);
   const catalogReady = !catalog.loading && !catalog.error && programs.length > 0;
   return (
     <CatalogPage>
@@ -106,11 +109,11 @@ export default function ProgramsNew() {
       </header>
       {catalogReady && (
         <section className="mb-10" aria-label="Program chooser">
-          <ProgramSelector programs={programs} />
+          <ProgramSelector programs={evaluationPrograms} />
         </section>
       )}
       {catalogReady && (
-        <ProgramComparison key={catalog.key} programs={programs} />
+        <ProgramComparison key={catalog.key} programs={evaluationPrograms} />
       )}
       <section
         id="program-catalog"
@@ -146,7 +149,7 @@ export default function ProgramsNew() {
                   onClick={() => setSelectedType(type)}
                   className={`${secondaryAction} ${activeType === type ? "border-cyan-400 bg-cyan-400/10 text-cyan-200" : ""}`}
                 >
-                  {type === "all" ? "All programs" : typeLabel(type)}
+                  {type === "all" ? "All programs" : type === "instant_funding" ? "Instant Funding — Coming soon" : typeLabel(type)}
                 </button>
               ))}
             </div>
@@ -166,6 +169,7 @@ export default function ProgramsNew() {
             ))}
           </div>
         )}
+        {(activeType === "all" || activeType === "instant_funding") && <div className="mt-6"><ComingSoonProgram /></div>}
       </section>
       <div className="mt-8">
         <PaymentBoundary />

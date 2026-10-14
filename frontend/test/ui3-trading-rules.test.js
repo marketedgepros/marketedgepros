@@ -7,12 +7,13 @@ const visibleCopy = source.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ' ');
 const copyOnly = visibleCopy.replace(/className="[^"]*"/g, ' ');
 
 test('trading rules distinguish owner-approved standard model from explicit catalog rollout and immutable orders', () => {
-  assert.match(visibleCopy, /Program-specific settings are displayed in the catalog and on each program details page/);
-  assert.match(visibleCopy, /Catalog rollout pending/);
-  assert.match(visibleCopy, /This model applies only when explicitly assigned to that program/);
+  assert.match(visibleCopy, /Program-specific targets and settings are displayed above and on each program details page/);
+  assert.match(visibleCopy, /Catalog assignment pending/);
+  assert.match(visibleCopy, /only when its full policy is recorded/);
   assert.match(visibleCopy, /An existing order keeps the terms recorded with it/);
   assert.match(visibleCopy, /<Link to="\/programs"/);
-  assert.match(source, /STANDARD_EVALUATION_POLICY as policy/);
+  assert.match(source, /approvedEvaluationPolicy, evaluationPolicyForTerms/);
+  assert.match(source, /data-shared-risk-policy/);
 });
 
 test('approved loss definitions do not invent strategy permissions, penalties, funding or payout schedule', () => {

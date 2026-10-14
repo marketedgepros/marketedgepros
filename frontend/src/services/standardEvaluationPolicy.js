@@ -1,5 +1,6 @@
-// Owner-approved standard evaluation model. This module has no runtime writes,
-// network calls or live trading/payout enforcement. Catalog assignment is explicit.
+// Retained v1 snapshot compatibility. New assignments use the family policy.
+// No runtime writes, network calls or live trading/payout enforcement.
+import { EVALUATION_RULES_FAQ } from './programEvaluationPolicy.js';
 export const STANDARD_EVALUATION_POLICY = Object.freeze({
   version: 'mep-standard-evaluation-v1',
   phases: 1,
@@ -23,10 +24,8 @@ export const STANDARD_EVALUATION_POLICY = Object.freeze({
   payout_schedule: null,
 });
 
-export const STANDARD_RULES_FAQ = Object.freeze({
-  trading: `One-phase, two-phase, three-phase and Instant Funding each have a separate rule category. Choose your specific program on the rules page to read its recorded catalog settings. Individual targets for stages in multi-phase evaluations still require confirmation. The approved standard model is a single-stage evaluation with a ${STANDARD_EVALUATION_POLICY.profit_target.replace('.00', '')}% profit target, a ${STANDARD_EVALUATION_POLICY.max_daily_loss.replace('.00', '')}% maximum daily loss based on the initial account size and a ${STANDARD_EVALUATION_POLICY.max_total_loss.replace('.00', '')}% fixed maximum total loss. Assignment to catalog programs is pending. A program listing or an existing order retains its own recorded terms; this model must not be assumed to override it. Live enforcement and the account delivered after passing are not confirmed.`,
-  payout: `Each program retains its recorded profit split. The approved one-phase standard model allocates ${STANDARD_EVALUATION_POLICY.profit_split.replace('.00', '')}% of eligible profit to the trader and ${STANDARD_EVALUATION_POLICY.operator_share.replace('.00', '')}% to the operator. This is a split of eligible profit, not account capital, an evaluation profit entitlement or a guaranteed return. Catalog assignment is pending. Payout availability, eligibility, methods, timing and the precise eligible-profit definition still require confirmation.`,
-});
+// Backwards-compatible export name, not a second copy of the FAQ content.
+export const STANDARD_RULES_FAQ = EVALUATION_RULES_FAQ;
 
 // An explicit frozen copy can later be assigned to a program's rules JSON and
 // retained by the existing immutable order-snapshot protocol. Never infer a policy

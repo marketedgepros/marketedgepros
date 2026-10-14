@@ -1,6 +1,8 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ProgramRules, primaryAction } from "./CatalogUI";
+import ComingSoonProgram from "./ComingSoonProgram";
+import { isProgramComingSoon } from "../../services/programEvaluationPolicy.js";
 import {
   formatCatalogMoney,
   typeLabel,
@@ -24,7 +26,8 @@ const uniqueValues = (items, valueFor) => {
  * A presentational chooser for already-normalized catalog data. It intentionally
  * performs no catalog reads, sorting, or mutation of the supplied program list.
  */
-export default function ProgramSelector({ programs }) {
+export default function ProgramSelector({ programs: catalogPrograms }) {
+  const programs = useMemo(() => catalogPrograms.filter((program) => !isProgramComingSoon(program.terms)), [catalogPrograms]);
   const headingId = useId();
   const [selectedId, setSelectedId] = useState(() => programs[0]?.id ?? null);
   const selectedProgram =
@@ -64,7 +67,7 @@ export default function ProgramSelector({ programs }) {
     [selectedProgram, typePrograms],
   );
 
-  if (!selectedProgram) return null;
+  if (!selectedProgram) return catalogPrograms.some((program) => isProgramComingSoon(program.terms)) ? <ComingSoonProgram /> : null;
 
   const chooseType = (type) => {
     const next = programs.find((program) => program.terms.type === type);
@@ -125,6 +128,7 @@ export default function ProgramSelector({ programs }) {
                 {typeLabel(type)}
               </button>
             ))}
+            <Link to="/trading-rules#instant-funding-rules" className="inline-flex min-h-11 items-center rounded-xl border border-slate-700 px-4 py-2.5 text-sm text-slate-400 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">Instant Funding — Coming soon</Link>
           </div>
         </div>
 

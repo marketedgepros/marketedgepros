@@ -23,6 +23,18 @@ const previewTarget = new URL(
   `../node_modules/.ui5-catalog-preview-${process.pid}.mjs`,
   import.meta.url,
 );
+const comingSoonFile = new URL(
+  "../src/components/programs/ComingSoonProgram.jsx",
+  import.meta.url,
+);
+const comingSoonTarget = new URL(
+  `../node_modules/.ui5-coming-soon-${process.pid}.mjs`,
+  import.meta.url,
+);
+const policyUrl = new URL(
+  "../src/services/programEvaluationPolicy.js",
+  import.meta.url,
+).href;
 const hookStub = new URL(
   `../node_modules/.ui5-catalog-hook-${process.pid}.mjs`,
   import.meta.url,
@@ -36,11 +48,25 @@ try {
     hookStub,
     "export default function useProgramCatalog() { return globalThis.__ui5CatalogState; }\n",
   );
+  const compiledComingSoon = await transformWithEsbuild(
+    fs.readFileSync(comingSoonFile, "utf8"),
+    comingSoonFile.pathname,
+    { loader: "jsx", jsx: "automatic" },
+  );
+  fs.writeFileSync(comingSoonTarget, compiledComingSoon.code);
   const uiSource = fs
     .readFileSync(uiFile, "utf8")
     .replace(
-      /import Layout from ['"]\.\.\/layout\/Layout['"];?/,
+      /import Layout from ['"]\.\.\/layout\/Layout['"];/,
       "const Layout = ({ children }) => <main>{children}</main>;",
+    )
+    .replace(
+      /import ComingSoonProgram from ['"]\.\/ComingSoonProgram['"];/,
+      `import ComingSoonProgram from ${JSON.stringify(comingSoonTarget.href)};`,
+    )
+    .replace(
+      /['"]\.\.\/\.\.\/services\/programEvaluationPolicy\.js['"]/,
+      JSON.stringify(policyUrl),
     )
     .replace(
       /['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/,
@@ -58,8 +84,10 @@ try {
   fs.writeFileSync(uiTarget, compiledUi.code);
 
   const selectorSource = fs.readFileSync(new URL('../src/components/programs/ProgramSelector.jsx', import.meta.url), 'utf8')
-    .replace(/import ['"][^'"]+\.css['"];?/, '')
+    .replace(/import ['"][^'"]+\.css['"];/, '')
     .replace(/['"]\.\/CatalogUI['"]/, JSON.stringify(uiTarget.href))
+    .replace(/['"]\.\/ComingSoonProgram['"]/, JSON.stringify(comingSoonTarget.href))
+    .replace(/['"]\.\.\/\.\.\/services\/programEvaluationPolicy\.js['"]/, JSON.stringify(policyUrl))
     .replace(/['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/, JSON.stringify(new URL('../src/services/programCatalogViewService.js', import.meta.url).href));
   const compiledSelector = await transformWithEsbuild(selectorSource, 'ProgramSelector.jsx', { loader: 'jsx', jsx: 'automatic' });
   fs.writeFileSync(selectorTarget, compiledSelector.code);
@@ -85,6 +113,7 @@ try {
   fs.rmSync(selectorTarget, { force: true });
   fs.rmSync(uiTarget, { force: true });
   fs.rmSync(previewTarget, { force: true });
+  fs.rmSync(comingSoonTarget, { force: true });
   fs.rmSync(hookStub, { force: true });
 }
 

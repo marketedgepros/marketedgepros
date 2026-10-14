@@ -8,6 +8,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Layout from "../layout/Layout";
+import ComingSoonProgram from "./ComingSoonProgram";
+import { evaluationPolicyForTerms, isProgramComingSoon } from "../../services/programEvaluationPolicy.js";
 import {
   formatCatalogMoney,
   formatCatalogPercent,
@@ -94,13 +96,24 @@ export function CatalogState({ loading, error, retry, empty = false }) {
     </section>
   );
 }
-export function ProgramRules({ terms }) {
+export function ProgramRules({ terms, historical = false }) {
+  if (isProgramComingSoon(terms) && !historical) {
+    return <p role="status" className="py-4 text-sm leading-relaxed text-cyan-100">Coming soon. No purchase price, evaluation target or account delivery is currently offered for Instant Funding.</p>;
+  }
+  const result = evaluationPolicyForTerms(terms);
+  if (result.status === "mismatch" || result.status === "unsupported") {
+    return <p role="alert" className="py-4 text-sm text-amber-100">Recorded evaluation policy is unavailable. No substitute rules are shown.</p>;
+  }
+  const policy = result.policy;
   const values = [
     ["Account size", formatCatalogMoney(terms.account_size)],
-    ["Profit target", formatCatalogPercent(terms.profit_target)],
+    ...(policy && policy.phases > 0
+      ? policy.phase_targets.map((target, index) => [`Phase ${index + 1} profit target`, formatCatalogPercent(target)])
+      : [["Profit target", formatCatalogPercent(terms.profit_target)]]),
     ["Maximum daily loss", formatCatalogPercent(terms.max_daily_loss)],
     ["Maximum total loss", formatCatalogPercent(terms.max_total_loss)],
     ["Profit split", formatCatalogPercent(terms.profit_split)],
+    ...(policy ? [["Operator share of eligible profit", formatCatalogPercent(policy.operator_share)]] : []),
   ];
   return (
     <dl className="divide-y divide-slate-700/60">
@@ -114,6 +127,23 @@ export function ProgramRules({ terms }) {
         </div>
       ))}
     </dl>
+  );
+}
+export function EvaluationPolicyDetails({ terms }) {
+  const result = evaluationPolicyForTerms(terms);
+  if (isProgramComingSoon(terms)) return null;
+  if (result.status === "unassigned") return <p className="mt-4 text-sm leading-relaxed text-amber-100">Policy assignment pending for this entry. Its existing recorded settings remain unchanged; no individual stage targets are inferred.</p>;
+  if (result.status !== "matched") return <p role="alert" className="mt-4 text-sm text-amber-100">The recorded evaluation policy cannot be verified. No replacement policy is assumed.</p>;
+  const policy = result.policy;
+  return (
+    <aside className="mt-5 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-5 text-sm leading-relaxed" data-recorded-evaluation-policy={policy.version}>
+      <h3 className="font-semibold text-cyan-100">Recorded evaluation policy</h3>
+      <p className="mt-3 text-slate-300">Each stage starts at the selected initial account size. Profit and loss are not carried into the next stage. Passing requires the recorded target after trading costs, all positions closed and no breach.</p>
+      <p className="mt-3 text-slate-300">The daily loss budget is {formatCatalogPercent(policy.max_daily_loss)} of the initial account size, measured from the closed balance at the start of the day. Equity at or below that threshold is a breach. The total loss threshold is fixed at 90% of initial account size.</p>
+      <p className="mt-3 text-slate-300">The trader share is {formatCatalogPercent(policy.profit_split)} of eligible profit and the operator share is {formatCatalogPercent(policy.operator_share)}. This is not account capital or an entitlement to evaluation profit.</p>
+      <p className="mt-3 text-slate-400">Daily reset timezone and time, account delivery/type and payout eligibility and schedule still require confirmation. These rules do not confirm live enforcement, funding, payment or payouts.</p>
+      <p className="mt-3 break-words text-xs text-slate-500">Recorded version: {policy.version}</p>
+    </aside>
   );
 }
 export function PaymentBoundary() {
@@ -144,6 +174,7 @@ export function PaymentBoundary() {
   );
 }
 export function CatalogCard({ program }) {
+  if (isProgramComingSoon(program.terms)) return <ComingSoonProgram />;
   return (
     <article
       className={`${panelStyle} flex flex-col hover:border-cyan-400/40 transition-colors motion-reduce:transition-none`}
@@ -177,17 +208,19 @@ export function CatalogCard({ program }) {
     </article>
   );
 }
-export function ConfiguredRules({ terms, headingId = 'additional-rules' }) {
-  const entries = Object.entries(terms.rules);
+export function ConfiguredRules({ terms, headingId = 'additional-rules', headingTag = 'h2' }) {
+  const entries = Object.entries(terms.rules).filter(([key]) => !["evaluation_policy", "product_availability", "_mep_legacy_challenge_terms"].includes(key));
+  const Heading = headingTag;
   return (
     <section className={panelStyle} aria-labelledby={headingId}>
-      <h2 id={headingId} className="mep-heading text-xl font-semibold">
+      <Heading id={headingId} className="mep-heading text-xl font-semibold">
         Additional catalog rules
-      </h2>
+      </Heading>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">
         Stored settings, not confirmation of live enforcement or eligibility.
         Missing details must be clarified before payment.
       </p>
+      <EvaluationPolicyDetails terms={terms} />
       {entries.length ? (
         <dl className="mt-5 space-y-4">
           {entries.map(([key, value]) => (
@@ -200,7 +233,11 @@ export function ConfiguredRules({ terms, headingId = 'additional-rules' }) {
                   ? "Not specified"
                   : typeof value === "object"
                     ? JSON.stringify(value, null, 2)
-                    : String(value)}
+                    : typeof value === "boolean"
+                      ? (value ? "Yes" : "No")
+                      : key === "drawdown_type" && value === "static"
+                        ? "Fixed (static)"
+                        : String(value)}
               </dd>
             </div>
           ))}
@@ -211,8 +248,9 @@ export function ConfiguredRules({ terms, headingId = 'additional-rules' }) {
         </p>
       )}
       <p className="mt-5 border-t border-slate-700 pt-4 text-xs text-slate-400">
-        These settings do not establish a refund, payout timetable, drawdown
-        method or provider guarantee.
+        The recorded drawdown type is a catalog setting, not evidence of live
+        enforcement. These settings do not establish a refund, payout timetable
+        or provider guarantee.
       </p>
     </section>
   );

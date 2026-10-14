@@ -4,6 +4,8 @@ import { ArrowRight, Layers } from "lucide-react";
 import useAuthStore from "../store/authStore";
 import useProgramCatalog from "../hooks/useProgramCatalog";
 import { programRulesPath } from "../services/programRuleFamilies.js";
+import { isProgramComingSoon } from "../services/programEvaluationPolicy.js";
+import ComingSoonProgram from "../components/programs/ComingSoonProgram";
 import {
   addonPriceLabel,
   formatCatalogMoney,
@@ -27,6 +29,7 @@ export default function ProgramDetails() {
   const navigate = useNavigate();
   const program = catalog.data;
   const proceed = () => {
+    if (!program || isProgramComingSoon(program.terms)) return;
     const destination = `/programs/${program.id}/checkout`;
     navigate(
       user ? destination : `/login?redirect=${encodeURIComponent(destination)}`,
@@ -38,6 +41,11 @@ export default function ProgramDetails() {
       <BackToPrograms />
       {catalog.loading || catalog.error || !program ? (
         <CatalogState loading={catalog.loading} error={catalog.error} retry={catalog.retry} />
+      ) : isProgramComingSoon(program.terms) ? (
+        <>
+          <h1 className="mep-heading mb-7 text-3xl font-semibold sm:text-5xl">Instant Funding</h1>
+          <ComingSoonProgram showTitle={false} />
+        </>
       ) : (
         <>
           <header className="mb-9">

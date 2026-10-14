@@ -285,5 +285,10 @@ def get_challenge(challenge_id):
     
     response = challenge.to_dict()
     response['program'] = challenge.program.to_dict()
+    # A matched private legacy snapshot owns the historical risk/profit fields;
+    # do not display an edited catalog program as if it governed this challenge.
+    historical_fields = challenge.historical_program_read_fields()
+    if historical_fields is not None:
+        response['program'].update(historical_fields)
     
     return jsonify(response), 200

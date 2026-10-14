@@ -43,7 +43,7 @@ const dependencies = new Map([
 let serial = 0;
 
 function externalize(code) {
-  for (const name of ['standardEvaluationPolicy', 'programRuleFamilies']) code = code.replace(new RegExp(`from ['"][^'"]+${name}\\.js['"]`, 'g'), 'from '+JSON.stringify(pathToFileURL(source('services', name+'.js')).href));
+  for (const name of ['standardEvaluationPolicy', 'programRuleFamilies', 'programEvaluationPolicy']) code = code.replace(new RegExp(`from ['"][^'"]+${name}\\.js['"]`, 'g'), 'from '+JSON.stringify(pathToFileURL(source('services', name+'.js')).href));
   for (const [specifier, url] of dependencies) {
     code = code.replaceAll(`from '${specifier}'`, `from ${JSON.stringify(url)}`);
     code = code.replaceAll(`from \"${specifier}\"`, `from ${JSON.stringify(url)}`);
@@ -82,6 +82,9 @@ const layoutStub = writeModule('layout.mjs', `
 const noOpStub = writeModule('noop.mjs', `import React from ${JSON.stringify(dependencies.get('react'))}; export default function NoOp() { return null; }`);
 const apiStub = writeModule('api.mjs', `export default { get: (...args) => globalThis.__ui6PublicApi.get(...args) };`);
 const catalogHookStub = writeModule('catalog-hook.mjs', `export default function useProgramCatalog() { return globalThis.__ui6Catalog; }`);
+const comingSoonSource = fs.readFileSync(source('components', 'programs', 'ComingSoonProgram.jsx'), 'utf8');
+const comingSoonCode = await transformWithEsbuild(externalize(comingSoonSource), 'ComingSoonProgram.jsx', { loader: 'jsx', jsx: 'automatic', format: 'esm' });
+const comingSoonUrl = writeModule('coming-soon-program.mjs', externalize(comingSoonCode.code));
 const catalogUiStub = writeModule('catalog-ui.mjs', `
   import React from ${JSON.stringify(dependencies.get('react'))};
   export const primaryAction = 'ui6-primary-action';
@@ -104,8 +107,9 @@ const withoutArticleLibraries = (text) => text
   .replace(/import DOMPurify from ['"]isomorphic-dompurify['"];?/, 'const DOMPurify = { sanitize: (value) => value };');
 
 await compile('components/programs/ProgramSelector.jsx', 'program-selector', (text) => text
-  .replace(/import ['"][^'"]+\.css['"];?/, '')
+  .replace(/import ['"][^'"]+\.css['"];/, '')
   .replace(/import \{ ProgramRules, primaryAction \} from ['"]\.\/CatalogUI['"];?/, `import { ProgramRules, primaryAction } from ${JSON.stringify(catalogUiStub)};`)
+  .replace(/import ComingSoonProgram from ['"]\.\/ComingSoonProgram['"];?/, `import ComingSoonProgram from ${JSON.stringify(comingSoonUrl)};`)
   .replace(/from ['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/, `from ${JSON.stringify(pathToFileURL(source('services', 'programCatalogViewService.js')).href)}`));
 const programSelectorUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('program-selector-')))).href;
 
@@ -115,11 +119,13 @@ const showcaseSource = fs.readFileSync(source('components', 'visual', 'PlatformS
 const showcaseCode = await transformWithEsbuild(externalize(showcaseSource), 'PlatformShowcase.jsx', { loader: 'jsx', jsx: 'automatic', format: 'esm' });
 const showcaseUrl = writeModule('premium-showcase.mjs', externalize(showcaseCode.code));
 await compile('components/programs/CatalogUI.jsx', 'rules-catalog-ui', (text) => text
-  .replace(/import Layout from ['"][^'"]+['"];?/, 'const Layout = ({ children }) => <main>{children}</main>;')
+  .replace(/import Layout from ['"][^'"]+['"];/, 'const Layout = ({ children }) => <main>{children}</main>;')
+  .replace(/import ComingSoonProgram from ['"]\.\/ComingSoonProgram['"];?/, `import ComingSoonProgram from ${JSON.stringify(comingSoonUrl)};`)
   .replace(/from ['"][^'"]+programCatalogViewService['"]/, `from ${JSON.stringify(pathToFileURL(source('services', 'programCatalogViewService.js')).href)}`));
 const rulesUiUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('rules-catalog-ui-')))).href;
 await compile('components/programs/ProgramRuleFamily.jsx', 'rule-family', (text) => text
   .replace(/from ['"][^'"]+programCatalogViewService\.js['"]/, `from ${JSON.stringify(pathToFileURL(source('services', 'programCatalogViewService.js')).href)}`)
+  .replace(/import ComingSoonProgram from ['"]\.\/ComingSoonProgram['"];?/, `import ComingSoonProgram from ${JSON.stringify(comingSoonUrl)};`)
   .replace(/from ['"]\.\/CatalogUI['"]/, `from ${JSON.stringify(rulesUiUrl)}`));
 const ruleFamilyUrl = pathToFileURL(path.join(tempDir, fs.readdirSync(tempDir).find((name) => name.startsWith('rule-family-')))).href;
 const pages = {
@@ -333,7 +339,7 @@ test('UI6 FAQ DOM expands, filters, and clears source state while retaining cano
     const answer = view.host.querySelector(`#${question.getAttribute('aria-controls')}`);
     assert.equal(answer.hidden, false, 'the clicked source question exposes its answer');
     await changeValue(view.host.querySelector('#faq-search'), 'payout');
-    await waitFor(() => text(view.host).includes('1 matching question'), 'filtered FAQ');
+    await waitFor(() => text(view.host).includes('2 matching questions'), 'filtered FAQ');
     assert.equal(question.isConnected, false, 'changing a filter removes prior expanded DOM rather than retaining stale content');
     await click([...view.host.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear search'));
     await waitFor(() => view.host.querySelector('#faq-search').value === '', 'cleared FAQ filter');

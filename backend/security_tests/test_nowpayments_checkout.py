@@ -156,6 +156,45 @@ def test_capabilities_are_disabled_without_complete_policy_and_never_call_provid
     assert called == []
 
 
+def test_instant_bound_immutable_quote_is_readable_but_never_calls_provider(checkout_app, monkeypatch):
+    """A historical Instant quote cannot open a new checkout command or POST."""
+    calls = []
+    monkeypatch.setattr(NowPaymentsTransport, "create_payment", lambda payload: calls.append(payload))
+    order_id = "00000000-0000-4000-8000-000000000013"
+    snapshot = {
+        "schema": 1, "kind": "purchase_quote", "user_id": 2, "tenant_id": 1,
+        "program_id": 10, "currency": "USD", "base_amount": "19.99", "addons": [],
+        "amount": "19.99", "rounding": "USD cents; ROUND_HALF_UP per add-on line",
+        "terms": {"name": "Historical Instant", "type": "instant_funding"},
+        "settlement": "not_configured", "entitlement": False,
+    }
+    snapshot_json = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    with checkout_app.app_context():
+        db.session.add(PurchaseOrder(
+            id=order_id, user_id=2, tenant_id=1, program_id=10,
+            idempotency_key="synthetic_instant_checkout_quote_0001",
+            request_hash=hashlib.sha256(b"synthetic-request").hexdigest(),
+            snapshot_hash=hashlib.sha256(snapshot_json.encode()).hexdigest(),
+            snapshot_json=snapshot_json, amount_minor=1999, currency="USD", state="quoted",
+        ))
+        db.session.commit()
+    client = checkout_app.test_client()
+    create = client.post(
+        f"/api/v1/orders/{order_id}/payments/nowpayments",
+        json={"pay_currency": "usdttrc20"}, headers=_headers(checkout_app),
+    )
+    assert create.status_code == 409 and create.get_json()["code"] == "PROGRAM_COMING_SOON"
+    assert calls == []
+    with checkout_app.app_context():
+        assert db.session.query(CheckoutIntent).count() == 0
+    # This local projection executes no provider call and remains available for
+    # the immutable quote; only new provider creation is closed.
+    projection = client.get(f"/api/v1/orders/{order_id}/payment", headers=_headers(checkout_app))
+    assert projection.status_code == 200
+    assert projection.get_json()["can_create"] is False
+    assert projection.get_json()["reason"] == "PROGRAM_COMING_SOON"
+
+
 def test_owner_create_projection_signed_finished_grant_and_admin_record(checkout_app, monkeypatch):
     calls = []
     def fake_create(payload):

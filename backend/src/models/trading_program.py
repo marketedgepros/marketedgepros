@@ -7,6 +7,7 @@ from decimal import Decimal
 from datetime import datetime, date
 import pytz
 from sqlalchemy.orm.attributes import flag_modified
+from src.services.program_evaluation_policy import legacy_challenge_terms, public_program_rules
 
 # Calculation method constants
 CALC_METHOD_FTMO = 'ftmo'
@@ -99,7 +100,9 @@ class TradingProgram(db.Model, TimestampMixin):
             'max_total_loss': float(self.max_total_loss) if self.max_total_loss else None,
             'price': float(self.price),
             'profit_split': float(self.profit_split),
-            'rules': self.rules,
+            # Never expose challenge identifiers from the reserved private
+            # history map. All other legacy JSON vocabulary remains unchanged.
+            'rules': public_program_rules(self.rules),
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
@@ -206,17 +209,88 @@ class Challenge(db.Model, TimestampMixin):
     
     def __repr__(self):
         return f'<Challenge {self.id} - User {self.user_id}>'
+
+    def _archived_terms(self):
+        """Return ``(terms, archived)`` for this immutable legacy binding.
+
+        A matching malformed archive deliberately returns ``(None, True)`` so
+        calculations do not silently switch to a later edited program row.
+        """
+        if not self.program:
+            return None, False
+        lookup = legacy_challenge_terms(self.program.rules, self.id)
+        if isinstance(self.program.rules, dict) and "_mep_legacy_challenge_terms" in self.program.rules and not lookup.valid:
+            return None, True
+        if lookup.found:
+            return lookup.terms if lookup.valid else None, True
+        return None, False
+
+    @staticmethod
+    def _term_decimal(value):
+        if value is None or isinstance(value, bool) or isinstance(value, float):
+            return None
+        try:
+            result = Decimal(value)
+        except Exception:
+            return None
+        return result if result.is_finite() else None
+
+    def historical_program_term(self, field):
+        """Read one archived program scalar, preserving old fallback semantics."""
+        terms, archived = self._archived_terms()
+        if archived:
+            return None if terms is None else terms.get(field)
+        return getattr(self.program, field, None) if self.program else None
+
+    def historical_program_rules(self):
+        """Read archived rules for a matching challenge, never current rules on error."""
+        terms, archived = self._archived_terms()
+        if archived:
+            return None if terms is None else terms.get('rules')
+        return self.program.rules if self.program else None
+
+    def historical_program_read_fields(self):
+        """Return serializer-compatible archived values for a matched snapshot.
+
+        Existing program DTOs use floats for numeric columns.  This helper keeps
+        that legacy wire shape while substituting only the values which belong to
+        the historical challenge rather than an edited current program row.
+        ``None`` values on a malformed matched archive are intentional: callers
+        must not fall back to newly assigned catalog terms.
+        """
+        terms, archived = self._archived_terms()
+        if not archived:
+            return None
+        fields = ('profit_target', 'max_daily_loss', 'max_total_loss', 'profit_split', 'profit_split_percentage')
+        if terms is None:
+            return {**{field: None for field in fields}, 'rules': None, 'name': None, 'type': None, 'description': None}
+        # A revised description can include new stage targets or profit splits.
+        # It must not be inherited by a historical challenge with archived terms.
+        result = {field: terms.get(field) for field in ('name', 'type', 'description')}
+        for field in fields:
+            value = self._term_decimal(terms.get(field))
+            result[field] = float(value) if value is not None else None
+        # The archived nested rules are independently bounded/validated when
+        # the private map is read. Strip the same reserved key defensively if a
+        # historic rules object itself contains one.
+        result['rules'] = public_program_rules(terms['rules'])
+        return result
     
     def calculate_progress(self):
         """Calculate challenge progress percentage"""
-        if not self.program or not self.program.profit_target:
+        target_percent = self._term_decimal(self.historical_program_term('profit_target'))
+        if target_percent is None or target_percent == 0:
             return 0
-        
-        target_profit = (self.initial_balance * self.program.profit_target / 100)
+
+        initial_balance = self._term_decimal(self.initial_balance)
+        total_profit = self._term_decimal(self.total_profit)
+        if initial_balance is None or total_profit is None:
+            return 0
+        target_profit = (initial_balance * target_percent / 100)
         if target_profit == 0:
             return 0
-        
-        progress = (self.total_profit / target_profit) * 100
+
+        progress = (total_profit / target_profit) * 100
         return min(progress, 100)
     
     def is_target_reached(self):
@@ -225,9 +299,10 @@ class Challenge(db.Model, TimestampMixin):
     
     def get_calculation_method(self):
         """Get calculation method from program settings"""
-        if not self.program or not self.program.rules:
+        rules = self.historical_program_rules()
+        if not isinstance(rules, dict):
             return CALC_METHOD_FTMO
-        return self.program.rules.get('calculation_method', CALC_METHOD_FTMO)
+        return rules.get('calculation_method', CALC_METHOD_FTMO)
     
     def get_timezone(self):
         """Get timezone based on calculation method"""
@@ -299,14 +374,15 @@ class Challenge(db.Model, TimestampMixin):
     
     def is_max_loss_exceeded(self):
         """FIXED: Check if maximum total loss limit is exceeded"""
-        if not self.program or not self.program.max_total_loss:
+        maximum_loss = self._term_decimal(self.historical_program_term('max_total_loss'))
+        if maximum_loss is None or maximum_loss == 0:
             return False
         
         if not self.initial_balance:
             return False
         
         # Calculate max allowed loss amount
-        max_loss_pct = float(self.program.max_total_loss) / 100
+        max_loss_pct = float(maximum_loss) / 100
         max_loss_amount = float(self.initial_balance) * max_loss_pct
         
         # Check if total_loss (absolute value) exceeds max
@@ -331,7 +407,8 @@ class Challenge(db.Model, TimestampMixin):
 
     def is_daily_loss_exceeded(self):
         """FIXED: Check if daily loss limit is exceeded (industry-standard)"""
-        if not self.program or not self.program.max_daily_loss:
+        maximum_daily_loss = self._term_decimal(self.historical_program_term('max_daily_loss'))
+        if maximum_daily_loss is None or maximum_daily_loss == 0:
             return False
         
         today = self.get_current_date()
@@ -401,8 +478,9 @@ class Challenge(db.Model, TimestampMixin):
             }
             
             # Calculate daily limit
-            if self.program and self.program.max_daily_loss:
-                daily_loss_pct = float(self.program.max_daily_loss) / 100
+            maximum_daily_loss = self._term_decimal(self.historical_program_term('max_daily_loss'))
+            if maximum_daily_loss is not None and maximum_daily_loss != 0:
+                daily_loss_pct = float(maximum_daily_loss) / 100
                 daily_limit = starting_value * daily_loss_pct
                 threshold = starting_value - daily_limit
                 
@@ -556,4 +634,3 @@ class Challenge(db.Model, TimestampMixin):
             'addons': self.addons,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-

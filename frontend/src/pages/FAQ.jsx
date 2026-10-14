@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown, HelpCircle, Search } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import StructuredData from '../components/seo/StructuredData';
-import { STANDARD_RULES_FAQ } from '../services/standardEvaluationPolicy.js';
+import { EVALUATION_RULES_FAQ } from '../services/programEvaluationPolicy.js';
 
 const categories = [
   {
@@ -18,7 +18,7 @@ const categories = [
     name: 'Programs & Rules',
     questions: [
       { q: 'What program types and terms are available?', a: 'Available programs and their displayed details are listed on the Programs page. Check the specific listing for its current information; this FAQ does not establish universal program terms.' },
-      { q: 'What trading rules apply?', a: STANDARD_RULES_FAQ.trading },
+      { q: 'What trading rules apply?', a: EVALUATION_RULES_FAQ.trading },
       { q: 'Are trading platforms or automated strategies supported?', a: 'This FAQ does not verify platform availability or permissions for automated strategies. Check current program information and applicable rules before relying on either.' },
     ],
   },
@@ -26,7 +26,7 @@ const categories = [
     name: 'Account & Payments',
     questions: [
       { q: 'When will an account or trading access be available?', a: 'This FAQ cannot confirm account issuance, access timing, or trading availability. Review the current program information; do not treat a quote or displayed price as payment settlement or account entitlement.' },
-      { q: 'What are the payout terms?', a: STANDARD_RULES_FAQ.payout },
+      { q: 'What are the payout terms?', a: EVALUATION_RULES_FAQ.payout },
       { q: 'What fees, add-ons, or refund terms apply?', a: 'This FAQ does not establish fees, add-on availability, or refund rights. Review the information applicable to the specific program and any separately approved terms.' },
     ],
   },

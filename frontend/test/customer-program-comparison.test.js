@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 import { transformWithEsbuild } from "vite";
+import { approvedEvaluationPolicy } from "../src/services/programEvaluationPolicy.js";
 
 const require = createRequire(import.meta.url);
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,6 +21,9 @@ const componentFile = path.join(
 const pageFile = path.join(frontend, "src", "pages", "ProgramsNew.jsx");
 const serviceUrl = pathToFileURL(
   path.join(frontend, "src", "services", "programCatalogViewService.js"),
+).href;
+const policyUrl = pathToFileURL(
+  path.join(frontend, "src", "services", "programEvaluationPolicy.js"),
 ).href;
 
 // ReactDOM must see a DOM at module initialization so its synthetic events work
@@ -88,6 +92,10 @@ let source = fs
   .replace(
     /['"]\.\.\/\.\.\/services\/programCatalogViewService['"]/,
     JSON.stringify(serviceUrl),
+  )
+  .replace(
+    /['"]\.\.\/\.\.\/services\/programEvaluationPolicy\.js['"]/,
+    JSON.stringify(policyUrl),
   );
 const compiled = await transformWithEsbuild(externalize(source), componentFile, {
   loader: "jsx",
@@ -119,6 +127,28 @@ function program(id, {
       max_daily_loss: maxDailyLoss,
       max_total_loss: maxTotalLoss,
       profit_split: profitSplit,
+    }),
+  });
+}
+
+function assignedProgram(id, type, name) {
+  const evaluationPolicy = approvedEvaluationPolicy(type);
+  return Object.freeze({
+    id,
+    price: "199.99",
+    terms: Object.freeze({
+      name,
+      type,
+      account_size: "25000.00",
+      profit_target: evaluationPolicy.phase_targets[0] ?? "0.00",
+      max_daily_loss: evaluationPolicy.max_daily_loss,
+      max_total_loss: evaluationPolicy.max_total_loss,
+      profit_split: evaluationPolicy.profit_split,
+      profit_split_percentage: evaluationPolicy.profit_split,
+      rules: Object.freeze({
+        drawdown_type: evaluationPolicy.drawdown_type,
+        evaluation_policy: evaluationPolicy,
+      }),
     }),
   });
 }
@@ -301,11 +331,37 @@ test("customer comparison DOM: a replacement list supplies current values and an
   }
 });
 
+test("customer comparison DOM: full assigned stage targets render, while Instant Funding is absent from every quote-selection control", { concurrency: false }, async () => {
+  const programs = Object.freeze([
+    assignedProgram(3697, "two_phase", "Two-stage recorded program"),
+    assignedProgram(3704, "three_phase", "Three-stage recorded program"),
+    assignedProgram(3711, "instant_funding", "Instant Funding hidden from comparison"),
+  ]);
+  const before = JSON.stringify(programs);
+  const harness = installDom();
+  try {
+    await harness.render(programs);
+    assert.equal(harness.host.querySelectorAll('[data-program-id]').length, 2);
+    assert.equal(harness.host.querySelector('[data-program-id="3711"]'), null);
+    assert.doesNotMatch(harness.host.textContent, /Instant Funding hidden from comparison/);
+
+    await click(checkbox(harness.host, 3697));
+    await click(checkbox(harness.host, 3704));
+    assert.match(harness.host.textContent, /Phase 1: 8% · Phase 2: 5%/);
+    assert.match(harness.host.textContent, /Phase 1: 5% · Phase 2: 5% · Phase 3: 5%/);
+    assert.doesNotMatch(harness.host.textContent, /Catalog ID #3711|Instant Funding hidden from comparison/);
+    assert.equal(JSON.stringify(programs), before, "comparison must not mutate supplied catalog policy snapshots");
+  } finally {
+    await harness.close();
+  }
+});
+
 test("customer comparison integration binds comparison lifetime to ready catalog data and catalog key", () => {
   const page = fs.readFileSync(pageFile, "utf8");
   assert.match(page, /import ProgramComparison from ["']\.\.\/components\/programs\/ProgramComparison["']/);
+  assert.match(page, /const evaluationPrograms = programs\.filter\(\(program\) => !isProgramComingSoon\(program\.terms\)\)/);
   assert.match(page, /const catalogReady = !catalog\.loading && !catalog\.error && programs\.length > 0/);
-  assert.match(page, /<ProgramComparison key=\{catalog\.key\} programs=\{programs\} \/>/);
+  assert.match(page, /<ProgramComparison key=\{catalog\.key\} programs=\{evaluationPrograms\} \/>/);
   assert.doesNotMatch(source, /localStorage|fetch\s*\(/);
 });
 

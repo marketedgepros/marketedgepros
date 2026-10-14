@@ -2,9 +2,19 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { FileText, AlertCircle } from 'lucide-react';
-import { STANDARD_EVALUATION_POLICY as policy } from '../services/standardEvaluationPolicy.js';
+import { approvedEvaluationPolicy } from '../services/programEvaluationPolicy.js';
+
+const policy = approvedEvaluationPolicy('one_phase');
+const targets = (type) => approvedEvaluationPolicy(type).phase_targets.map((value) => `${value.replace('.00', '')}%`).join(' / ');
 
 export default function TermsOfService() {
+  if (!policy) return (
+    <Layout><section className="mep-screen min-h-screen px-5 py-16 text-white"><div className="mx-auto max-w-5xl">
+      <h1 className="mep-heading text-4xl font-bold">Terms of Service</h1>
+      <p role="alert" className="mt-6 leading-relaxed text-amber-100">The approved evaluation policy is unavailable. No substitute program terms or completed contractual agreement are represented.</p>
+      <Link to="/programs" className="mep-primary mt-6 inline-flex min-h-11 items-center px-5 py-3 font-semibold">Review current program information</Link>
+    </div></section></Layout>
+  );
   const sections = [
     {
       title: 'Operator information',
@@ -12,15 +22,15 @@ export default function TermsOfService() {
     },
     {
       title: 'Evaluation and account access',
-      content: 'The catalog has one-phase, two-phase, three-phase and Instant Funding families with separate rule categories. The approved standard update concerns a single-stage evaluation only. Instant Funding is a catalog family name, not proof of immediate funding or trading access. Payment for an evaluation is not a deposit into an investment account and does not transfer ownership of the stated account capital. The real-capital or simulated-account model after passing and its delivery conditions still require confirmation. Trading access is not activated by this page.',
+      content: 'The evaluation catalog has one-phase, two-phase and three-phase families with their own recorded stage targets. Instant Funding is Coming soon and is not available for purchase, quote requests or new payments. No launch date, immediate funding or trading access is promised. Payment for an evaluation is not a deposit into an investment account and does not transfer ownership of the stated account capital. The real-capital or simulated-account model after passing and its delivery conditions still require confirmation. Trading access is not activated by this page.',
     },
     {
       title: 'Which program terms apply',
-      content: `Read the selected program’s recorded settings in its rule category. Multi-phase stage targets and transition criteria must be confirmed separately. The approved one-phase standard model has a ${policy.profit_target.replace('.00', '')}% target, a ${policy.max_daily_loss.replace('.00', '')}% maximum daily loss and a ${policy.max_total_loss.replace('.00', '')}% fixed maximum total loss. Catalog rollout is pending. It must be explicitly assigned to a program; it does not replace other listings or rewrite the terms already recorded with an order.`,
+      content: `Read the selected program’s recorded policy in its rule category. The approved targets are ${targets('one_phase')} for one-phase, ${targets('two_phase')} for two-phase and ${targets('three_phase')} for three-phase. They require a full explicit versioned snapshot in the specific program; matching percentages alone do not assign a policy. The policies use a ${policy.max_daily_loss.replace('.00', '')}% maximum daily loss based on initial account size and a ${policy.max_total_loss.replace('.00', '')}% fixed maximum total loss. Targets require closed positions after trading costs and no breach. A new stage starts at initial account size without profit or loss carryover. Existing orders and historical challenges retain their previous recorded terms; they are not rewritten.`,
     },
     {
       title: 'Eligible profit and distributions',
-      content: `Each program retains its recorded profit split. The one-phase standard model allocates ${policy.profit_split.replace('.00', '')}% of eligible profit to the trader and ${policy.operator_share.replace('.00', '')}% to the operator. It does not promise a return, distribution of evaluation profits or withdrawal of account capital. Eligible-profit calculation, payout eligibility, timing, minimums and any withdrawal fees or methods remain to be defined. Payouts are not enabled by this page.`,
+      content: `A program with the approved versioned evaluation policy allocates ${policy.profit_split.replace('.00', '')}% of eligible profit to the trader and ${policy.operator_share.replace('.00', '')}% to the operator. An old order keeps its originally recorded split. These figures do not promise a return, distribution of evaluation profits or withdrawal of account capital. Eligible-profit calculation, payout eligibility, timing, minimums and any withdrawal fees or methods still need a complete approved policy. Payouts are not enabled by this page.`,
     },
     {
       title: 'Fees, refunds and changes',

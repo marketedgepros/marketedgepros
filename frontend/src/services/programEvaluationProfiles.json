@@ -1,0 +1,46 @@
+{
+  "version": "mep-evaluation-families-v1",
+  "common": {
+    "max_daily_loss": "5.00",
+    "max_total_loss": "10.00",
+    "drawdown_type": "static",
+    "profit_split": "90.00",
+    "operator_share": "10.00",
+    "daily_loss_amount_base": "initial_account_size",
+    "daily_threshold_base": "day_start_closed_balance",
+    "breach_comparison": "equity_less_than_or_equal_to_threshold",
+    "evaluation_target_basis": "closed_profit_after_trading_costs",
+    "evaluation_requires_closed_positions": true,
+    "phase_reset_basis": "initial_account_size",
+    "phase_profit_carryover": false,
+    "phase_loss_carryover": false,
+    "daily_reset_timezone": null,
+    "daily_reset_time": null,
+    "funded_account_type": null,
+    "eligible_profit_definition": null,
+    "payout_schedule": null
+  },
+  "profiles": {
+    "one_phase": {
+      "availability": "evaluation_catalog",
+      "phase_targets": ["10.00"]
+    },
+    "two_phase": {
+      "availability": "evaluation_catalog",
+      "phase_targets": ["8.00", "5.00"]
+    },
+    "three_phase": {
+      "availability": "evaluation_catalog",
+      "phase_targets": ["5.00", "5.00", "5.00"]
+    },
+    "instant_funding": {
+      "availability": "coming_soon",
+      "phase_targets": [],
+      "evaluation_target_basis": null,
+      "evaluation_requires_closed_positions": null,
+      "phase_reset_basis": null,
+      "phase_profit_carryover": null,
+      "phase_loss_carryover": null
+    }
+  }
+}

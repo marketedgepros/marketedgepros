@@ -12,6 +12,7 @@ import { transformWithEsbuild } from 'vite';
 const require = createRequire(import.meta.url);
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(frontend, 'src/pages/FAQ.jsx'), 'utf8');
+const policyUrl = pathToFileURL(path.join(frontend, 'src/services/programEvaluationPolicy.js')).href;
 const bootstrap = new JSDOM('<!doctype html><html><body></body></html>');
 const keys = ['window', 'document', 'navigator', 'HTMLElement', 'HTMLInputElement', 'Node', 'Event', 'MouseEvent', 'IS_REACT_ACT_ENVIRONMENT'];
 function bind(dom) {
@@ -33,7 +34,7 @@ restoreBootstrap();
 bootstrap.window.close();
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'customer-faq-'));
 let compiled = source
-  .replace(/from ['"][^'"]+standardEvaluationPolicy\.js['"]/, 'from '+JSON.stringify(pathToFileURL(path.join(frontend, 'src/services/standardEvaluationPolicy.js')).href))
+  .replace(/from ['"][^'"]+programEvaluationPolicy\.js['"]/, `from ${JSON.stringify(policyUrl)}`)
   .replace(/import Layout from ['"][^'"]+['"];?/, 'const Layout = ({ children }) => <>{children}</>;')
   .replace(/import StructuredData from ['"][^'"]+['"];?/, 'const StructuredData = ({ data }) => <script type="application/ld+json" data-faq-schema>{JSON.stringify(data)}</script>;');
 for (const name of ['react', 'react-router-dom', 'lucide-react']) {
@@ -70,7 +71,7 @@ async function search(host, value) {
 
 test('customer FAQ: approved question/answer copy and complete schema remain consistent while topics filter DOM', async () => {
   const block = source.slice(source.indexOf('const categories = ['), source.indexOf('const allQuestions ='));
-  assert.equal(createHash('sha256').update(block).digest('hex'), 'a216a6d1c9407ef99623d734305e527e354ed6a5498ca26e28780401f4a08eb5');
+  assert.equal(createHash('sha256').update(block).digest('hex'), '1322eaa1b431bb33cc9aa10a81e818fe200aa22b3ab6698977357de9ce42a4a1');
   const harness = await mount();
   try {
     const { host } = harness;

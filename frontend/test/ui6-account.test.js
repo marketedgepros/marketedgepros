@@ -12,6 +12,9 @@ const frontendDirectory = path.resolve(testDirectory, '..');
 const compiledTargets = new Set();
 const source = (relative) => path.join(frontendDirectory, 'src', relative);
 const sourceUrl = (relative) => pathToFileURL(source(relative)).href;
+const policyOverride = {
+  'services/programEvaluationPolicy.js': `export * from ${JSON.stringify(sourceUrl('services/programEvaluationPolicy.js'))};`,
+};
 
 after(() => {
   for (const target of compiledTargets) fs.rmSync(target, { force: true });
@@ -116,7 +119,10 @@ const DocumentsModule = await compileJsx('documents', 'pages/user/Documents.jsx'
   .replace("} from '../../services/kycViewService';", `} from ${JSON.stringify(sourceUrl('services/kycViewService.js'))};`));
 const AccountSetupGuideUrl = await compileJsxDependency('account-setup-guide', 'components/account/AccountSetupGuide.jsx', (text) => text
   .replace("'../../services/accountSetupViewService.js'", JSON.stringify(sourceUrl('services/accountSetupViewService.js'))));
-const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'ui6-account-payment' });
+const purchaseBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), {
+  prefix: 'ui6-account-payment',
+  overrides: policyOverride,
+});
 const purchaseBuildUrl = purchaseBuild.targets.get(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url).pathname);
 after(() => purchaseBuild.cleanup());
 const UserDashboardModule = await compileJsx('user-dashboard', 'pages/user/UserDashboard.jsx', (text) => text

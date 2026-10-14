@@ -113,6 +113,33 @@ def test_replay_returns_same_snapshot_after_catalog_changes_and_conflict_refused
         assert db.session.query(PurchaseOrder).count() == 1
 
 
+def test_instant_funding_refuses_a_new_quote_before_insert_even_without_policy_metadata(quote_app):
+    with quote_app.app_context():
+        db.session.add(TradingProgram(
+            id=13, tenant_id=1, name='Coming soon instant', type='instant_funding',
+            account_size=Decimal('10000.00'), price=Decimal('19.99'), is_active=True,
+            # No evaluation_policy is required for this refusal: old/current
+            # direct links may not manufacture a quote during Coming soon.
+            rules={'unknown_legacy_rule': True},
+        ))
+        db.session.commit()
+    response = _create(quote_app, {'program_id': 13}, key='synthetic_instant_quote_0001')
+    assert response.status_code == 409 and response.get_json()['code'] == 'PROGRAM_COMING_SOON'
+    with quote_app.app_context():
+        assert db.session.query(PurchaseOrder).count() == 0
+
+
+def test_stored_quote_replay_precedes_later_instant_catalog_guard(quote_app):
+    original = _create(quote_app, {'program_id': 10}, key='synthetic_replay_instant_0001')
+    assert original.status_code == 201
+    with quote_app.app_context():
+        db.session.get(TradingProgram, 10).type = 'instant_funding'
+        db.session.commit()
+    replay = _create(quote_app, {'program_id': 10}, key='synthetic_replay_instant_0001')
+    assert replay.status_code == 200 and replay.get_json()['replayed'] is True
+    assert replay.get_json()['order'] == original.get_json()['order']
+
+
 def test_same_key_is_separate_per_owner_and_quote_read_is_exact_owner_only(quote_app):
     first = _create(quote_app).get_json()['order']
     second = _create(quote_app, actor=3).get_json()['order']
@@ -219,3 +246,33 @@ def test_quote_amount_column_must_match_snapshot_even_with_unchanged_hash(quote_
         db.session.commit()
     response = quote_app.test_client().get('/api/v1/orders/' + identity, headers=_headers(quote_app))
     assert response.status_code == 503 and response.get_json()['code'] == 'ORDER_INTEGRITY_FAILED'
+
+
+@pytest.mark.parametrize('program_type,targets', [('one_phase', ['10.00']), ('two_phase', ['8.00', '5.00']), ('three_phase', ['5.00', '5.00', '5.00'])])
+def test_versioned_family_policy_is_frozen_in_new_quote_without_private_history_or_entitlement(quote_app, program_type, targets):
+    from src.services.program_catalog_service import program_terms
+    from src.services.program_evaluation_policy import build_evaluation_policy
+    with quote_app.app_context():
+        program = db.session.get(TradingProgram, 10)
+        old_terms = program_terms(program)
+        policy = build_evaluation_policy(program_type)
+        program.type = program_type
+        program.profit_target = Decimal(targets[0])
+        program.max_daily_loss = Decimal('5.00')
+        program.max_total_loss = Decimal('10.00')
+        program.profit_split = program.profit_split_percentage = Decimal('90.00')
+        program.rules = {'drawdown_type': 'static', 'evaluation_policy': policy, '_mep_legacy_challenge_terms': {'999': old_terms}}
+        db.session.commit()
+    response = _create(quote_app, {'program_id': 10, 'addon_ids': []}, key='synthetic_versioned_family_quote_0001')
+    assert response.status_code == 201
+    order = response.get_json()['order']
+    terms = order['snapshot']['terms']
+    assert terms['rules']['evaluation_policy'] == policy
+    assert terms['rules']['evaluation_policy']['phase_targets'] == targets
+    assert terms['profit_split'] == terms['profit_split_percentage'] == '90.00'
+    assert '_mep_legacy_challenge_terms' not in terms['rules']
+    assert order['amount'] == '19.99' and order['state'] == 'quoted' and order['paid'] is False
+    assert order['snapshot']['entitlement'] is False
+    with quote_app.app_context():
+        assert db.session.query(PurchaseOrder).count() == 1
+        assert db.session.query(Payment).count() == db.session.query(Challenge).count() == 0

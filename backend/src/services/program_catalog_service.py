@@ -16,6 +16,11 @@ from sqlalchemy import select, text
 from src.database import db
 from src.middleware.tenant_middleware import get_tenant_from_request
 from src.models.trading_program import ProgramAddOn, TradingProgram
+from src.services.program_evaluation_policy import (
+    EvaluationPolicyError,
+    public_program_rules,
+    validate_program_evaluation_policy,
+)
 from src.utils.hierarchy_scoping import without_hierarchy_scope
 
 
@@ -136,6 +141,15 @@ def program_terms(program: TradingProgram) -> dict:
     are validated before serialization so a malformed legacy row fails closed rather
     than changing a displayed or quoted rule by coercion.
     """
+    try:
+        # Assigned rows must carry the full canonical policy snapshot, while
+        # unassigned legacy rows remain their stored facts.  The private
+        # challenge archive is validated and removed only from public/quote
+        # serialization; every other unknown rule remains untouched.
+        rules = public_program_rules(_json_object(program.rules, "rules"))
+        validate_program_evaluation_policy(program, program.rules)
+    except EvaluationPolicyError:
+        raise _catalog_error("evaluation_policy") from None
     terms = {
         "name": _required_text(program.name, "name", limit=255),
         # Preserve unknown legacy/program labels when they are a safe bounded ASCII
@@ -156,7 +170,7 @@ def program_terms(program: TradingProgram) -> dict:
         "minimum_payout_amount": _optional_money(
             program.minimum_payout_amount, "minimum_payout_amount", maximum=_MAX_PRICE
         ),
-        "rules": _json_object(program.rules, "rules"),
+        "rules": rules,
     }
     return _terms_budget(terms)
 

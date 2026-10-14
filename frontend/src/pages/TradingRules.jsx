@@ -2,18 +2,29 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { ArrowRight, BookOpen, ShieldCheck } from 'lucide-react';
-import { STANDARD_EVALUATION_POLICY as policy } from '../services/standardEvaluationPolicy.js';
+import { approvedEvaluationPolicy, evaluationPolicyForTerms } from '../services/programEvaluationPolicy.js';
 import { PROGRAM_RULE_FAMILIES } from '../services/programRuleFamilies.js';
 import useProgramCatalog from '../hooks/useProgramCatalog';
 import ProgramRuleFamily from '../components/programs/ProgramRuleFamily';
 import { CatalogState } from '../components/programs/CatalogUI';
 
 const percent = (value) => `${value.replace('.00', '')}%`;
+const policy = approvedEvaluationPolicy('one_phase');
 const action = 'mep-primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300';
 
 export default function TradingRules() {
   const catalog = useProgramCatalog();
   const programs = catalog.loading || catalog.error ? [] : (catalog.data ?? []);
+  const evaluations = programs.filter((program) => ['one_phase', 'two_phase', 'three_phase'].includes(program.terms.type));
+  const assigned = evaluations.filter((program) => evaluationPolicyForTerms(program.terms).status === 'matched').length;
+  const complete = evaluations.length > 0 && assigned === evaluations.length;
+  if (!policy) return (
+    <Layout><section className="mep-screen min-h-screen px-5 py-16 text-white"><div className="mx-auto max-w-5xl">
+      <h1 className="mep-heading text-4xl font-bold">Trading rules and program terms</h1>
+      <p role="alert" className="mt-6 leading-relaxed text-amber-100">The approved evaluation policy is unavailable. No substitute targets, risk limits or profit-share terms are shown. Instant Funding remains Coming soon.</p>
+      <Link to="/programs" className={`${action} mt-6`}>Review current program information</Link>
+    </div></section></Layout>
+  );
   return (
     <Layout>
       <div className="mep-screen min-h-screen text-white">
@@ -23,7 +34,7 @@ export default function TradingRules() {
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300">Trading information</p>
             <h1 className="mep-heading max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">Trading rules and program terms</h1>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300">
-              Four program families, four rule categories. Select your program to review its own recorded terms, then read the separate approved one-phase update below.
+              Three evaluation routes with their own recorded stage targets. Select your program to review its versioned rules. Instant Funding is Coming soon and is not available for purchase.
             </p>
           </div>
         </section>
@@ -40,14 +51,12 @@ export default function TradingRules() {
             <div className="flex items-start gap-4">
               <ShieldCheck className="mt-1 h-6 w-6 shrink-0 text-cyan-300" aria-hidden="true" />
               <div className="min-w-0">
-                <h2 id="program-settings-heading" className="mep-heading text-2xl font-semibold">Approved standard evaluation model</h2>
+                <h2 id="program-settings-heading" className="mep-heading text-2xl font-semibold">Shared loss and profit-share definitions</h2>
                 <p className="mt-3 leading-relaxed text-slate-300">
-                  A single-stage evaluation. The figures and loss definitions below describe only the approved one-phase update, not an automatic change to every program or existing order. They do not define the two-phase, three-phase or Instant Funding categories.
+                  These definitions describe the approved versioned evaluation policies. They apply to a selected program only when its full policy is recorded. The selected program’s snapshot supplies its individual stage targets and actual limits; these definitions never replace an unassigned entry or the terms of an old order.
                 </p>
-                <dl data-standard-model className="mt-6 grid gap-3 sm:grid-cols-2">
+                <dl data-shared-risk-policy className="mt-6 grid gap-3 sm:grid-cols-2">
                   {[
-                    ['Evaluation stages', String(policy.phases)],
-                    ['Profit target', percent(policy.profit_target)],
                     ['Maximum daily loss', percent(policy.max_daily_loss)],
                     ['Maximum total loss — fixed', percent(policy.max_total_loss)],
                     ['Trader share of eligible profit', percent(policy.profit_split)],
@@ -59,15 +68,16 @@ export default function TradingRules() {
                     </div>
                   ))}
                 </dl>
-                <p className="mt-5 break-words text-xs text-slate-400">Model version: {policy.version}</p>
+                <p className="mt-5 break-words text-xs text-slate-400">Evaluation policy version: {policy.version}</p>
               </div>
             </div>
           </div>
 
           <aside className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-6" aria-labelledby="rollout-heading">
-            <h2 id="rollout-heading" className="mep-heading text-xl font-semibold text-amber-200">Catalog rollout pending</h2>
+            <h2 id="rollout-heading" className="mep-heading text-xl font-semibold text-amber-200">{complete ? 'Policies recorded in the current catalog' : evaluations.length ? 'Catalog assignment pending' : 'Catalog policy status unavailable'}</h2>
             <p className="mt-3 leading-relaxed text-slate-300">
-              Program-specific settings are displayed in the catalog and on each program details page. This model applies only when explicitly assigned to that program. Current listings may have different terms; their values are not replaced by this page. All four families remain separate; new stage-specific targets and any revised family limits need explicit approval.
+              {evaluations.length ? `${assigned} of ${evaluations.length} evaluation entries have the complete versioned policy recorded. ` : 'Current assignment status cannot be verified until the catalog is available. '}
+              Program-specific targets and settings are displayed above and on each program details page from the same catalog. An unassigned entry keeps its existing terms; a matching percentage alone is not an assignment. Instant Funding remains Coming soon.
             </p>
             <p className="mt-3 leading-relaxed text-slate-300">
               An existing order keeps the terms recorded with it. This page does not rewrite past orders, confirm a funded account or enable live trading or payouts.
@@ -107,10 +117,10 @@ export default function TradingRules() {
           <section className="mep-panel rounded-2xl border p-6 sm:p-9" aria-labelledby="passing-heading">
             <h2 id="passing-heading" className="mep-heading text-2xl font-semibold">Passing the evaluation</h2>
             <p className="mt-4 leading-relaxed text-slate-300">
-              The standard target is {percent(policy.profit_target)} closed profit after trading costs, measured against the initial account size. Positions must be closed and the applicable rules must have been respected throughout the evaluation. Reaching the profit target does not erase an earlier breach.
+              Use the target recorded for the current stage of the selected program: one-phase has one target, two-phase has two and three-phase has three. Each target measures closed profit after trading costs against the initial account size. Positions must be closed and the applicable rules must have been respected. Reaching a target does not erase an earlier breach. A new stage starts at the selected initial account size, without carrying the previous stage’s profit or loss forward.
             </p>
             <p className="mt-4 leading-relaxed text-slate-300">
-              Minimum trading days, maximum evaluation duration, inactivity rules and the account provided after passing still require confirmation. A displayed target or a recorded purchase is not proof that a live trading account has been issued.
+              Read the selected program’s existing minimum-day and duration settings. Their detailed application across stages, inactivity handling and the account provided after passing still require confirmation before live enforcement. A displayed target or a recorded purchase is not proof that a live trading account has been issued.
             </p>
           </section>
 
@@ -127,7 +137,7 @@ export default function TradingRules() {
           <aside className="mep-panel rounded-2xl border p-6" aria-labelledby="availability-heading">
             <div className="flex items-center gap-3"><BookOpen className="h-5 w-5 text-cyan-300" aria-hidden="true" /><h2 id="availability-heading" className="mep-heading text-lg font-semibold">What is still not defined</h2></div>
             <p className="mt-3 leading-relaxed text-slate-300">
-              Operator identity and jurisdiction, the funded-account model, refund terms, strategy permissions and the process for reviewing a disputed breach are not established by this page. No company, licence, payment schedule or provider capability is inferred from the MarketEdgePros brand name.
+              Operator identity and jurisdiction, the funded-account model, refund terms, detailed strategy conditions beyond the recorded flags and the process for reviewing a disputed breach are not established by this page. No company, licence, payment schedule or provider capability is inferred from the MarketEdgePros brand name.
             </p>
             <div className="mt-5 flex flex-wrap gap-4">
               <Link to="/terms-of-service" className="rounded font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">Terms status</Link>

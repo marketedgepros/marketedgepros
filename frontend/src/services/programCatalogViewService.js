@@ -1,4 +1,5 @@
 import api from "./api.js";
+import { evaluationPolicyForTerms } from "./programEvaluationPolicy.js";
 
 export const MAX_CATALOG_ITEMS = 200;
 export const PROGRAM_TYPES = Object.freeze({
@@ -66,7 +67,7 @@ export const normalizeProgramTerms = (source) => {
   if (!record(source)) invalid("Program terms");
   const type = text(source.type, "Program type", 50);
   if (!/^[\x20-\x7e]+$/.test(type)) invalid("Program type");
-  return Object.freeze({
+  const terms = Object.freeze({
     name: text(source.name, "Program name"),
     type,
     description: nullableText(source.description, "Program description", 65536),
@@ -86,6 +87,10 @@ export const normalizeProgramTerms = (source) => {
     payout_mode: nullableText(source.payout_mode, "Payout mode", 50),
     rules: jsonCopy(source.rules),
   });
+  const policy = evaluationPolicyForTerms(terms);
+  if (policy.status === "mismatch" || policy.status === "unsupported")
+    invalid("Recorded evaluation policy");
+  return terms;
 };
 const canonical = (value) => {
   if (Array.isArray(value)) return value.map(canonical);
