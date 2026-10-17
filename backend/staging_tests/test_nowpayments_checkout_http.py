@@ -49,6 +49,35 @@ _POLICY = {
     "NOWPAYMENTS_FEE_PAID_BY_USER": False,
     "NOWPAYMENTS_REFRESH_MIN_SECONDS": 30,
 }
+_PUBLIC_ACCOUNT_ACCESS_PROFILE = {
+    "PUBLIC_ACCOUNT_ACCESS_ENABLED": True,
+    "EMAIL_PROVIDER": "brevo",
+    "BREVO_API_KEY": "synthetic-brevo-key-1234567890-ABC",
+    "EMAIL_FROM_ADDRESS": "accounts@marketedgepros.com",
+    "EMAIL_FROM_NAME": "MarketEdgePros",
+    "EMAIL_SENDER_VERIFIED": True,
+    "EMAIL_DOMAIN_AUTHENTICATED": True,
+    "FRONTEND_URL": "https://marketedgepros.com",
+}
+
+
+def _non_testing_demo_config(app):
+    """Use this exact HTTP policy in the pure, non-Testing deployment guards."""
+    config = dict(app.config)
+    config.update({
+        "TESTING": False,
+        "PRODUCTION": False,
+        "DEMO_RELEASE_ENABLED": True,
+        "SQLALCHEMY_DATABASE_URI": (
+            "postgresql://marketedgepros_demo:demo-password@127.0.0.1:5432/"
+            "marketedgepros_demo_20261012"
+        ),
+        "REDIS_URL": "redis://:synthetic-dedicated-redis-password-0123456789@127.0.0.1:6380/0",
+        "CACHE_REDIS_URL": "redis://:synthetic-dedicated-redis-password-0123456789@127.0.0.1:6380/1",
+        "RATELIMIT_STORAGE_URL": "redis://:synthetic-dedicated-redis-password-0123456789@127.0.0.1:6380/2",
+        "PLATFORM_ROOT_USER_ID": 1,
+    })
+    return config
 
 
 @contextmanager
@@ -88,7 +117,7 @@ def _checkout_http_database(resources, monkeypatch):
             "PLATFORM_ROOT_USER_ID": 1,
             "EXPANDED_HIERARCHY_ENABLED": False,
             "PROPAGATE_EXCEPTIONS": True,
-            **_POLICY,
+            **_POLICY, **_PUBLIC_ACCOUNT_ACCESS_PROFILE,
         })
         with app.app_context():
             assert db.engine.dialect.name == "postgresql"
@@ -165,9 +194,9 @@ def _quote(app, *, actor=2, program_id=10, key="http_quote_key_0001"):
     return response.get_json()["order"]["id"]
 
 
-def _provider_response(payload, *, status="waiting"):
+def _provider_response(payload, *, status="waiting", payment_id=123456789):
     return {
-        "payment_id": 123456789,
+        "payment_id": payment_id,
         "payment_status": status,
         "pay_address": _TRON_ADDRESS,
         "price_amount": "19.99",
@@ -215,7 +244,7 @@ def _notify(app, body):
     )
 
 
-def _bind_waiting(app, monkeypatch, *, quote_key="http_quote_key_0002", create_key="http_create_key_0002"):
+def _bind_waiting(app, monkeypatch, *, quote_key="http_quote_key_0002", create_key="http_create_key_0002", payment_id=123456789):
     """Create a quote and a single locally transported waiting payment binding."""
     from src.services.nowpayments_checkout import NowPaymentsCheckoutService, NowPaymentsTransport
 
@@ -231,7 +260,7 @@ def _bind_waiting(app, monkeypatch, *, quote_key="http_quote_key_0002", create_k
 
     def provider(payload):
         calls.append(dict(payload))
-        response = _provider_response(payload)
+        response = _provider_response(payload, payment_id=payment_id)
         return response, json.dumps(response, separators=(",", ":")).encode("utf-8")
 
     monkeypatch.setattr(NowPaymentsCheckoutService, "prepare_create", traced_prepare)
@@ -253,6 +282,36 @@ def _bind_waiting(app, monkeypatch, *, quote_key="http_quote_key_0002", create_k
             f"prepare_trace={prepare_traces[-1:]!r}"
         )
     return order_id, calls[0]["order_id"]
+
+
+def test_nowpayments_checkout_http_non_testing_semantic_guards_allow_complete_brevo_and_pilot(
+    nowpayments_checkout_http_app,
+):
+    """The Testing factory skip is not evidence for the real deployment guards."""
+    from src.production_safety import (
+        validate_demo_release_configuration,
+        validate_production_configuration,
+    )
+
+    demo = _non_testing_demo_config(nowpayments_checkout_http_app)
+    assert demo["TESTING"] is False
+    validate_demo_release_configuration(demo)
+
+    production = dict(demo)
+    production.update({
+        "PRODUCTION": True,
+        "DEMO_RELEASE_ENABLED": False,
+        "DEBUG": False,
+        "SECRET_KEY": "staging-http-production-secret-abcdefghijklmnopqrstuvwxyz",
+        "JWT_SECRET_KEY": "staging-http-production-jwt-abcdefghijklmnopqrstuvwxyz",
+        "SQLALCHEMY_DATABASE_URI": "postgresql://staging:synthetic@database.invalid:5432/staging",
+        "REDIS_URL": "redis://redis.invalid:6379/0",
+        "CACHE_TYPE": "RedisCache",
+        "RATELIMIT_ENABLED": True,
+        "CACHE_REDIS_URL": "redis://cache.invalid:6379/1",
+        "RATELIMIT_STORAGE_URL": "redis://limiter.invalid:6379/2",
+    })
+    validate_production_configuration(production)
 
 
 def test_nowpayments_checkout_http_capabilities_create_commits_before_transport(nowpayments_checkout_http_app, monkeypatch):
@@ -392,6 +451,64 @@ def test_nowpayments_checkout_http_signed_finished_callback_is_atomic_and_replay
         # A completed HTTP commit proves PostgreSQL's INITIALLY DEFERRED chain
         # validator accepted receipt, journal, exact two entries, and grant together.
         assert db.session.query(NowPaymentsVerifiedReceipt).count() == db.session.query(NowPaymentsSettlementJournal).count() == 1
+
+
+def test_nowpayments_checkout_http_invalid_ipn_and_stale_storage_never_grant_or_activate(nowpayments_checkout_http_app, monkeypatch):
+    """Only one exact signed final callback can settle; stale storage closes every path."""
+    from src.database import db
+    from src.models.nowpayments_checkout import CheckoutIntent, NowPaymentsVerifiedReceipt, OrderEntitlementGrant
+
+    app = nowpayments_checkout_http_app
+    unsigned_order, unsigned_reference = _bind_waiting(
+        app, monkeypatch, quote_key="http_quote_key_unsigned", create_key="http_create_key_unsigned",
+    )
+    raw, _signature = _signed(_finished(unsigned_reference))
+    unsigned = app.test_client().post(
+        "/api/v1/orders/webhooks/nowpayments", data=raw, content_type="application/json",
+    )
+    assert unsigned.status_code == 401 and unsigned.get_json()["code"] == "IPN_INVALID"
+
+    for tag, changes, payment_id in (
+        ("mismatch", {"price_amount": 19.98}, 123456790),
+        ("underpaid", {"actually_paid": 19.999999}, 123456791),
+    ):
+        order_id, reference = _bind_waiting(
+            app, monkeypatch,
+            quote_key=f"http_quote_key_{tag}", create_key=f"http_create_key_{tag}",
+            payment_id=payment_id,
+        )
+        rejected = _notify(app, {**_finished(reference), "payment_id": payment_id, **changes})
+        assert rejected.status_code == 200 and rejected.get_json() == {"schema_version": 1, "replayed": False}
+        projection = app.test_client().get(f"/api/v1/orders/{order_id}/payment", headers=_headers(app))
+        assert projection.status_code == 200
+        assert projection.get_json()["state"] == "manual_review"
+        assert projection.get_json()["paid"] is projection.get_json()["recorded_purchase"] is False
+
+    # Revision 000001 lacks the checkout schema. The actual service readiness
+    # guard must block both callback settlement and a fresh local command before
+    # provider transport; this is runner-owned PostgreSQL only, never a migration.
+    with app.app_context():
+        db.session.execute(text("UPDATE alembic_version SET version_num = '20261013_000001'"))
+        db.session.commit()
+    capabilities = app.test_client().get("/api/v1/orders/payment-capabilities", headers=_headers(app))
+    assert capabilities.status_code == 200
+    assert capabilities.get_json()["enabled"] is False
+    assert capabilities.get_json()["reason"] == "CHECKOUT_STORAGE_NOT_READY"
+    blocked_callback = _notify(app, _finished(unsigned_reference))
+    assert blocked_callback.status_code == 503
+    assert blocked_callback.get_json()["code"] == "CHECKOUT_STORAGE_NOT_READY"
+    stale_order = _quote(app, key="http_quote_key_stale_revision")
+    blocked_create = app.test_client().post(
+        f"/api/v1/orders/{stale_order}/payments/nowpayments", json={"pay_currency": "usdttrc20"},
+        headers=_headers(app, key="http_create_key_stale_revision"),
+    )
+    assert blocked_create.status_code == 503
+    assert blocked_create.get_json()["code"] == "CHECKOUT_STORAGE_NOT_READY"
+    with app.app_context():
+        assert db.session.query(NowPaymentsVerifiedReceipt).count() == 0
+        assert db.session.query(OrderEntitlementGrant).count() == 0
+        assert db.session.execute(select(CheckoutIntent).where(CheckoutIntent.order_id == stale_order)).scalar_one_or_none() is None
+        assert db.session.execute(select(CheckoutIntent).where(CheckoutIntent.order_id == unsigned_order)).scalar_one().state == "awaiting_payment"
 
 
 def test_nowpayments_checkout_http_read_models_are_local_owner_scoped_and_brand_isolated(nowpayments_checkout_http_app, monkeypatch):

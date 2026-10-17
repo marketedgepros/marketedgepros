@@ -352,6 +352,40 @@ def _account_access_production_profile(**overrides):
     return config
 
 
+def _approved_nowpayments_profile(scope="pilot", **overrides):
+    """Return an explicit, synthetic NOWPayments policy without provider access."""
+    config = {
+        "NOWPAYMENTS_API_KEY": "synthetic-nowpayments-api-key-" + "a" * 40,
+        "NOWPAYMENTS_IPN_SECRET": "synthetic-nowpayments-ipn-secret-" + "b" * 40,
+        "NOWPAYMENTS_PILOT_ENABLED": True,
+        "NOWPAYMENTS_ACCEPT_EXISTING_IPN": False,
+        "NOWPAYMENTS_CHECKOUT_SCOPE": scope,
+        "NOWPAYMENTS_APPROVED_POLICY_VERSION": "2026-10-17",
+        "NOWPAYMENTS_MERCHANT_CONTEXT": "marketedgepros-pilot",
+        "NOWPAYMENTS_CALLBACK_ORIGIN": "https://marketedgepros.com",
+        "NOWPAYMENTS_CALLBACK_PATH": "/api/v1/orders/webhooks/nowpayments",
+        "NOWPAYMENTS_API_BASE": "https://api.nowpayments.io/v1",
+        "NOWPAYMENTS_STORAGE_REVISION": "20261013_000002",
+        "NOWPAYMENTS_PILOT_TENANT_IDS": (202,),
+        "NOWPAYMENTS_PILOT_ROLES": ("trader",),
+        "NOWPAYMENTS_ALLOWED_CURRENCIES": (
+            {
+                "code": "usdttrc20",
+                "label": "USDT on TRC20",
+                "network": "TRC20",
+                "decimals": 6,
+            },
+        ),
+        "NOWPAYMENTS_OUTCOME_CURRENCY": "usdt",
+        "NOWPAYMENTS_FIXED_RATE": False,
+        "NOWPAYMENTS_FEE_PAID_BY_USER": False,
+    }
+    if scope == "pilot":
+        config["NOWPAYMENTS_PILOT_PRINCIPAL_IDS"] = (101,)
+    config.update(overrides)
+    return config
+
+
 @pytest.mark.parametrize("overrides", [
     {"EMAIL_PROVIDER": "sendgrid", "SENDGRID_API_KEY": "synthetic"},
     {"BREVO_API_KEY": "a" * 40},
@@ -359,11 +393,8 @@ def _account_access_production_profile(**overrides):
     {"EMAIL_SENDER_VERIFIED": False},
     {"EMAIL_DOMAIN_AUTHENTICATED": False},
     {"FRONTEND_URL": "https://evil.invalid"},
-    {"NOWPAYMENTS_PILOT_ENABLED": True},
-    {"NOWPAYMENTS_API_KEY": "synthetic"},
-    {"STRIPE_SECRET_KEY": "synthetic"},
 ])
-def test_production_public_account_requires_email_only_brevo_profile(overrides):
+def test_production_public_account_rejects_incomplete_brevo_profile(overrides):
     with pytest.raises(ValueError):
         validate_production_configuration(_account_access_production_profile(**overrides))
 
@@ -372,16 +403,76 @@ def test_production_public_account_accepts_complete_brevo_profile():
     validate_production_configuration(_account_access_production_profile())
 
 
-@pytest.mark.parametrize("setting,value", [
-    ("NOWPAYMENTS_PILOT_ENABLED", True),
-    ("NOWPAYMENTS_ACCEPT_EXISTING_IPN", True),
-    ("NOWPAYMENTS_API_KEY", "synthetic-nowpayments-key"),
-    ("NOWPAYMENTS_IPN_SECRET", "synthetic-nowpayments-secret"),
-    ("STRIPE_SECRET_KEY", "synthetic-stripe-secret"),
+@pytest.mark.parametrize(("scope", "has_principal_whitelist"), [
+    ("pilot", True),
+    ("customers", False),
 ])
-def test_demo_public_account_rejects_payment_activation_or_credentials(setting, value):
-    with pytest.raises(ValueError, match="PUBLIC_ACCOUNT_ACCESS_PAYMENT_SETTINGS"):
-        validate_demo_release_configuration(_account_access_demo_profile(**{setting: value}))
+def test_public_account_accepts_complete_brevo_and_nowpayments_profiles(
+    scope, has_principal_whitelist,
+):
+    nowpayments = _approved_nowpayments_profile(scope)
+    assert nowpayments["NOWPAYMENTS_CALLBACK_PATH"] == "/api/v1/orders/webhooks/nowpayments"
+    assert ("NOWPAYMENTS_PILOT_PRINCIPAL_IDS" in nowpayments) is has_principal_whitelist
+    for validator, profile in (
+        (validate_demo_release_configuration, _account_access_demo_profile),
+        (validate_production_configuration, _account_access_production_profile),
+    ):
+        validator(profile(**nowpayments))
+
+
+@pytest.mark.parametrize("nowpayments", [
+    {"NOWPAYMENTS_PILOT_ENABLED": True},
+    _approved_nowpayments_profile(NOWPAYMENTS_PILOT_PRINCIPAL_IDS=()),
+    _approved_nowpayments_profile(
+        "customers", NOWPAYMENTS_PILOT_TENANT_IDS=(),
+    ),
+])
+def test_public_account_rejects_partial_or_invalid_nowpayments_profiles(nowpayments):
+    for validator, profile in (
+        (validate_demo_release_configuration, _account_access_demo_profile),
+        (validate_production_configuration, _account_access_production_profile),
+    ):
+        with pytest.raises(ValueError, match="NOWPAYMENTS_PILOT_POLICY"):
+            validator(profile(**nowpayments))
+
+
+@pytest.mark.parametrize("activation", [
+    {},
+    {"NOWPAYMENTS_PILOT_ENABLED": True},
+    {"NOWPAYMENTS_ACCEPT_EXISTING_IPN": True},
+])
+def test_nowpayments_credentials_without_policy_are_rejected_including_callback_only(
+    activation,
+):
+    credentials_without_policy = {
+        "NOWPAYMENTS_API_KEY": "synthetic-nowpayments-api-key-" + "a" * 40,
+        "NOWPAYMENTS_IPN_SECRET": "synthetic-nowpayments-ipn-secret-" + "b" * 40,
+        **activation,
+    }
+    for validator, profile in (
+        (validate_demo_release_configuration, _account_access_demo_profile),
+        (validate_production_configuration, _account_access_production_profile),
+    ):
+        with pytest.raises(ValueError) as error:
+            validator(profile(**credentials_without_policy))
+        if activation or validator is validate_production_configuration:
+            assert "NOWPAYMENTS_PILOT_POLICY" in str(error.value)
+        else:
+            assert "NOWPAYMENTS_API_KEY" in str(error.value)
+
+
+@pytest.mark.parametrize("setting", [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+])
+def test_public_account_still_rejects_stripe_settings(setting):
+    for validator, profile in (
+        (validate_demo_release_configuration, _account_access_demo_profile),
+        (validate_production_configuration, _account_access_production_profile),
+    ):
+        with pytest.raises(ValueError, match="PUBLIC_ACCOUNT_ACCESS_PAYMENT_SETTINGS"):
+            validator(profile(**{setting: "synthetic-stripe-value"}))
 
 
 def test_demo_standalone_approved_nowpayments_pilot_validation_remains_independent():

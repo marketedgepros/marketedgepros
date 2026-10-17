@@ -343,8 +343,7 @@ def validate_demo_release_configuration(config):
     nowpayments_pilot_valid = _valid_nowpayments_pilot(config)
     account_access_profile_valid = _valid_demo_account_access_profile(config)
     if config.get("PUBLIC_ACCOUNT_ACCESS_ENABLED") is True and (
-        _has_nowpayments_activation_or_credentials(config)
-        or any(config.get(setting) is not None for setting in (
+        any(config.get(setting) is not None for setting in (
             "STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY", "STRIPE_WEBHOOK_SECRET",
         ))
     ):
@@ -407,7 +406,7 @@ def validate_production_configuration(config):
             invalid.append("PUBLIC_ACCOUNT_ACCESS_PROFILE")
         if config.get("SENDGRID_API_KEY") is not None:
             invalid.append("SENDGRID_API_KEY")
-        if _has_nowpayments_activation_or_credentials(config) or any(
+        if any(
             config.get(setting) is not None for setting in {
                 "STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY", "STRIPE_WEBHOOK_SECRET",
             }
