@@ -180,7 +180,7 @@ function App() {
       <BrowserRouter>
         {import.meta.env?.VITE_DEMO_RELEASE === 'true' && (
           <aside aria-label="Demo release status" className="bg-slate-900 px-4 py-2 text-center text-sm text-cyan-200 border-b border-cyan-400/20">
-            Limited release — live trading, payouts, registration and email delivery are disabled. Purchase availability is checked separately in checkout.
+            Limited release — live trading and payouts are disabled. Account access and purchase availability are controlled separately by the service.
           </aside>
         )}
         <Notification />
