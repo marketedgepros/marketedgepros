@@ -22,13 +22,13 @@ from src.models.token_blacklist import TokenBlacklist
 from src.models.trading_program import Challenge, ProgramAddOn, TradingProgram
 from src.models.user import User
 from src.services.nowpayments_checkout import (
-    NowPaymentsTransport, ProviderUnavailable, canonical_ipn_bytes,
+    CheckoutError, CheckoutPolicy, NowPaymentsTransport, ProviderUnavailable, canonical_ipn_bytes,
     parse_bounded_json, verify_ipn_signature,
 )
 
 
 _SECRET = "synthetic-ipn-secret-for-isolated-tests-only-0123456789"
-_API_KEY = "synthetic-api-key-for-isolated-tests-only-0123456789"
+_API_KEY = "synthetic-np-api-A1b2C3d4E5f6G7"
 _TRON_ADDRESS = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
 _POLICY = {
     "ORDER_QUOTES_ENABLED": True,
@@ -154,6 +154,47 @@ def test_capabilities_are_disabled_without_complete_policy_and_never_call_provid
     body = response.get_json()
     assert body["enabled"] is False and body["currencies"] == [] and body["reason"] == "PILOT_DISABLED"
     assert called == []
+
+
+def test_synthetic_31_character_api_key_passes_full_policy_and_mocked_transport(checkout_app, monkeypatch):
+    class FakeResponse:
+        status_code = 201
+
+        def iter_content(self, chunk_size):
+            yield b"{}"
+
+        def close(self):
+            return None
+
+    captured = {}
+
+    def fake_post(url, *, data, headers, timeout, allow_redirects, stream):
+        captured.update(url=url, headers=dict(headers), timeout=timeout, allow_redirects=allow_redirects, stream=stream)
+        return FakeResponse()
+
+    with checkout_app.app_context():
+        assert len(_API_KEY) == 31
+        policy = CheckoutPolicy.from_config()
+        monkeypatch.setattr("src.services.nowpayments_checkout.requests.post", fake_post)
+        body, raw = NowPaymentsTransport.create_payment({
+            "price_amount": "19.99",
+            "price_currency": "usd",
+            "pay_currency": "usdttrc20",
+            "ipn_callback_url": policy.callback_url,
+            "order_id": "synthetic-transport-reference",
+            "is_fixed_rate": False,
+            "is_fee_paid_by_user": False,
+        })
+
+    assert body == {} and raw == b"{}"
+    assert captured["headers"]["x-api-key"] == _API_KEY
+    assert captured["url"].endswith("/payment") and captured["allow_redirects"] is False and captured["stream"] is True
+
+    checkout_app.config["NOWPAYMENTS_IPN_SECRET"] = _API_KEY
+    with checkout_app.app_context():
+        with pytest.raises(CheckoutError) as error:
+            CheckoutPolicy.from_config()
+    assert error.value.code == "POLICY_NOT_CONFIGURED"
 
 
 def test_instant_bound_immutable_quote_is_readable_but_never_calls_provider(checkout_app, monkeypatch):

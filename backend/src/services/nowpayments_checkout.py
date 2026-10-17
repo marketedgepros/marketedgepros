@@ -37,6 +37,7 @@ from src.models.nowpayments_checkout import (
     OrderEntitlementGrant,
 )
 from src.models.purchase_order import PurchaseOrder
+from src.nowpayments_credentials import is_valid_nowpayments_api_key
 from src.services.order_service import OrderError, OrderService
 from src.constants.roles import Roles
 from src.utils.hierarchy_scoping import complete_hierarchy_scope, platform_root_scope, without_hierarchy_scope
@@ -413,7 +414,7 @@ class CheckoutPolicy:
             raise CheckoutError("Payment fee policy is not explicitly approved", "POLICY_NOT_CONFIGURED", 503)
         api_key = config.get("NOWPAYMENTS_API_KEY")
         ipn_secret = config.get("NOWPAYMENTS_IPN_SECRET")
-        if not (isinstance(api_key, str) and len(api_key) >= 32 and isinstance(ipn_secret, str) and len(ipn_secret) >= 32):
+        if not (is_valid_nowpayments_api_key(api_key) and isinstance(ipn_secret, str) and len(ipn_secret) >= 32):
             raise CheckoutError("Payment credentials are not configured", "POLICY_NOT_CONFIGURED", 503)
         principals = _positive_ids(config.get("NOWPAYMENTS_PILOT_PRINCIPAL_IDS")) if scope == "pilot" else ()
         tenants = _positive_ids(config.get("NOWPAYMENTS_PILOT_TENANT_IDS"))

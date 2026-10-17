@@ -9,6 +9,9 @@ from src.production_safety import (
 )
 
 
+_SYNTHETIC_NOWPAYMENTS_API_KEY_31 = "synthetic-np-api-A1b2C3d4E5f6G7"
+
+
 def synthetic_production_config(**overrides):
     """Return synthetic .invalid endpoints that are never contacted by these tests."""
     config = {
@@ -355,7 +358,7 @@ def _account_access_production_profile(**overrides):
 def _approved_nowpayments_profile(scope="pilot", **overrides):
     """Return an explicit, synthetic NOWPayments policy without provider access."""
     config = {
-        "NOWPAYMENTS_API_KEY": "synthetic-nowpayments-api-key-" + "a" * 40,
+        "NOWPAYMENTS_API_KEY": _SYNTHETIC_NOWPAYMENTS_API_KEY_31,
         "NOWPAYMENTS_IPN_SECRET": "synthetic-nowpayments-ipn-secret-" + "b" * 40,
         "NOWPAYMENTS_PILOT_ENABLED": True,
         "NOWPAYMENTS_ACCEPT_EXISTING_IPN": False,
@@ -384,6 +387,45 @@ def _approved_nowpayments_profile(scope="pilot", **overrides):
         config["NOWPAYMENTS_PILOT_PRINCIPAL_IDS"] = (101,)
     config.update(overrides)
     return config
+
+
+@pytest.mark.parametrize("api_key", [
+    None,
+    "",
+    _SYNTHETIC_NOWPAYMENTS_API_KEY_31[:-1] + "\x7f",
+    "placeholder-nowpayments-key-A1b2C3d4",
+    "change-me",
+    "A1b2C3d4" * 65,
+], ids=["blank-none", "blank-empty", "control", "placeholder", "weak", "oversize"])
+def test_nowpayments_api_credential_validator_rejects_unsafe_or_placeholder_values(api_key):
+    from src.nowpayments_credentials import is_valid_nowpayments_api_key
+
+    assert is_valid_nowpayments_api_key(api_key) is False
+
+
+def test_complete_nowpayments_profiles_accept_synthetic_31_character_api_credential():
+    from src.nowpayments_credentials import is_valid_nowpayments_api_key
+
+    assert len(_SYNTHETIC_NOWPAYMENTS_API_KEY_31) == 31
+    assert is_valid_nowpayments_api_key(_SYNTHETIC_NOWPAYMENTS_API_KEY_31) is True
+    nowpayments = _approved_nowpayments_profile()
+    for validator, profile in (
+        (validate_demo_release_configuration, _account_access_demo_profile),
+        (validate_production_configuration, _account_access_production_profile),
+    ):
+        validator(profile(**nowpayments))
+
+
+def test_complete_nowpayments_profiles_reject_31_character_ipn_signing_secret():
+    short_ipn_secret = "synthetic-np-ipn-A1b2C3d4E5f6G7"
+    assert len(short_ipn_secret) == 31
+    nowpayments = _approved_nowpayments_profile(NOWPAYMENTS_IPN_SECRET=short_ipn_secret)
+    for validator, profile in (
+        (validate_demo_release_configuration, _account_access_demo_profile),
+        (validate_production_configuration, _account_access_production_profile),
+    ):
+        with pytest.raises(ValueError, match="NOWPAYMENTS_PILOT_POLICY"):
+            validator(profile(**nowpayments))
 
 
 @pytest.mark.parametrize("overrides", [

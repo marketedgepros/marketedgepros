@@ -4,6 +4,8 @@ from urllib.parse import urlparse
 
 from sqlalchemy.engine import make_url
 
+from src.nowpayments_credentials import is_valid_nowpayments_api_key
+
 
 MINIMUM_SECRET_LENGTH = 32
 MAXIMUM_ACCOUNT_FRONTEND_URL_LENGTH = 2048
@@ -260,7 +262,7 @@ def _valid_nowpayments_pilot(config):
     """
     if config.get("NOWPAYMENTS_PILOT_ENABLED") is not True and config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is not True:
         return False
-    if not _is_strong_secret(config.get("NOWPAYMENTS_API_KEY")) or not _is_strong_secret(config.get("NOWPAYMENTS_IPN_SECRET")):
+    if not is_valid_nowpayments_api_key(config.get("NOWPAYMENTS_API_KEY")) or not _is_strong_secret(config.get("NOWPAYMENTS_IPN_SECRET")):
         return False
     if not isinstance(config.get("NOWPAYMENTS_APPROVED_POLICY_VERSION"), str) or not _POLICY_VERSION.fullmatch(config["NOWPAYMENTS_APPROVED_POLICY_VERSION"]):
         return False
