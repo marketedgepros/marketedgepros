@@ -45,7 +45,7 @@ test('registration payload excludes confirmation, preserves referral query, and 
   assert.match(source, /const \{ confirmPassword, \.\.\.registerData \} = formData/);
   assert.match(source, /register\(registerData\)/);
   assert.match(source, /searchParams\.get\('ref'\)/);
-  assert.match(source, /navigate\('\/verify-email', \{ state: \{ email: formData\.email \} \}\)/);
+  assert.match(source, /navigate\('\/verify-email', \{ state: \{ email: formData\.email, emailDeliveryStatus \} \}\)/);
   assert.match(source, /catch \{[\s\S]*?do not navigate on failure/);
   assert.match(source, /to="\/login"/);
 });

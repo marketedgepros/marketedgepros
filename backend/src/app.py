@@ -69,11 +69,17 @@ def create_app(config_name=None, *, config_overrides=None):
                     '/api/v1/auth/register',
                     '/api/v1/auth/resend-verification',
                     '/api/v1/auth/password/reset-request',
+                    '/api/v1/auth/password/reset',
+                    '/api/v1/auth/password/verify-code',
+                    '/api/v1/auth/password/reset-with-code',
                 }
                 or path == '/api/v1/auth/verify-email'
                 or path.startswith('/api/v1/auth/verify-email/')
             )
-            if blocked_auth_action:
+            # Demo remains closed unless the independently validated account
+            # access profile is deliberately enabled. This does not relax
+            # chat, payment, order, or MT5 containment in any way.
+            if blocked_auth_action and app.config.get('PUBLIC_ACCOUNT_ACCESS_ENABLED') is not True:
                 return jsonify({
                     'error': 'Registration and email actions are unavailable in this demo release.',
                     'code': 'DEMO_ACTION_UNAVAILABLE',

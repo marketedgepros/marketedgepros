@@ -1,18 +1,19 @@
 import React from 'react';
 import Layout from '../components/layout/Layout';
 import { AlertTriangle, TrendingDown, DollarSign, Target, Shield } from 'lucide-react';
+import { APPROVED_ACCOUNT_MODEL } from '../services/programEvaluationPolicy.js';
 
 export default function RiskDisclosure() {
   const risks = [
     {
       icon: TrendingDown,
       title: "Market Volatility",
-      description: "Financial markets can be extremely volatile. Prices can change rapidly in very short periods, potentially resulting in substantial losses."
+      description: "Market-price changes can affect simulated performance and the ability to meet program targets. Displayed results do not prove execution or returns in a real-money trading account."
     },
     {
       icon: DollarSign,
       title: "Leverage Risk",
-      description: "Trading with leverage amplifies both potential profits and losses. You can lose more than your initial investment when using leverage."
+      description: "Leverage, trading costs and execution assumptions can amplify changes in simulated account performance. Read the recorded program limits; the displayed account size is not an investment deposit or money you own."
     },
     {
       icon: Target,
@@ -21,8 +22,8 @@ export default function RiskDisclosure() {
     },
     {
       icon: Shield,
-      title: "Capital Loss",
-      description: "You should only trade with money you can afford to lose. Never trade with borrowed money or funds needed for essential expenses."
+      title: "Program Fees and Account Capital",
+      description: "Program fees are separate from simulated account capital. Completing an evaluation does not entitle you to withdraw that capital or receive evaluation profits. Cancellation and refund terms still require an approved policy."
     }
   ];
 
@@ -63,13 +64,12 @@ export default function RiskDisclosure() {
                 <div>
                   <h3 className="text-2xl font-bold mb-4 text-red-400">High Risk Warning</h3>
                   <p className="text-gray-300 text-lg leading-relaxed mb-4">
-                    Trading foreign exchange, contracts for difference (CFDs), and other leveraged products involves substantial risk of loss 
-                    and may not be suitable for all investors. The high degree of leverage can work against you as well as for you.
+                    Program participation does not guarantee passing, account access or a reward. Simulated results do not establish real-money trading returns or money available for withdrawal.
                   </p>
                   <p className="text-gray-300 text-lg leading-relaxed">
-                    Before deciding to trade, you should carefully consider your investment objectives, level of experience, and risk appetite. 
-                    You should only trade with money you can afford to lose.
+                    Review the selected program’s fees, recorded rules and the approved cancellation and reward conditions before relying on an offer. Reward eligibility and timing still require completion; payouts are not enabled by this page.
                   </p>
+                  <p data-account-model={APPROVED_ACCOUNT_MODEL.version} className="mt-4 text-sm leading-relaxed text-slate-300">{APPROVED_ACCOUNT_MODEL.description}</p>
                 </div>
               </div>
             </div>
@@ -165,4 +165,3 @@ export default function RiskDisclosure() {
     </Layout>
   );
 }
-

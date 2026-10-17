@@ -12,7 +12,7 @@ test('verify email copy does not claim a code was already sent on direct visits'
 });
 
 test('resend remains anti-enumerating and only describes the conditional outcome', () => {
-  assert.match(source, /If the email exists and is not verified, a new verification code has been sent\./);
+  assert.match(source, /If the account is eligible, a verification email has been requested\. If nothing arrives, try again later\./);
   assert.match(source, /api\.post\('\/auth\/resend-verification', \{ email \}\)/);
   assert.doesNotMatch(source, /Verification code sent! Please check your email\./);
   assert.match(source, /setResendCooldown\(120\)/);

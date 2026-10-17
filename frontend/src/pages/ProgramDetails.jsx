@@ -4,7 +4,7 @@ import { ArrowRight, Layers } from "lucide-react";
 import useAuthStore from "../store/authStore";
 import useProgramCatalog from "../hooks/useProgramCatalog";
 import { programRulesPath } from "../services/programRuleFamilies.js";
-import { isProgramComingSoon } from "../services/programEvaluationPolicy.js";
+import { APPROVED_ACCOUNT_MODEL, isProgramComingSoon } from "../services/programEvaluationPolicy.js";
 import ComingSoonProgram from "../components/programs/ComingSoonProgram";
 import {
   addonPriceLabel,
@@ -87,6 +87,9 @@ export default function ProgramDetails() {
                 <p className="mt-4 text-sm leading-relaxed text-slate-400">
                   “Not specified” means a value has not been published in this
                   catalog entry. It does not mean zero or no restriction.
+                </p>
+                <p data-account-model={APPROVED_ACCOUNT_MODEL.version} className="mt-4 text-sm leading-relaxed text-slate-300">
+                  {APPROVED_ACCOUNT_MODEL.description}
                 </p>
                 {program.terms.description && (
                   <div className="mt-5 border-t border-slate-700 pt-4">

@@ -955,3 +955,64 @@ test('four rule categories: failed read and identity change hide old evaluation 
     assert.equal(calls.length,3);
   } finally {api.defaults.adapter=previousAdapter;await harness.close();}
 });
+
+test('UI3 account model: ordinary catalog/detail content is secondary readable text with no dialog or extra action', { concurrency: false }, async () => {
+  const { APPROVED_ACCOUNT_MODEL } = await import(policyUrl);
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/programs');
+  const calls = [];
+  api.defaults.adapter = async (config) => {
+    calls.push(config);
+    assert.equal(config.method, 'get');
+    return response(config, config.url === '/programs/' ? listFixture() : program());
+  };
+  try {
+    globalThis.__ui6CatalogAuth = { user: null, isAuthenticated: false, isLoading: false };
+    const routes = h(Routes, null,
+      h(Route, { path: '/programs', element: h(ProgramsNew) }),
+      h(Route, { path: '/programs/:id', element: h(ProgramDetails) }),
+      h(Route, { path: '*', element: h('p', null, 'destination reached') }),
+    );
+    for (const location of ['/programs', '/programs/12']) {
+      await renderRouter(harness, routes, location, `model-${location}`);
+      await waitFor(() => harness.host.querySelector('[data-account-model]'), 'ordinary model description');
+      const note = harness.host.querySelector('[data-account-model]');
+      assert.equal(note.tagName, 'P');
+      assert.equal(note.textContent.trim(), APPROVED_ACCOUNT_MODEL.description);
+      assert.equal(note.getAttribute('data-account-model'), APPROVED_ACCOUNT_MODEL.version);
+      assert.match(note.className, /text-sm/);
+      assert.match(note.className, /text-slate-300/);
+      assert.equal(note.hasAttribute('hidden'), false);
+      assert.equal(note.closest('dialog,[role="dialog"],[aria-modal="true"]'), null);
+      assert.equal(Boolean(note.closest('label,fieldset,form')), false, 'description is ordinary content, not an acceptance control');
+      if (location === '/programs/12') assert.equal(Boolean(harness.host.querySelector('input[type="checkbox"]')), false);
+      else for (const input of harness.host.querySelectorAll('input[type="checkbox"]')) assert.equal(Boolean(input.closest('#program-comparison')), true, 'pre-existing comparison choices remain available');
+      assert.equal([...harness.host.querySelectorAll('h1,h2,h3,h4')].some(node => /simulated trading|simulated account/i.test(node.textContent)), false);
+    }
+    await click(button(harness.host, 'Check quote availability'));
+    assert.equal(harness.host.querySelector('[data-location]').textContent, '/login?redirect=%2Fprograms%2F12%2Fcheckout');
+    assert.equal(calls.length, 2, 'regular browsing makes only the existing list and detail reads');
+  } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
+});
+
+test('UI3 account model: checkout remains the existing quote flow with no injected description, disclosure dialog or consent checkbox', { concurrency: false }, async () => {
+  const previousAdapter = api.defaults.adapter;
+  const harness = installDom('/programs/12/checkout');
+  const calls = [];
+  api.defaults.adapter = async (config) => {
+    calls.push(config); assert.equal(config.method, 'get'); assert.equal(config.url, '/programs/12');
+    return response(config, program());
+  };
+  try {
+    globalThis.__ui6CatalogAuth = { user: { id: 41, tenant_id: 1, role: 'user' }, isAuthenticated: true, isLoading: false };
+    const routes = h(Routes, null, h(Route, { path: '/programs/:programId/checkout', element: h(Checkout) }));
+    await renderRouter(harness, routes, '/programs/12/checkout', 'unchanged-checkout-model');
+    await waitFor(() => button(harness.host, 'Request server quote'), 'existing quote action');
+    assert.equal(harness.host.querySelector('[data-account-model]'), null);
+    assert.equal(harness.host.querySelector('dialog,[role="dialog"],[aria-modal="true"]'), null);
+    assert.equal(harness.host.querySelector('input[type="checkbox"]')?.closest('fieldset') !== null, true, 'any existing checkbox belongs to the original add-on selector');
+    assert.equal(harness.host.querySelectorAll('input[type="checkbox"]').length, 1, 'only the pre-existing fixture add-on checkbox remains');
+    assert.equal([...harness.host.querySelectorAll('button')].filter(node => /accept|acknowledge|understand/i.test(node.textContent)).length, 0);
+    assert.equal(calls.length, 1, 'opening checkout neither creates a quote nor requests a payment');
+  } finally { api.defaults.adapter = previousAdapter; await harness.close(); }
+});

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { ArrowRight, BookOpen, ShieldCheck } from 'lucide-react';
-import { approvedEvaluationPolicy, evaluationPolicyForTerms } from '../services/programEvaluationPolicy.js';
+import { APPROVED_ACCOUNT_MODEL, approvedEvaluationPolicy, evaluationPolicyForTerms } from '../services/programEvaluationPolicy.js';
 import { PROGRAM_RULE_FAMILIES } from '../services/programRuleFamilies.js';
 import useProgramCatalog from '../hooks/useProgramCatalog';
 import ProgramRuleFamily from '../components/programs/ProgramRuleFamily';
@@ -44,6 +44,7 @@ export default function TradingRules() {
             {PROGRAM_RULE_FAMILIES.map((family) => <Link key={family.type} to={`#${family.anchor}`} className="inline-flex min-h-11 items-center rounded-xl border border-cyan-400/30 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">{family.title}</Link>)}
           </nav>
           <p className="text-sm leading-relaxed text-slate-400">These categories read the same current catalog as program details. Recorded settings do not confirm live enforcement, payout eligibility or funding. Existing orders retain their recorded terms.</p>
+          <p data-account-model={APPROVED_ACCOUNT_MODEL.version} className="text-sm leading-relaxed text-slate-300">{APPROVED_ACCOUNT_MODEL.description}</p>
           {(catalog.loading || catalog.error) && <CatalogState loading={catalog.loading} error={catalog.error} retry={catalog.retry} />}
           {PROGRAM_RULE_FAMILIES.map((family) => <ProgramRuleFamily key={family.type} family={family} programs={programs} unavailable={Boolean(catalog.loading || catalog.error)} />)}
 
@@ -120,7 +121,7 @@ export default function TradingRules() {
               Use the target recorded for the current stage of the selected program: one-phase has one target, two-phase has two and three-phase has three. Each target measures closed profit after trading costs against the initial account size. Positions must be closed and the applicable rules must have been respected. Reaching a target does not erase an earlier breach. A new stage starts at the selected initial account size, without carrying the previous stage’s profit or loss forward.
             </p>
             <p className="mt-4 leading-relaxed text-slate-300">
-              Read the selected program’s existing minimum-day and duration settings. Their detailed application across stages, inactivity handling and the account provided after passing still require confirmation before live enforcement. A displayed target or a recorded purchase is not proof that a live trading account has been issued.
+              Read the selected program’s existing minimum-day and duration settings. Their detailed application across stages, inactivity handling and account-delivery conditions still require confirmation before enforcement. The approved post-evaluation account model is simulated; reaching a target or recording a purchase does not issue or activate an account.
             </p>
           </section>
 
@@ -137,7 +138,7 @@ export default function TradingRules() {
           <aside className="mep-panel rounded-2xl border p-6" aria-labelledby="availability-heading">
             <div className="flex items-center gap-3"><BookOpen className="h-5 w-5 text-cyan-300" aria-hidden="true" /><h2 id="availability-heading" className="mep-heading text-lg font-semibold">What is still not defined</h2></div>
             <p className="mt-3 leading-relaxed text-slate-300">
-              Operator identity and jurisdiction, the funded-account model, refund terms, detailed strategy conditions beyond the recorded flags and the process for reviewing a disputed breach are not established by this page. No company, licence, payment schedule or provider capability is inferred from the MarketEdgePros brand name.
+              Operator identification and applicable contractual details, account-delivery conditions, reward eligibility and timing, refund terms, detailed strategy conditions beyond the recorded flags and the process for reviewing a disputed breach still require completion. No company, licence, payment schedule or provider capability is inferred from the MarketEdgePros brand name.
             </p>
             <div className="mt-5 flex flex-wrap gap-4">
               <Link to="/terms-of-service" className="rounded font-semibold text-cyan-200 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">Terms status</Link>

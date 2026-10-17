@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { FileText, AlertCircle } from 'lucide-react';
-import { approvedEvaluationPolicy } from '../services/programEvaluationPolicy.js';
+import { APPROVED_ACCOUNT_MODEL, approvedEvaluationPolicy } from '../services/programEvaluationPolicy.js';
 
 const policy = approvedEvaluationPolicy('one_phase');
 const targets = (type) => approvedEvaluationPolicy(type).phase_targets.map((value) => `${value.replace('.00', '')}%`).join(' / ');
@@ -22,7 +22,7 @@ export default function TermsOfService() {
     },
     {
       title: 'Evaluation and account access',
-      content: 'The evaluation catalog has one-phase, two-phase and three-phase families with their own recorded stage targets. Instant Funding is Coming soon and is not available for purchase, quote requests or new payments. No launch date, immediate funding or trading access is promised. Payment for an evaluation is not a deposit into an investment account and does not transfer ownership of the stated account capital. The real-capital or simulated-account model after passing and its delivery conditions still require confirmation. Trading access is not activated by this page.',
+      content: `The evaluation catalog has one-phase, two-phase and three-phase families with their own recorded stage targets. ${APPROVED_ACCOUNT_MODEL.description} Instant Funding is Coming soon and is not available for purchase, quote requests or new payments. No launch date, immediate funding or trading access is promised. Payment for an evaluation is not a deposit into an investment account and does not transfer ownership of the stated account capital. Account-delivery conditions and timing still require confirmation. Trading access is not activated by this page.`,
     },
     {
       title: 'Which program terms apply',
@@ -65,7 +65,7 @@ export default function TermsOfService() {
           {sections.map(({ title, content }) => (
             <section key={title} className="mep-panel rounded-2xl border p-6 sm:p-8">
               <h2 className="mep-heading text-2xl font-semibold">{title}</h2>
-              <p className="mt-4 leading-relaxed text-slate-300">{content}</p>
+              <p className="mt-4 leading-relaxed text-slate-300" data-account-model={title === 'Evaluation and account access' ? APPROVED_ACCOUNT_MODEL.version : undefined}>{content}</p>
             </section>
           ))}
           <div className="mep-panel rounded-2xl border p-6 sm:p-8">

@@ -6,11 +6,15 @@ from sqlalchemy.engine import make_url
 
 
 MINIMUM_SECRET_LENGTH = 32
+MAXIMUM_ACCOUNT_FRONTEND_URL_LENGTH = 2048
 MAX_SIGNED_INT32 = 2**31 - 1
 _CANONICAL_POSITIVE_ID = re.compile(r"[1-9][0-9]*\Z")
 _POLICY_VERSION = re.compile(r"[A-Za-z0-9_.:-]{1,64}\Z")
 _CURRENCY_CODE = re.compile(r"[a-z0-9]{2,32}\Z")
 _NETWORK_CODE = re.compile(r"[A-Za-z0-9_.:-]{1,32}\Z")
+_SENDER_EMAIL = re.compile(
+    r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+\Z"
+)
 _KNOWN_WEAK_SECRETS = frozenset({
     "dev-secret-key-change-in-production",
     "change-me",
@@ -21,10 +25,21 @@ _DEMO_DATABASE_NAMES = frozenset({
     "marketedgepros_demo_20261012",
     "marketedgepros_candidate_20261012",
 })
+_NOWPAYMENTS_SETTINGS = frozenset({
+    "NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET", "NOWPAYMENTS_PILOT_ENABLED",
+    "NOWPAYMENTS_ACCEPT_EXISTING_IPN", "NOWPAYMENTS_CHECKOUT_SCOPE",
+    "NOWPAYMENTS_APPROVED_POLICY_VERSION", "NOWPAYMENTS_MERCHANT_CONTEXT",
+    "NOWPAYMENTS_CALLBACK_ORIGIN", "NOWPAYMENTS_CALLBACK_PATH", "NOWPAYMENTS_API_BASE",
+    "NOWPAYMENTS_STORAGE_REVISION", "NOWPAYMENTS_PILOT_PRINCIPAL_IDS",
+    "NOWPAYMENTS_PILOT_TENANT_IDS", "NOWPAYMENTS_PILOT_ROLES",
+    "NOWPAYMENTS_ALLOWED_CURRENCIES", "NOWPAYMENTS_OUTCOME_CURRENCY",
+    "NOWPAYMENTS_FIXED_RATE", "NOWPAYMENTS_FEE_PAID_BY_USER",
+})
 _DEMO_PROVIDER_SETTINGS = frozenset({
     "STRIPE_SECRET_KEY",
     "STRIPE_PUBLISHABLE_KEY",
     "STRIPE_WEBHOOK_SECRET",
+    "BREVO_API_KEY",
     "SENDGRID_API_KEY",
     "NOWPAYMENTS_API_KEY",
     "NOWPAYMENTS_IPN_SECRET",
@@ -40,6 +55,31 @@ _DEMO_PROVIDER_SETTINGS = frozenset({
     "TWILIO_AUTH_TOKEN",
     "VAULT_TOKEN",
 })
+
+
+def _has_nowpayments_activation_or_credentials(config):
+    """Detect active NOWPayments controls while ignoring inert code defaults."""
+    if any(config.get(name) is not None for name in (
+        "NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET",
+    )):
+        return True
+    if config.get("NOWPAYMENTS_PILOT_ENABLED") is True or config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is True:
+        return True
+    inert = {
+        "NOWPAYMENTS_CHECKOUT_SCOPE": "pilot",
+        "NOWPAYMENTS_CALLBACK_PATH": "/api/v1/orders/webhooks/nowpayments",
+        "NOWPAYMENTS_API_BASE": "https://api.nowpayments.io/v1",
+    }
+    for setting in _NOWPAYMENTS_SETTINGS - {
+        "NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET",
+        "NOWPAYMENTS_PILOT_ENABLED", "NOWPAYMENTS_ACCEPT_EXISTING_IPN",
+    }:
+        value = config.get(setting)
+        if setting in inert and value == inert[setting]:
+            continue
+        if value is not None and value is not False and value != () and value != []:
+            return True
+    return False
 
 
 def _is_strong_secret(value):
@@ -92,6 +132,77 @@ def _is_canonical_positive_id(value):
             len(value) < len(str(MAX_SIGNED_INT32))
             or (len(value) == len(str(MAX_SIGNED_INT32)) and value <= str(MAX_SIGNED_INT32))
         )
+    )
+
+
+def _is_boolean(value):
+    """Require a real boolean rather than a truthy deployment string."""
+    return value is True or value is False
+
+
+def _is_valid_marketedgepros_sender(value):
+    """Validate one bounded explicit mailbox at the reviewed brand domain."""
+    return (
+        isinstance(value, str)
+        and len(value) <= 254
+        and value.isascii()
+        and bool(_SENDER_EMAIL.fullmatch(value))
+        and value.rsplit("@", 1)[1] == "marketedgepros.com"
+        and 1 <= len(value.rsplit("@", 1)[0]) <= 64
+    )
+
+
+def _is_canonical_account_frontend_url(value):
+    """Allow only the reviewed public brand origin, never a supplied path."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > MAXIMUM_ACCOUNT_FRONTEND_URL_LENGTH
+    ):
+        return False
+    try:
+        parsed = urlparse(value)
+        port = parsed.port
+    except (TypeError, ValueError):
+        return False
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname in {"marketedgepros.com", "www.marketedgepros.com"}
+        and port is None
+        and parsed.path in {"", "/"}
+        and not parsed.params
+        and not parsed.query
+        and not parsed.fragment
+        and parsed.username is None
+        and parsed.password is None
+    )
+
+
+def is_valid_brevo_api_key(value):
+    """Pure shared validator for a printable, non-placeholder Brevo key."""
+    if not isinstance(value, str) or not 32 <= len(value) <= 512 or not value.isascii():
+        return False
+    lowered = value.lower()
+    return (
+        value not in _KNOWN_WEAK_SECRETS
+        and not any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value)
+        and lowered not in {"change-me", "secret", "default", "placeholder", "your-brevo-api-key"}
+        and not any(marker in lowered for marker in ("placeholder", "example", "replace", "your_"))
+        and len(set(value)) >= 8
+    )
+
+def _valid_demo_account_access_profile(config):
+    """Check the sole Demo exception that may hold a Brevo credential."""
+    return (
+        config.get("PUBLIC_ACCOUNT_ACCESS_ENABLED") is True
+        and isinstance(config.get("EMAIL_PROVIDER"), str)
+        and config.get("EMAIL_PROVIDER") == "brevo"
+        and is_valid_brevo_api_key(config.get("BREVO_API_KEY"))
+        and _is_valid_marketedgepros_sender(config.get("EMAIL_FROM_ADDRESS"))
+        and config.get("EMAIL_FROM_NAME") == "MarketEdgePros"
+        and config.get("EMAIL_SENDER_VERIFIED") is True
+        and config.get("EMAIL_DOMAIN_AUTHENTICATED") is True
+        and _is_canonical_account_frontend_url(config.get("FRONTEND_URL"))
     )
 
 
@@ -210,6 +321,14 @@ def validate_demo_release_configuration(config):
         return
 
     invalid = []
+    if (
+        "PUBLIC_ACCOUNT_ACCESS_ENABLED" in config
+        and not _is_boolean(config.get("PUBLIC_ACCOUNT_ACCESS_ENABLED"))
+    ):
+        invalid.append("PUBLIC_ACCOUNT_ACCESS_ENABLED")
+    for setting in ("EMAIL_SENDER_VERIFIED", "EMAIL_DOMAIN_AUTHENTICATED"):
+        if setting in config and not _is_boolean(config.get(setting)):
+            invalid.append(setting)
     if not _is_demo_database_url(config.get("SQLALCHEMY_DATABASE_URI")):
         invalid.append("SQLALCHEMY_DATABASE_URI")
     for setting, database in (
@@ -222,13 +341,25 @@ def validate_demo_release_configuration(config):
     if not _is_canonical_positive_id(config.get("PLATFORM_ROOT_USER_ID")):
         invalid.append("PLATFORM_ROOT_USER_ID")
     nowpayments_pilot_valid = _valid_nowpayments_pilot(config)
+    account_access_profile_valid = _valid_demo_account_access_profile(config)
+    if config.get("PUBLIC_ACCOUNT_ACCESS_ENABLED") is True and (
+        _has_nowpayments_activation_or_credentials(config)
+        or any(config.get(setting) is not None for setting in (
+            "STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY", "STRIPE_WEBHOOK_SECRET",
+        ))
+    ):
+        invalid.append("PUBLIC_ACCOUNT_ACCESS_PAYMENT_SETTINGS")
     for setting in sorted(_DEMO_PROVIDER_SETTINGS):
         if setting in {"NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET"} and nowpayments_pilot_valid:
+            continue
+        if setting == "BREVO_API_KEY" and account_access_profile_valid:
             continue
         if config.get(setting) is not None:
             invalid.append(setting)
     if (config.get("NOWPAYMENTS_PILOT_ENABLED") is True or config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is True) and not nowpayments_pilot_valid:
         invalid.append("NOWPAYMENTS_PILOT_POLICY")
+    if config.get("PUBLIC_ACCOUNT_ACCESS_ENABLED") is True and not account_access_profile_valid:
+        invalid.append("PUBLIC_ACCOUNT_ACCESS_PROFILE")
 
     if invalid:
         raise ValueError("Invalid demo release configuration: " + ", ".join(invalid))
@@ -262,6 +393,26 @@ def validate_production_configuration(config):
             invalid.append(setting)
     if not _is_canonical_positive_id(config.get("PLATFORM_ROOT_USER_ID")):
         invalid.append("PLATFORM_ROOT_USER_ID")
+    # Config objects from older non-demo deployments do not carry these keys;
+    # only the new explicit profile is type-checked here.
+    for setting in (
+        "PUBLIC_ACCOUNT_ACCESS_ENABLED",
+        "EMAIL_SENDER_VERIFIED",
+        "EMAIL_DOMAIN_AUTHENTICATED",
+    ):
+        if setting in config and not _is_boolean(config.get(setting)):
+            invalid.append(setting)
+    if config.get("PUBLIC_ACCOUNT_ACCESS_ENABLED") is True:
+        if not _valid_demo_account_access_profile(config):
+            invalid.append("PUBLIC_ACCOUNT_ACCESS_PROFILE")
+        if config.get("SENDGRID_API_KEY") is not None:
+            invalid.append("SENDGRID_API_KEY")
+        if _has_nowpayments_activation_or_credentials(config) or any(
+            config.get(setting) is not None for setting in {
+                "STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY", "STRIPE_WEBHOOK_SECRET",
+            }
+        ):
+            invalid.append("PUBLIC_ACCOUNT_ACCESS_PAYMENT_SETTINGS")
     has_nowpayments_setting = any(config.get(setting) is not None for setting in (
         "NOWPAYMENTS_API_KEY", "NOWPAYMENTS_IPN_SECRET",
     )) or config.get("NOWPAYMENTS_PILOT_ENABLED") is True or config.get("NOWPAYMENTS_ACCEPT_EXISTING_IPN") is True

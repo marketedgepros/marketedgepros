@@ -13,7 +13,8 @@ export default function VerifyEmail() {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const emailFromState = location.state?.email || '';
+  const emailFromState = location.state?.email || new URLSearchParams(location.search).get('email') || '';
+  const emailDeliveryStatus = location.state?.emailDeliveryStatus;
 
   const [email, setEmail] = useState(emailFromState);
   const [code, setCode] = useState('');
@@ -74,7 +75,7 @@ export default function VerifyEmail() {
       await api.post('/auth/resend-verification', { email });
       if (!isMountedRef.current) return;
       setResendCooldown(120);
-      toast.warning('If the email exists and is not verified, a new verification code has been sent.');
+      toast.warning('If the account is eligible, a verification email has been requested. If nothing arrives, try again later.');
     } catch {
       if (!isMountedRef.current) return;
       setError('Unable to process the request right now. Please try again.');
@@ -134,6 +135,11 @@ export default function VerifyEmail() {
               )}
             </header>
 
+            {emailDeliveryStatus === 'unavailable' && (
+              <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950" role="status">
+                Your account was created, but the verification email was not accepted for delivery. You can request another verification email below.
+              </div>
+            )}
             {error && (
               <div className="mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4" role="alert">
                 <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-700" aria-hidden="true" />

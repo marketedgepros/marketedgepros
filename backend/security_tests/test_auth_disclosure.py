@@ -223,7 +223,7 @@ def test_email_request_endpoints_reject_invalid_email_before_service(client, end
 
 
 @pytest.mark.parametrize(
-    ("endpoint", "service_method", "email_method", "payload", "error_message", "code"),
+    ("endpoint", "service_method", "email_method", "payload", "status", "message", "code"),
     [
         (
             "/api/v1/auth/register",
@@ -235,7 +235,8 @@ def test_email_request_endpoints_reject_invalid_email_before_service(client, end
                 "first_name": "Security",
                 "last_name": "Tester",
             },
-            "Registration failed",
+            202,
+            "Account created and pending email verification. Use resend verification when email delivery is available.",
             VERIFICATION_CODE,
         ),
         (
@@ -243,7 +244,8 @@ def test_email_request_endpoints_reject_invalid_email_before_service(client, end
             "resend_verification_code",
             "send_verification_email",
             {"email": "existing@example.test"},
-            "Failed to resend verification code",
+            200,
+            "If the account is eligible, a verification email has been requested. If nothing arrives, try again later.",
             VERIFICATION_CODE,
         ),
         (
@@ -251,19 +253,21 @@ def test_email_request_endpoints_reject_invalid_email_before_service(client, end
             "request_password_reset",
             "send_password_reset_email",
             {"email": "existing@example.test"},
-            "Password reset request failed",
+            200,
+            "If the account is eligible, a password reset email has been requested. If nothing arrives, try again later.",
             RESET_CODE,
         ),
     ],
 )
-def test_email_provider_exceptions_are_generic_and_do_not_disclose_secrets(
+def test_email_provider_exceptions_remain_neutral_and_do_not_disclose_secrets(
     client,
     monkeypatch,
     endpoint,
     service_method,
     email_method,
     payload,
-    error_message,
+    status,
+    message,
     code,
 ):
     user = FakeUser()
@@ -285,7 +289,9 @@ def test_email_provider_exceptions_are_generic_and_do_not_disclose_secrets(
 
     response = client.post(endpoint, json=payload)
 
-    assert response.status_code == 500
-    assert response.get_json() == {"error": error_message}
+    assert response.status_code == status
+    assert response.get_json()["message"] == message
+    if endpoint == "/api/v1/auth/register":
+        assert response.get_json()["verification_email_status"] == "unavailable"
     assert PROVIDER_SECRET not in response.get_data(as_text=True)
     assert code not in response.get_data(as_text=True)

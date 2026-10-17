@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import useProgramCatalog from "../hooks/useProgramCatalog";
 import { typeLabel } from "../services/programCatalogViewService";
-import { isProgramComingSoon } from "../services/programEvaluationPolicy.js";
+import { APPROVED_ACCOUNT_MODEL, isProgramComingSoon } from "../services/programEvaluationPolicy.js";
 import ComingSoonProgram from "../components/programs/ComingSoonProgram";
 import {
   CatalogPage,
@@ -70,6 +70,9 @@ export default function ProgramsNew() {
             Compare programs
             <ArrowDown size={16} aria-hidden="true" />
           </a>
+          <p data-account-model={APPROVED_ACCOUNT_MODEL.version} className="mt-5 max-w-xl text-sm leading-relaxed text-slate-300">
+            {APPROVED_ACCOUNT_MODEL.description}
+          </p>
         </div>
         <aside className={panelStyle} aria-label="Selection process">
           <ol className="space-y-6">

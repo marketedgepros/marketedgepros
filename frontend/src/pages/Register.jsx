@@ -64,10 +64,12 @@ export default function Register() {
 
     try {
       const { confirmPassword, ...registerData } = formData;
-      await register(registerData);
-      
-      // Navigate to verify email page with email in state
-      navigate('/verify-email', { state: { email: formData.email } });
+      const response = await register(registerData);
+      const emailDeliveryStatus = response?.verification_email_status;
+      // Only a committed pending account response advances to code verification.
+      if (emailDeliveryStatus === 'accepted' || emailDeliveryStatus === 'unavailable') {
+        navigate('/verify-email', { state: { email: formData.email, emailDeliveryStatus } });
+      }
     } catch {
       // authStore exposes the request error; do not navigate on failure.
     } finally {

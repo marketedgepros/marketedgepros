@@ -57,7 +57,7 @@ export default function ForgotPassword() {
               </div>
               <h1 className="mep-heading text-2xl font-bold text-white mb-2">Check Your Email</h1>
               <p className="text-gray-400 mb-6">
-                If an account exists for <strong className="text-cyan-400">{email}</strong>, a password reset code has been requested. If eligible, check your inbox and enter the code on the next page.
+                If an account exists for <strong className="text-cyan-400">{email}</strong>, a password reset email has been requested. If eligible, use the code on the next page. If nothing arrives, try again later.
               </p>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mx-auto"></div>
             </div>

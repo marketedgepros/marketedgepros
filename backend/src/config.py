@@ -15,6 +15,21 @@ if os.environ.get('FLASK_TESTING', '').lower() != 'true':
 
 import secrets
 
+
+def _strict_boolean_env(name, default=False):
+    """Read a feature flag without treating malformed values as an opt-in."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized == 'true':
+        return True
+    if normalized == 'false':
+        return False
+    # Validators reject this in a deployment; callers also see a falsey value.
+    return None
+
+
 def _payment_policy_json(name, default=None):
     """Bounded server-only configuration; error messages never contain values."""
     raw = os.getenv(name)
@@ -41,6 +56,11 @@ class Config:
     # Demo mode is an explicit, deployment-scoped feature flag.  It defaults
     # closed so a normal release retains its established route behavior.
     DEMO_RELEASE_ENABLED = os.getenv('DEMO_RELEASE_ENABLED', 'false').lower() == 'true'
+    # Public registration and recovery are separately reviewed from the demo
+    # release itself. An invalid environment value cannot enable the feature.
+    PUBLIC_ACCOUNT_ACCESS_ENABLED = _strict_boolean_env(
+        'PUBLIC_ACCOUNT_ACCESS_ENABLED', False
+    )
     # Single-brand ownership is pinned by a reviewed stable DB ID, not email.
     PLATFORM_ROOT_USER_ID = os.getenv('PLATFORM_ROOT_USER_ID')
     EXPANDED_HIERARCHY_ENABLED = False
@@ -107,11 +127,23 @@ class Config:
     NOWPAYMENTS_FIXED_RATE = _payment_policy_json('NOWPAYMENTS_FIXED_RATE')
     NOWPAYMENTS_FEE_PAID_BY_USER = _payment_policy_json('NOWPAYMENTS_FEE_PAID_BY_USER')
     NOWPAYMENTS_REFRESH_MIN_SECONDS = 30
-    
-    # SendGrid
-    SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
-    SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@marketedgepros.com')
-    
+
+    # Account-access delivery is Brevo-only and never relies on an implicit
+    # sender or origin. The narrow Demo profile validates every outbound
+    # value before a public account-access opt-in is accepted.
+    EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'brevo')
+    BREVO_API_KEY = os.getenv('BREVO_API_KEY') or None
+    EMAIL_FROM_ADDRESS = os.getenv('EMAIL_FROM_ADDRESS') or None
+    EMAIL_FROM_NAME = os.getenv('EMAIL_FROM_NAME', 'MarketEdgePros')
+    EMAIL_SENDER_VERIFIED = _strict_boolean_env('EMAIL_SENDER_VERIFIED', False)
+    EMAIL_DOMAIN_AUTHENTICATED = _strict_boolean_env(
+        'EMAIL_DOMAIN_AUTHENTICATED', False
+    )
+    # Retained only to detect and reject the explicitly disallowed legacy
+    # credential in a Demo deployment; it is not a supported email profile.
+    SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY') or None
+    FRONTEND_URL = os.getenv('FRONTEND_URL') or None
+
     # MetaTrader (placeholder for future implementation)
     MT_SERVER = os.getenv('MT_SERVER')
     MT_LOGIN = os.getenv('MT_LOGIN')
@@ -163,7 +195,15 @@ class TestingConfig(Config):
     RATELIMIT_STORAGE_URL = 'memory://'
     WTF_CSRF_ENABLED = False
     MAIL_SUPPRESS_SEND = True
+    EMAIL_PROVIDER = 'brevo'
+    BREVO_API_KEY = None
+    EMAIL_FROM_ADDRESS = None
+    EMAIL_FROM_NAME = 'MarketEdgePros'
+    EMAIL_SENDER_VERIFIED = False
+    EMAIL_DOMAIN_AUTHENTICATED = False
     SENDGRID_API_KEY = None
+    FRONTEND_URL = None
+    PUBLIC_ACCOUNT_ACCESS_ENABLED = False
     STRIPE_SECRET_KEY = None
     STRIPE_PUBLISHABLE_KEY = None
     STRIPE_WEBHOOK_SECRET = None

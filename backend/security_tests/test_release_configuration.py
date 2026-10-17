@@ -90,6 +90,82 @@ def test_synthetic_complete_demo_config_is_accepted_without_network_access():
     validate_demo_release_configuration(synthetic_demo_config())
 
 
+def _account_access_demo_profile(**overrides):
+    """Return the only narrow Demo profile allowed to contain Brevo access."""
+    config = synthetic_demo_config(
+        PUBLIC_ACCOUNT_ACCESS_ENABLED=True,
+        EMAIL_PROVIDER="brevo",
+        BREVO_API_KEY="synthetic-brevo-key-" + "b" * 40,
+        EMAIL_FROM_ADDRESS="accounts@marketedgepros.com",
+        EMAIL_FROM_NAME="MarketEdgePros",
+        EMAIL_SENDER_VERIFIED=True,
+        EMAIL_DOMAIN_AUTHENTICATED=True,
+        FRONTEND_URL="https://marketedgepros.com",
+    )
+    config.update(overrides)
+    return config
+
+
+def test_demo_account_access_profile_allows_only_validated_brevo_delivery():
+    validate_demo_release_configuration(_account_access_demo_profile())
+    validate_demo_release_configuration(
+        _account_access_demo_profile(FRONTEND_URL="https://www.marketedgepros.com/")
+    )
+
+
+@pytest.mark.parametrize("setting", ["SENDGRID_API_KEY", "STRIPE_SECRET_KEY"])
+def test_demo_account_access_profile_still_rejects_other_provider_credentials(setting):
+    provider_value = "synthetic-provider-key-must-not-be-echoed"
+    with pytest.raises(ValueError, match=setting) as error:
+        validate_demo_release_configuration(
+            _account_access_demo_profile(**{setting: provider_value})
+        )
+    assert provider_value not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "setting"),
+    [
+        ({"EMAIL_PROVIDER": "sendgrid"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_PROVIDER": 1}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_PROVIDER": None}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_FROM_ADDRESS": "not-a-mailbox"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_FROM_ADDRESS": "accounts@sub.marketedgepros.com"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_FROM_ADDRESS": "a" * 65 + "@marketedgepros.com"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_FROM_ADDRESS": None}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_FROM_NAME": "Market Edge Pros"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_SENDER_VERIFIED": False}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_SENDER_VERIFIED": "true"}, "EMAIL_SENDER_VERIFIED"),
+        ({"EMAIL_DOMAIN_AUTHENTICATED": False}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"EMAIL_DOMAIN_AUTHENTICATED": "true"}, "EMAIL_DOMAIN_AUTHENTICATED"),
+        ({"FRONTEND_URL": "http://marketedgepros.com"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"FRONTEND_URL": "https://marketedgepros.com/reset"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"FRONTEND_URL": "https://example.invalid"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"FRONTEND_URL": "https://marketedgepros.com/" + "a" * 2048}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"BREVO_API_KEY": "short"}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"BREVO_API_KEY": " " + "b" * 40}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+        ({"BREVO_API_KEY": "b" * 513}, "PUBLIC_ACCOUNT_ACCESS_PROFILE"),
+    ],
+)
+def test_demo_account_access_profile_rejects_invalid_sender_or_origin(overrides, setting):
+    with pytest.raises(ValueError, match=setting) as error:
+        validate_demo_release_configuration(_account_access_demo_profile(**overrides))
+    assert "synthetic-brevo-key" not in str(error.value)
+
+
+def test_malformed_account_access_boolean_fails_closed_in_production_validation():
+    with pytest.raises(ValueError, match="PUBLIC_ACCOUNT_ACCESS_ENABLED"):
+        validate_production_configuration(
+            synthetic_production_config(PUBLIC_ACCOUNT_ACCESS_ENABLED="true")
+        )
+
+
+@pytest.mark.parametrize("setting", ["EMAIL_SENDER_VERIFIED", "EMAIL_DOMAIN_AUTHENTICATED"])
+def test_malformed_account_email_verification_flags_fail_closed_in_production_validation(setting):
+    with pytest.raises(ValueError, match=setting):
+        validate_production_configuration(synthetic_production_config(**{setting: "true"}))
+
+
 @pytest.mark.parametrize(
     ("overrides", "setting"),
     [
@@ -140,6 +216,7 @@ def test_demo_configuration_rejects_non_allowlisted_targets(overrides, setting):
     "setting",
     [
         "STRIPE_SECRET_KEY",
+        "BREVO_API_KEY",
         "SENDGRID_API_KEY",
         "NOWPAYMENTS_API_KEY",
         "MT_LOGIN",
@@ -163,13 +240,26 @@ def test_demo_validation_is_disabled_when_the_explicit_demo_flag_is_off():
 
 
 def test_testing_config_does_not_inherit_demo_or_provider_credentials():
-    from src.config import TestingConfig
+    from src.config import Config, TestingConfig
 
+    assert Config.EMAIL_PROVIDER == "brevo"
+    assert Config.BREVO_API_KEY is None
+    assert Config.EMAIL_FROM_ADDRESS is None
+    assert Config.EMAIL_FROM_NAME == "MarketEdgePros"
+    assert Config.EMAIL_SENDER_VERIFIED is False
+    assert Config.EMAIL_DOMAIN_AUTHENTICATED is False
     assert TestingConfig.DEMO_RELEASE_ENABLED is False
     assert TestingConfig.STRIPE_SECRET_KEY is None
     assert TestingConfig.STRIPE_PUBLISHABLE_KEY is None
     assert TestingConfig.STRIPE_WEBHOOK_SECRET is None
+    assert TestingConfig.EMAIL_PROVIDER == "brevo"
+    assert TestingConfig.BREVO_API_KEY is None
+    assert TestingConfig.EMAIL_FROM_ADDRESS is None
+    assert TestingConfig.EMAIL_FROM_NAME == "MarketEdgePros"
+    assert TestingConfig.EMAIL_SENDER_VERIFIED is False
+    assert TestingConfig.EMAIL_DOMAIN_AUTHENTICATED is False
     assert TestingConfig.SENDGRID_API_KEY is None
+    assert TestingConfig.PUBLIC_ACCOUNT_ACCESS_ENABLED is False
     assert TestingConfig.NOWPAYMENTS_API_KEY is None
     assert TestingConfig.NOWPAYMENTS_IPN_SECRET is None
     assert TestingConfig.MT_LOGIN is None
@@ -225,3 +315,77 @@ def test_factory_validates_actual_config_before_extensions(monkeypatch):
             "testing",
             config_overrides={"PRODUCTION": True, "DEBUG": True},
         )
+
+
+@pytest.mark.parametrize("key", [
+    "a" * 40,
+    "synthetic-key-1234567890\tabcdefghijk",
+    "synthetic-key-1234567890\u00a0abcdefghijk",
+    "synthetic-key-1234567890\x7fabcdefghijk",
+    "example-brevo-key-1234567890abcdef",
+    "your_brevo_key_1234567890abcdef",
+])
+def test_brevo_key_validator_rejects_transport_invalid_keys(key):
+    from src.production_safety import is_valid_brevo_api_key
+
+    assert is_valid_brevo_api_key(key) is False
+
+
+def test_brevo_key_validator_accepts_shared_valid_shape():
+    from src.production_safety import is_valid_brevo_api_key
+
+    assert is_valid_brevo_api_key("synthetic-brevo-key-1234567890-ABC") is True
+
+
+def _account_access_production_profile(**overrides):
+    config = synthetic_production_config(
+        PUBLIC_ACCOUNT_ACCESS_ENABLED=True,
+        EMAIL_PROVIDER="brevo",
+        BREVO_API_KEY="synthetic-brevo-key-1234567890-ABC",
+        EMAIL_FROM_ADDRESS="accounts@marketedgepros.com",
+        EMAIL_FROM_NAME="MarketEdgePros",
+        EMAIL_SENDER_VERIFIED=True,
+        EMAIL_DOMAIN_AUTHENTICATED=True,
+        FRONTEND_URL="https://marketedgepros.com",
+    )
+    config.update(overrides)
+    return config
+
+
+@pytest.mark.parametrize("overrides", [
+    {"EMAIL_PROVIDER": "sendgrid", "SENDGRID_API_KEY": "synthetic"},
+    {"BREVO_API_KEY": "a" * 40},
+    {"EMAIL_FROM_ADDRESS": "bad"},
+    {"EMAIL_SENDER_VERIFIED": False},
+    {"EMAIL_DOMAIN_AUTHENTICATED": False},
+    {"FRONTEND_URL": "https://evil.invalid"},
+    {"NOWPAYMENTS_PILOT_ENABLED": True},
+    {"NOWPAYMENTS_API_KEY": "synthetic"},
+    {"STRIPE_SECRET_KEY": "synthetic"},
+])
+def test_production_public_account_requires_email_only_brevo_profile(overrides):
+    with pytest.raises(ValueError):
+        validate_production_configuration(_account_access_production_profile(**overrides))
+
+
+def test_production_public_account_accepts_complete_brevo_profile():
+    validate_production_configuration(_account_access_production_profile())
+
+
+@pytest.mark.parametrize("setting,value", [
+    ("NOWPAYMENTS_PILOT_ENABLED", True),
+    ("NOWPAYMENTS_ACCEPT_EXISTING_IPN", True),
+    ("NOWPAYMENTS_API_KEY", "synthetic-nowpayments-key"),
+    ("NOWPAYMENTS_IPN_SECRET", "synthetic-nowpayments-secret"),
+    ("STRIPE_SECRET_KEY", "synthetic-stripe-secret"),
+])
+def test_demo_public_account_rejects_payment_activation_or_credentials(setting, value):
+    with pytest.raises(ValueError, match="PUBLIC_ACCOUNT_ACCESS_PAYMENT_SETTINGS"):
+        validate_demo_release_configuration(_account_access_demo_profile(**{setting: value}))
+
+
+def test_demo_standalone_approved_nowpayments_pilot_validation_remains_independent():
+    config = synthetic_demo_config(NOWPAYMENTS_PILOT_ENABLED=True)
+    # Existing detailed pilot policy validator still independently gates payment activation.
+    with pytest.raises(ValueError, match="NOWPAYMENTS_PILOT_POLICY"):
+        validate_demo_release_configuration(config)

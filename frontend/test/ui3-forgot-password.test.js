@@ -6,7 +6,7 @@ const source = await readFile(new URL('../src/pages/ForgotPassword.jsx', import.
 
 test('reset request success remains neutral for anti-enumeration behavior', () => {
   assert.match(source, /If an account exists for/);
-  assert.match(source, /If eligible, check your inbox/);
+  assert.match(source, /If eligible, use the code on the next page/);
   assert.doesNotMatch(source, /We've sent a 6-digit reset code/);
   assert.doesNotMatch(source, /code has been sent to/);
 });

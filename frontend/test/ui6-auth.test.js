@@ -52,6 +52,7 @@ const dependencies = new Map([
   ['react/jsx-runtime', dependencyUrl('react/jsx-runtime')],
   ['react/jsx-dev-runtime', dependencyUrl('react/jsx-dev-runtime')],
   ['react-router-dom', dependencyUrl('react-router-dom')],
+  ['zustand', dependencyUrl('zustand')],
 ]);
 
 function makeImportable(code) {
@@ -87,6 +88,14 @@ after(() => {
 const layoutStub = 'const Layout = ({ children }) => <main data-ui6-layout="auth">{children}</main>;';
 const iconStub = 'const Icon = (props) => <svg aria-hidden="true" {...props} />;';
 const authStoreStub = 'const useAuthStore = () => globalThis.__ui6AuthStore();';
+
+// Keep the registration store and Axios request adapter live for delivery-status coverage.
+// The only substitutions below are rendering-only dependencies that cannot run in jsdom.
+const liveApi = (await import(sourceUrl('services', 'api.js'))).default;
+const LiveAuthStore = (await compile('live-auth-store', 'store/authStore.js', (text) => text
+  .replace("import { create } from 'zustand';", `import { create } from ${JSON.stringify(dependencyUrl('zustand'))};`)
+  .replace("import { authAPI } from '../services/api.js';", `import { authAPI } from ${JSON.stringify(sourceUrl('services', 'api.js'))};`)
+)).default;
 
 const Login = (await compile('login', 'pages/Login.jsx', (text) => text
   .replace("import { postLoginDestination } from '../services/navigationService.js';", 'const postLoginDestination = (user, search) => globalThis.__ui6PostLogin(user, search);')
@@ -144,6 +153,10 @@ function LocationProbe() {
   const location = useLocation();
   return h('output', { 'data-ui6-location': true }, `${location.pathname}${location.search}`);
 }
+function LocationStateProbe() {
+  const currentLocation = useLocation();
+  return h('output', { 'data-ui6-location-state': true }, JSON.stringify(currentLocation.state));
+}
 
 async function render(Component, initialEntries = ['/']) {
   document.body.innerHTML = '<div id="root"></div>';
@@ -154,6 +167,25 @@ async function render(Component, initialEntries = ['/']) {
       { initialEntries },
       h(Routes, null, h(Route, { path: '*', element: h(Component) })),
       h(LocationProbe),
+    ));
+    await Promise.resolve();
+  });
+  return root;
+}
+
+async function renderRegistrationFlow(initialEntries = ['/register']) {
+  document.body.innerHTML = '<div id="root"></div>';
+  const root = createRoot(document.getElementById('root'));
+  await act(async () => {
+    root.render(h(
+      MemoryRouter,
+      { initialEntries },
+      h(Routes, null,
+        h(Route, { path: '/register', element: h(Register) }),
+        h(Route, { path: '/verify-email', element: h(VerifyEmail) }),
+      ),
+      h(LocationProbe),
+      h(LocationStateProbe),
     ));
     await Promise.resolve();
   });
@@ -242,6 +274,18 @@ function authState(overrides = {}) {
   state.clearError = () => { state.error = null; };
   state.cancel2FA = () => { state.pending2FA = null; };
   return Object.assign(state, overrides);
+}
+
+async function populateValidRegistration(email) {
+  const fields = {
+    first_name: 'Ada',
+    last_name: 'Lovelace',
+    email,
+    phone: '+12025550123',
+    password: 'StrongValue42!',
+    confirmPassword: 'StrongValue42!',
+  };
+  for (const [id, value] of Object.entries(fields)) await type(document.getElementById(id), value);
 }
 
 test('UI6 auth router renders public guest routes, redirects authenticated login/register, exposes loading, and remounts safely', { concurrency: false }, async () => {
@@ -401,7 +445,7 @@ test('UI6 Register validates locally, sends canonical mutated payload only to th
     await submit(document.querySelector('form'));
     assert.equal(button('Creating Account...')?.disabled, true, 'pending registration is visibly disabled');
     assert.equal(location(), '/register?ref=REF-42');
-    await act(async () => { pending.resolve({ data: { user: { id: 'synthetic-user' } } }); await Promise.resolve(); });
+    await act(async () => { pending.resolve({ verification_email_status: 'accepted', user: { id: 'synthetic-user' } }); await Promise.resolve(); });
     await waitFor(() => location() === '/verify-email', 'acknowledged registration route');
     assert.deepEqual(calls, [
       { first_name: 'Ada', last_name: 'Lovelace', email: 'ada@example.test', phone: '+12025550123', password: 'StrongValue42!', country_code: 'US', referral_code: 'REF-42' },
@@ -410,6 +454,138 @@ test('UI6 Register validates locally, sends canonical mutated payload only to th
   } finally {
     delete globalThis.__ui6AuthStore;
     await unmount(root);
+  }
+});
+
+test('UI6 Register carries live Axios 201 accepted and 202 unavailable delivery states into VerifyEmail without a session', { concurrency: false }, async () => {
+  const registrationCalls = [];
+  const resendCalls = [];
+  const toastCalls = [];
+  const originalAdapter = liveApi.defaults.adapter;
+  let response = { status: 201, data: { verification_email_status: 'accepted' } };
+  liveApi.defaults.adapter = async (config) => {
+    registrationCalls.push({
+      method: config.method,
+      url: config.url,
+      data: typeof config.data === 'string' ? JSON.parse(config.data) : config.data,
+      status: response.status,
+    });
+    return {
+      data: response.data,
+      status: response.status,
+      statusText: response.status === 201 ? 'Created' : 'Accepted',
+      headers: {},
+      config,
+      request: {},
+    };
+  };
+  globalThis.__ui6AuthStore = () => LiveAuthStore();
+  globalThis.__ui6Toast = { warning(message) { toastCalls.push(message); } };
+  globalThis.__ui6Api = {
+    post: async (url, payload) => {
+      resendCalls.push([url, payload]);
+      return { data: { acknowledgement: 'accepted' } };
+    },
+  };
+  let root;
+  try {
+    LiveAuthStore.setState({ user: null, isAuthenticated: false, error: null, isLoading: false, pending2FA: null });
+    root = await renderRegistrationFlow();
+    await populateValidRegistration('accepted@example.test');
+    await submit(document.querySelector('form'));
+    await waitFor(() => location() === '/verify-email', '201 accepted registration navigation');
+    assert.deepEqual(JSON.parse(document.querySelector('[data-ui6-location-state]').textContent), {
+      email: 'accepted@example.test',
+      emailDeliveryStatus: 'accepted',
+    });
+    assert.equal(document.getElementById('verify-email'), null, 'the acknowledged email is carried in navigation state');
+    assert.match(text(), /accepted@example\.test/);
+    assert.equal(document.querySelector('[role="status"]'), null, '201 does not render the unavailable-delivery notice');
+
+    await unmount(root);
+    response = { status: 202, data: { verification_email_status: 'unavailable' } };
+    LiveAuthStore.setState({ user: null, isAuthenticated: false, error: null, isLoading: false, pending2FA: null });
+    root = await renderRegistrationFlow();
+    await populateValidRegistration('pending@example.test');
+    await submit(document.querySelector('form'));
+    await waitFor(() => location() === '/verify-email', '202 unavailable registration navigation');
+    assert.deepEqual(JSON.parse(document.querySelector('[data-ui6-location-state]').textContent), {
+      email: 'pending@example.test',
+      emailDeliveryStatus: 'unavailable',
+    });
+    assert.match(document.querySelector('[role="status"]')?.textContent, /account was created, but the verification email was not accepted for delivery/i);
+    assert.equal(LiveAuthStore.getState().isAuthenticated, false, 'a pending account response never creates a login session');
+    assert.equal(LiveAuthStore.getState().user, null);
+
+    await click(button('Resend verification code'));
+    await waitFor(() => button('Resend code in 120s'), 'unavailable-delivery resend cooldown');
+    assert.equal(button('Resend code in 120s').disabled, true, 'the full 120-second cooldown begins after acknowledgement');
+    assert.deepEqual(resendCalls, [['/auth/resend-verification', { email: 'pending@example.test' }]]);
+    assert.deepEqual(toastCalls, ['If the account is eligible, a verification email has been requested. If nothing arrives, try again later.']);
+    assert.doesNotMatch(toastCalls[0], /\b(?:sent|delivered)\b/i, 'generic resend copy does not promise delivery');
+    assert.equal(registrationCalls.some((call) => call.url.includes('/auth/login')), false, 'neither delivery status attempts login');
+    assert.deepEqual(registrationCalls, [
+      {
+        method: 'post',
+        url: '/auth/register',
+        data: {
+          first_name: 'Ada', last_name: 'Lovelace', email: 'accepted@example.test', phone: '+12025550123', password: 'StrongValue42!', country_code: 'US', referral_code: '',
+        },
+        status: 201,
+      },
+      {
+        method: 'post',
+        url: '/auth/register',
+        data: {
+          first_name: 'Ada', last_name: 'Lovelace', email: 'pending@example.test', phone: '+12025550123', password: 'StrongValue42!', country_code: 'US', referral_code: '',
+        },
+        status: 202,
+      },
+    ], 'both responses traverse the actual authStore registration adapter with their HTTP statuses');
+  } finally {
+    liveApi.defaults.adapter = originalAdapter;
+    LiveAuthStore.setState({ user: null, isAuthenticated: false, error: null, isLoading: false, pending2FA: null });
+    delete globalThis.__ui6AuthStore;
+    delete globalThis.__ui6Toast;
+    delete globalThis.__ui6Api;
+    await unmount(root);
+  }
+});
+
+test('UI6 Register renders a live Axios global 503 error and does not navigate to verification', { concurrency: false }, async () => {
+  const requests = [];
+  const originalAdapter = liveApi.defaults.adapter;
+  liveApi.defaults.adapter = async (config) => {
+    requests.push({ method: config.method, url: config.url });
+    const error = new Error('Request failed with status code 503');
+    error.config = config;
+    error.response = {
+      data: { error: 'Registration is temporarily unavailable. Please try again later.' },
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: {},
+      config,
+    };
+    error.isAxiosError = true;
+    throw error;
+  };
+  globalThis.__ui6AuthStore = () => LiveAuthStore();
+  let root;
+  try {
+    LiveAuthStore.setState({ user: null, isAuthenticated: false, error: null, isLoading: false, pending2FA: null });
+    root = await render(Register, ['/register']);
+    await populateValidRegistration('outage@example.test');
+    await submit(document.querySelector('form'));
+    await waitFor(() => document.querySelector('[role="alert"]'), '503 registration alert');
+    assert.match(document.querySelector('[role="alert"]').textContent, /Registration is temporarily unavailable\. Please try again later\./);
+    assert.equal(location(), '/register', 'a global service failure never advances to email verification');
+    assert.equal(document.querySelector('[data-ui6-location-state]'), null);
+    assert.deepEqual(requests, [{ method: 'post', url: '/auth/register' }]);
+  } finally {
+    liveApi.defaults.adapter = originalAdapter;
+    delete globalThis.__ui6AuthStore;
+    await unmount(root);
+    LiveAuthStore.setState({ error: null, isLoading: false });
   }
 });
 
@@ -460,8 +636,18 @@ test('UI6 VerifyEmail binds six-digit verification and resend requests to a narr
     await click(button('Resend verification code'));
     await waitFor(() => text().includes('Resend code in 120s'), 'resend cooldown acknowledgement');
     assert.deepEqual(calls.at(-1), ['/auth/resend-verification', { email: 'known@example.test' }]);
-    assert.deepEqual(toastCalls, ['If the email exists and is not verified, a new verification code has been sent.']);
+    assert.deepEqual(toastCalls, ['If the account is eligible, a verification email has been requested. If nothing arrives, try again later.']);
     assert.equal(anchor('/login')?.getAttribute('href'), '/login');
+
+    await unmount(root);
+    root = await render(VerifyEmail, ['/verify-email?email=prefill%40example.test']);
+    assert.equal(document.getElementById('verify-email'), null, 'a valid query email is prefilled rather than duplicated as an editable field');
+    assert.match(text(), /prefill@example\.test/);
+    await type(document.getElementById('verification-code'), 'x112233');
+    assert.equal(document.getElementById('verification-code').value, '112233');
+    await submit(document.querySelector('form'));
+    await waitFor(() => text().includes('Email verified'), 'query-prefilled verification acknowledgement');
+    assert.deepEqual(calls.at(-1), ['/auth/verify-email', { email: 'prefill@example.test', code: '112233' }]);
   } finally {
     delete globalThis.__ui6Api;
     delete globalThis.__ui6Toast;
@@ -500,7 +686,8 @@ test('UI6 ForgotPassword submits the canonical email to synthetic acknowledgemen
     await act(async () => { pending.resolve({ data: { acknowledgement: 'accepted' } }); await Promise.resolve(); });
     await waitFor(() => document.querySelector('[role="status"]'), 'neutral reset-request result');
     assert.match(text(), /If an account exists for neutral@example\.test/);
-    assert.match(text(), /If eligible, check your inbox/);
+    assert.match(text(), /If eligible, use the code on the next page/);
+    assert.doesNotMatch(text(), /password reset email (?:was|has been) (?:sent|delivered)/i, 'the reset acknowledgement remains conditional rather than claiming delivery');
     assert.deepEqual(calls, [
       ['/auth/password/reset-request', { email: 'forgot@example.test' }],
       ['/auth/password/reset-request', { email: 'neutral@example.test' }],

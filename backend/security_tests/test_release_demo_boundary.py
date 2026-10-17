@@ -93,6 +93,25 @@ def _install_blocked_action_canaries(monkeypatch):
             {"email": "valid-reset@example.test"},
         ),
         (
+            "/api/v1/auth/password/reset",
+            "post",
+            {"token": "opaque-reset-token", "new_password": "ValidPassword1!"},
+        ),
+        (
+            "/api/v1/auth/password/verify-code",
+            "post",
+            {"email": "valid-code@example.test", "code": "482913"},
+        ),
+        (
+            "/api/v1/auth/password/reset-with-code",
+            "post",
+            {
+                "email": "valid-reset-code@example.test",
+                "code": "482913",
+                "new_password": "ValidPassword1!",
+            },
+        ),
+        (
             "/api/v1/auth/verify-email",
             "post",
             {"email": "valid-verify@example.test", "code": "482913"},
@@ -152,7 +171,6 @@ def test_testing_factory_explicit_demo_override_registers_guard_before_tenant_mi
     [
         "/api/v1/auth/login",
         "/api/v1/auth/login/2fa",
-        "/api/v1/auth/password/reset",
         "/api/v1/profile",
     ],
 )
@@ -194,7 +212,55 @@ def test_historical_register_route_is_not_refused_when_demo_is_off(monkeypatch):
 
         assert response.status_code == 201
         assert response.get_json()["user"]["email"] == "owner@example.test"
+        assert response.get_json()["verification_email_status"] == "accepted"
         assert "DEMO_ACTION_UNAVAILABLE" not in response.get_data(as_text=True)
+    finally:
+        with app.app_context():
+            db.session.remove()
+
+
+def test_demo_account_access_opt_in_allows_auth_but_not_chat_or_money(monkeypatch):
+    """The new profile is narrow: registration opens, provider/settlement does not."""
+    app = create_app(
+        "testing",
+        config_overrides={
+            "DEMO_RELEASE_ENABLED": True,
+            "PUBLIC_ACCOUNT_ACCESS_ENABLED": True,
+            "EXPANDED_HIERARCHY_ENABLED": True,
+        },
+    )
+    try:
+        user = SimpleNamespace(to_dict=lambda: {"email": "opt-in@example.test"})
+        token = SimpleNamespace(user=user, code="482913")
+        monkeypatch.setattr(
+            auth_routes.EmailService, "is_configured", lambda: True, raising=False
+        )
+        monkeypatch.setattr(
+            auth_routes.AuthService, "register_user", lambda **_kwargs: (user, token)
+        )
+        monkeypatch.setattr(
+            auth_routes.EmailService, "send_verification_email", lambda *_args: True
+        )
+
+        registration = app.test_client().post(
+            "/api/v1/auth/register",
+            json={
+                "email": "opt-in@example.test",
+                "password": "ValidPassword1!",
+                "first_name": "Opt",
+                "last_name": "In",
+            },
+        )
+        chat = app.test_client().post("/api/v1/chat/faq", json={"question": "test"})
+
+        assert registration.status_code == 201
+        assert registration.get_json()["verification_email_status"] == "accepted"
+        assert chat.status_code == 503
+        assert chat.get_json() == CHAT_ACTION_UNAVAILABLE
+        # Account access has no coupling to any monetary/provider opt-in.
+        assert app.config["NOWPAYMENTS_PILOT_ENABLED"] is False
+        assert app.config["STRIPE_SECRET_KEY"] is None
+        assert app.config["MT_SERVER"] is None
     finally:
         with app.app_context():
             db.session.remove()

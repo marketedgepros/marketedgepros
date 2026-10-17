@@ -324,7 +324,7 @@ const useAuthStore = create((set, get) => ({
     try {
       set({ error: null });
       const response = await authAPI.register(data);
-      return { success: true, user: response.data.user };
+      return response.data;
     } catch (error) {
       const errorMessage = getAuthErrorMessage(error, 'Registration failed');
       set({ error: errorMessage });

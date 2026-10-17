@@ -195,3 +195,32 @@ test('malformed or reordered source is checked by exact shape and values, not ob
   const reordered = Object.fromEntries(Object.entries(clone(sharedProfiles)).reverse());
   assert.equal(policy.isApprovedEvaluationSource(reordered), true);
 });
+
+test('owner-approved account description is explicit, immutable and separate from the recorded v1 policy', () => {
+  const model = policy.APPROVED_ACCOUNT_MODEL;
+  assert.equal(model.version, 'mep-simulated-rewards-description-v1');
+  assert.equal(model.evaluation, 'simulated');
+  assert.equal(model.postEvaluation, 'simulated');
+  assert.equal(model.rewardProvider, 'operator');
+  assert.equal(Object.isFrozen(model), true);
+  assert.match(model.description, /simulated trading.*evaluation.*account after passing/);
+  assert.match(model.description, /MarketEdgePros operator.*not withdrawals/);
+  assert.match(model.availability, /not an active trading account or an enabled payout service/);
+  for (const type of ['one_phase', 'two_phase', 'three_phase']) {
+    const before = profileTerms(type);
+    assert.equal(before.rules.evaluation_policy.funded_account_type, null);
+    assert.equal(policy.evaluationPolicyForTerms(before).status, 'matched');
+    assert.equal(before.rules.evaluation_policy.version, 'mep-evaluation-families-v1');
+    assert.equal(Object.hasOwn(before.rules.evaluation_policy, 'rewardProvider'), false);
+  }
+});
+
+test('FAQ description states simulation and operator rewards without inventing availability or leaving account type undecided', () => {
+  for (const copy of [policy.EVALUATION_RULES_FAQ.trading, policy.EVALUATION_RULES_FAQ.payout]) {
+    assert.ok(copy.includes(policy.APPROVED_ACCOUNT_MODEL.description));
+    assert.match(copy, /90%.*10%/);
+    assert.doesNotMatch(copy, /account type still require|real-capital or simulated-account model/);
+    assert.match(copy, /Coming soon/);
+  }
+  assert.match(policy.EVALUATION_RULES_FAQ.payout, /Payouts are not enabled/);
+});

@@ -212,3 +212,22 @@ test('policy and UI display paths remain local, source-backed and do not add pay
 });
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+test('account model is readable ordinary rules/terms content, never a heading, popup or completed agreement', () => {
+  for (const Component of [Rules, Terms]) {
+    const doc = view(Component);
+    const note = doc.querySelector('[data-account-model="mep-simulated-rewards-description-v1"]');
+    assert.ok(note);
+    assert.equal(note.tagName, 'P');
+    assert.match(note.textContent, /simulated trading/);
+    assert.match(note.textContent, /MarketEdgePros operator/);
+    assert.match(note.className, /text-(sm|slate-300)/);
+    assert.equal(note.closest('dialog,[role="dialog"],[aria-modal="true"]'), null);
+    assert.equal(note.hasAttribute('hidden'), false);
+    assert.equal(note.hasAttribute('aria-hidden'), false);
+    assert.doesNotMatch(note.className, /sr-only|opacity-0|text-xs|hidden/);
+    assert.equal([...doc.querySelectorAll('h1,h2,h3,h4')].some(node => /simulated trading|simulated account/i.test(node.textContent)), false);
+    assert.equal(doc.querySelectorAll('input[type="checkbox"]').length, 0);
+  }
+  assert.match(view(Terms).body.textContent, /Contractual policy is not complete/);
+});
