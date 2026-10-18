@@ -1,5 +1,5 @@
 """
-Sentry integration for PropTradePro
+Sentry integration for MarketEdgePros
 Add this to app.py after app creation
 """
 

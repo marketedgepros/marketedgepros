@@ -12,6 +12,7 @@ from src.models.affiliate import (
     AffiliateLink, AffiliateReferral, AffiliateCommission, AffiliateSettings
 )
 from src.models.user import User
+from src.services.affiliate_financial_boundary import refuse_unverified_affiliate_mutation
 
 
 class AffiliateService:
@@ -62,87 +63,8 @@ class AffiliateService:
     
     @staticmethod
     def track_conversion(user_id, program_id, purchase_amount, ref_code=None):
-        """
-        Track affiliate conversion
-        Creates commission if referral exists
-        """
-        try:
-            # Find referral
-            referral = None
-            
-            if ref_code:
-                # Find by ref code
-                affiliate_link = AffiliateLink.query.filter_by(code=ref_code).first()
-                if affiliate_link:
-                    referral = AffiliateReferral.query.filter_by(
-                        affiliate_link_id=affiliate_link.id,
-                        referred_user_id=None
-                    ).order_by(AffiliateReferral.click_date.desc()).first()
-            else:
-                # Find recent referral for this user
-                settings = AffiliateSettings.query.first()
-                cookie_duration = settings.cookie_duration_days if settings else 30
-                
-                cutoff_date = datetime.utcnow() - timedelta(days=cookie_duration)
-                
-                referral = AffiliateReferral.query.filter(
-                    AffiliateReferral.ip_address == request.remote_addr,
-                    AffiliateReferral.referred_user_id == None,
-                    AffiliateReferral.click_date >= cutoff_date
-                ).order_by(AffiliateReferral.click_date.desc()).first()
-            
-            if not referral:
-                return None
-            
-            # Update referral
-            referral.referred_user_id = user_id
-            referral.status = 'converted'
-            referral.program_id = program_id
-            referral.purchase_amount = purchase_amount
-            referral.conversion_date = datetime.utcnow()
-            
-            # Calculate commission
-            affiliate_link = AffiliateLink.query.get(referral.affiliate_link_id)
-            
-            # Safe commission calculation with zero check
-            if affiliate_link.commission_rate and affiliate_link.commission_rate > 0:
-                commission_amount = Decimal(str(purchase_amount)) * (Decimal(str(affiliate_link.commission_rate)) / Decimal('100'))
-            else:
-                commission_amount = Decimal('0')
-            
-            referral.commission_amount = commission_amount
-            
-            # Update affiliate link stats
-            affiliate_link.conversions += 1
-            affiliate_link.total_revenue += purchase_amount
-            affiliate_link.total_commission += commission_amount
-            
-            # Create commission record
-            commission = AffiliateCommission(
-                affiliate_user_id=referral.affiliate_user_id,
-                referral_id=referral.id,
-                amount=commission_amount,
-                type='one_time',
-                status='pending',
-                description=f'Commission from program #{program_id} purchase'
-            )
-            
-            db.session.add(commission)
-            
-            # Auto-approve if enabled
-            settings = AffiliateSettings.query.first()
-            if settings and settings.auto_approve_commissions:
-                commission.status = 'approved'
-                commission.approved_at = datetime.utcnow()
-            
-            db.session.commit()
-            
-            return commission.id
-            
-        except Exception as e:
-            db.session.rollback()
-            print(f'Track conversion error: {str(e)}')
-            return None
+        """Legacy conversion cannot establish verified attribution or entitlement."""
+        refuse_unverified_affiliate_mutation()
     
     @staticmethod
     def get_affiliate_stats(user_id):
@@ -197,7 +119,9 @@ class AffiliateService:
                     'pending': commission_breakdown.get('pending', 0.0),
                     'approved': commission_breakdown.get('approved', 0.0),
                     'paid': commission_breakdown.get('paid', 0.0),
-                    'available_for_payout': commission_breakdown.get('approved', 0.0)
+                    'available_for_payout': None,
+                    'payouts_enabled': False,
+                    'verification': 'unverified_legacy'
                 },
                 'monthly_stats': [
                     {
@@ -277,28 +201,6 @@ class AffiliateService:
     
     @staticmethod
     def validate_payout_request(user_id):
-        """Validate if user can request payout"""
-        try:
-            # Get approved commissions
-            approved_commissions = AffiliateCommission.query.filter_by(
-                affiliate_user_id=user_id,
-                status='approved',
-                payout_id=None
-            ).all()
-            
-            if not approved_commissions:
-                return False, 'No approved commissions available'
-            
-            total_amount = sum(c.amount for c in approved_commissions)
-            
-            # Check minimum payout
-            settings = AffiliateSettings.query.first()
-            if settings and total_amount < settings.min_payout_amount:
-                return False, f'Minimum payout amount is ${float(settings.min_payout_amount)}'
-            
-            return True, total_amount
-            
-        except Exception as e:
-            print(f'Validate payout error: {str(e)}')
-            return False, 'Failed to validate payout request'
+        """Legacy approval totals are not proof of payout eligibility."""
+        refuse_unverified_affiliate_mutation()
 

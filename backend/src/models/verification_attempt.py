@@ -33,7 +33,7 @@ class VerificationAttempt(db.Model, TimestampMixin):
         """Log a verification attempt"""
         attempt = VerificationAttempt(
             email=email,
-            code_entered=code_entered,
+            code_entered='******',
             success=success,
             ip_address=ip_address,
             user_agent=user_agent,

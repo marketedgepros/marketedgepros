@@ -1,5 +1,5 @@
 """
-Flask Caching Configuration for PropTradePro
+Flask Caching Configuration for MarketEdgePros
 Adds Redis caching to improve API performance
 """
 
@@ -19,7 +19,7 @@ def init_cache(app):
         'CACHE_REDIS_PORT': 6379,
         'CACHE_REDIS_DB': 1,  # Use DB 1 for caching (DB 0 for Celery)
         'CACHE_DEFAULT_TIMEOUT': 300,  # 5 minutes default
-        'CACHE_KEY_PREFIX': 'proptrade_'
+        'CACHE_KEY_PREFIX': 'marketedgepros_'
     })
     return cache
 
@@ -81,17 +81,17 @@ def invalidate_programs_cache():
     cache.delete_memoized('get_all_programs')
     cache.delete_memoized('get_program')
     # Delete all keys with programs prefix
-    for key in cache.cache._write_client.keys('proptrade_programs_*'):
+    for key in cache.cache._write_client.keys('marketedgepros_programs_*'):
         cache.delete(key)
 
 def invalidate_user_cache(user_id):
     """Invalidate cache for specific user"""
-    for key in cache.cache._write_client.keys(f'proptrade_*{user_id}*'):
+    for key in cache.cache._write_client.keys(f'marketedgepros_*{user_id}*'):
         cache.delete(key)
 
 def invalidate_challenge_cache(challenge_id):
     """Invalidate cache for specific challenge"""
-    for key in cache.cache._write_client.keys(f'proptrade_*challenge_{challenge_id}*'):
+    for key in cache.cache._write_client.keys(f'marketedgepros_*challenge_{challenge_id}*'):
         cache.delete(key)
 
 # Example usage in routes:

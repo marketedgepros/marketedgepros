@@ -5,6 +5,7 @@ API endpoints for commission management
 from flask import Blueprint, request, jsonify, g
 from src.utils.decorators import token_required, admin_required
 from src.services.commission_service import CommissionService
+from src.services.affiliate_financial_boundary import affiliate_mutation_unavailable_response
 from src.models import Commission, Agent, User
 from src.database import db
 
@@ -172,48 +173,19 @@ def get_commission(commission_id):
 
 
 @commissions_bp.route('/<int:commission_id>/approve', methods=['POST'])
+@token_required
 @admin_required
 def approve_commission(commission_id):
-    """Approve a commission (Admin only)"""
-    commission = CommissionService.approve_commission(
-        commission_id=commission_id,
-        approved_by_id=g.current_user.id
-    )
-    
-    if not commission:
-        return jsonify({'error': 'Commission not found or cannot be approved'}), 404
-    
-    return jsonify({
-        'message': 'Commission approved successfully',
-        'commission': commission.to_dict()
-    }), 200
+    """Legacy affiliate commission approval is unavailable after admin auth."""
+    return affiliate_mutation_unavailable_response()
 
 
 @commissions_bp.route('/<int:commission_id>/pay', methods=['POST'])
+@token_required
 @admin_required
 def mark_commission_paid(commission_id):
-    """Mark a commission as paid (Admin only)"""
-    data = request.get_json()
-    
-    payment_method = data.get('payment_method')
-    transaction_id = data.get('transaction_id')
-    
-    if not payment_method or not transaction_id:
-        return jsonify({'error': 'payment_method and transaction_id are required'}), 400
-    
-    commission = CommissionService.mark_commission_paid(
-        commission_id=commission_id,
-        payment_method=payment_method,
-        transaction_id=transaction_id
-    )
-    
-    if not commission:
-        return jsonify({'error': 'Commission not found or cannot be marked as paid'}), 404
-    
-    return jsonify({
-        'message': 'Commission marked as paid successfully',
-        'commission': commission.to_dict()
-    }), 200
+    """Legacy affiliate commission payment is unavailable after admin auth."""
+    return affiliate_mutation_unavailable_response()
 
 
 @commissions_bp.route('/summary', methods=['GET'])
@@ -269,4 +241,3 @@ def get_commissions_summary():
         'active_agents': active_agents,
         'agents_with_balance': agents_with_balance
     }), 200
-

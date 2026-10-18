@@ -1,0 +1,101 @@
+name: Focused security regressions
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/security-foundation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-security.lock
+      - name: Install isolated locked dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --require-hashes -r backend/requirements-security.lock
+      - name: Run focused HTTP and resource-isolation regressions
+        run: sudo .venv/bin/python backend/scripts/run_security_tests.py -q --junitxml=security-junit.xml
+      - name: Verify worker isolation
+        run: sudo .venv/bin/python backend/scripts/run_security_tests.py -q -n 4 --junitxml=security-parallel-junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focused-security-junit
+          path: backend/security*-junit.xml
+          if-no-files-found: error
+
+  frontend-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install exact locked frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify authentication and route contracts
+        run: node --test --test-reporter=junit test/*.test.js > frontend-junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-contracts-junit
+          path: frontend/frontend-junit.xml
+          if-no-files-found: error
+      - name: Build production frontend (no publish)
+        run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+          if-no-files-found: error
+
+  isolated-migration-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-security.lock
+      - name: Install exact Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --require-hashes -r backend/requirements-security.lock
+      - name: Install local PostgreSQL 18 and Redis test binaries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-common ca-certificates curl
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y noble
+          sudo apt-get install -y --no-install-recommends postgresql-18 postgresql-client-18 redis-server
+      - name: Rehearse migrations and test real protocols in disposable namespace
+        run: .venv/bin/python backend/scripts/run_staging_integration.py --junitxml="$GITHUB_WORKSPACE/staging-junit.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-staging-junit
+          path: staging-junit.xml
+          if-no-files-found: error

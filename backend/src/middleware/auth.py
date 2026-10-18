@@ -18,54 +18,36 @@ def jwt_required(f):
         
         # Fallback to Authorization header for API clients
         if not token and 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            try:
-                token = auth_header.split(" ")[1]  # Bearer <token>
-            except IndexError:
+            parts = request.headers['Authorization'].split()
+            if len(parts) != 2 or parts[0].lower() != 'bearer':
                 return jsonify({'error': 'Invalid token format'}), 401
-        
+            token = parts[1]
+
         if not token:
             return jsonify({'error': 'Authentication token is missing'}), 401
         
         try:
-            # Decode token
-            data = jwt.decode(
-                token,
-                current_app.config['JWT_SECRET_KEY'],
-                algorithms=["HS256"]
-            )
-            
-            # Check if token is blacklisted (revoked)
-            jti = data.get('jti')
-            if jti and TokenBlacklist.is_token_revoked(jti):
-                return jsonify({'error': 'Token has been revoked'}), 401
-            
-            # Get user
-            current_user = User.query.get(data['user_id'])
-            if not current_user or not current_user.is_active:
-                return jsonify({'error': 'Invalid or inactive user'}), 401
-            
-            # Check token version (for mass revocation)
-            token_version = data.get('token_version', 0)
-            user_token_version = getattr(current_user, 'token_version', 0) or 0
-            if token_version < user_token_version:
-                return jsonify({'error': 'Token has been revoked'}), 401
-            
-            # Store in g object
-            g.current_user = current_user
-            
-            # Set hierarchy scope for automatic filtering
-            from src.utils.hierarchy_scoping import set_request_hierarchy_scope
+            from src.services.session_service import SessionService
+            # Authentication is a read boundary.  It must not flush unrelated
+            # pending ORM state before an authenticated read-only handler gets
+            # a chance to preserve that state as well.
             from src.database import db
-            set_request_hierarchy_scope(db.session, current_user)
-            
-        except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid token'}), 401
-        except Exception as e:
-            return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
-        
+            with db.session.no_autoflush:
+                current_user, payload = SessionService.authenticate(token, 'access')
+        except ValueError:
+            return jsonify({'error': 'Invalid or revoked session'}), 401
+        except Exception:
+            return jsonify({'error': 'Authentication unavailable'}), 503
+        if request.cookies.get('access_token') and request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+            from src.middleware.csrf_middleware import validate_session_csrf
+            if not validate_session_csrf(token):
+                return jsonify({'error': 'CSRF validation failed', 'code': 'CSRF_INVALID'}), 403
+        g.current_user = current_user
+        g.token = token
+        from src.utils.hierarchy_scoping import set_request_hierarchy_scope
+        from src.database import db
+        set_request_hierarchy_scope(db.session, current_user)
+
         return f(*args, **kwargs)
     
     return decorated_function

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Fragment, lazy, Suspense } from 'react';
 import useAuthStore from '../../store/authStore';
 import { ADMIN_ROLES } from '../../constants/roles';
 
@@ -26,9 +26,9 @@ export default function UserLayout({ children }) {
   // Loading state
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="mep-shell min-h-screen flex items-center justify-center">
+        <div className="text-center" role="status" aria-live="polite">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
           <p className="text-gray-300 mt-4">Loading...</p>
         </div>
       </div>
@@ -37,19 +37,21 @@ export default function UserLayout({ children }) {
 
   // Detect role and render appropriate layout
   const role = user.role;
+  const identityKey = JSON.stringify([user.id ?? null, user.tenant_id ?? user.tenantId ?? user.tenant?.id ?? null, role]);
+  const accountContent = <Fragment key={identityKey}>{children}</Fragment>;
 
   // Admin roles
   if (ADMIN_ROLES.includes(role)) {
     return (
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-900">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+        <div className="mep-shell min-h-screen flex items-center justify-center">
+          <div className="text-center" role="status" aria-live="polite">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
             <p className="text-gray-300 mt-4">Loading...</p>
           </div>
         </div>
       }>
-        <AdminLayout>{children}</AdminLayout>
+        <AdminLayout>{accountContent}</AdminLayout>
       </Suspense>
     );
   }
@@ -58,14 +60,14 @@ export default function UserLayout({ children }) {
   if (role === 'affiliate') {
     return (
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-900">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+        <div className="mep-shell min-h-screen flex items-center justify-center">
+          <div className="text-center" role="status" aria-live="polite">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
             <p className="text-gray-300 mt-4">Loading...</p>
           </div>
         </div>
       }>
-        <AffiliateLayout>{children}</AffiliateLayout>
+        <AffiliateLayout>{accountContent}</AffiliateLayout>
       </Suspense>
     );
   }
@@ -73,15 +75,14 @@ export default function UserLayout({ children }) {
   // Trader role (default)
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="mep-shell min-h-screen flex items-center justify-center">
+        <div className="text-center" role="status" aria-live="polite">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" aria-hidden="true"></div>
           <p className="text-gray-300 mt-4">Loading...</p>
         </div>
       </div>
     }>
-      <TraderLayout>{children}</TraderLayout>
+      <TraderLayout>{accountContent}</TraderLayout>
     </Suspense>
   );
 }
-

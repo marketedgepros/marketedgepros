@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "generator": "Official NOWPayments recursive Node sortObject + JSON.stringify + SHA-512 HMAC",
+  "vectors": [
+    {
+      "raw": "{\"n\":1.0,\"tiny\":1e-7,\"edge\":0.000001,\"large\":1e21,\"negzero\":-0}",
+      "canonical": "{\"edge\":0.000001,\"large\":1e+21,\"n\":1,\"negzero\":0,\"tiny\":1e-7}",
+      "signature": "c9807bc07e6d275cb99e1f1025d6120711e83e1631195c4974453e78716bbec9ede50b5c36727c4778f6d02470beffbacaccdc3eeefb776537b0c7a93ab96094"
+    },
+    {
+      "raw": "{\"n\":9007199254740993,\"fraction\":19.99,\"long\":0.0000012345678901234567}",
+      "canonical": "{\"fraction\":19.99,\"long\":0.0000012345678901234567,\"n\":9007199254740992}",
+      "signature": "d1d5907520df9fa089151f3362ceb69cba9bf79721ea301040e681b4868598a9371722ff5407ff7be27da2083c1f04885bc555860a856967450b75c3834179a4"
+    },
+    {
+      "raw": "{\"10\":10,\"2\":2,\"4294967295\":5,\"astral\":\"🙂\",\"שלום\":{\"nested\":[1.0,2.50]}}",
+      "canonical": "{\"2\":2,\"10\":10,\"4294967295\":5,\"astral\":\"🙂\",\"שלום\":{\"nested\":{\"0\":1,\"1\":2.5}}}",
+      "signature": "4f18e374ca300089bcaf2ae073979771d5550e8514b023c9cf30b24948a34c0621764099b896b38cacdaa3e1faf19997138166adcfe57bfff64d18cfe0573232"
+    },
+    {
+      "raw": "{\"nested\":{\"a\":null,\"b\":false,\"c\":true},\"array\":[{\"z\":2,\"a\":1},0.0000001]}",
+      "canonical": "{\"array\":{\"0\":{\"a\":1,\"z\":2},\"1\":1e-7},\"nested\":{\"a\":null,\"b\":false,\"c\":true}}",
+      "signature": "7e59063daa5d71105f5c36fe79cae6a1d914e1eebfee53aea32d8dc2dabfe2d19ec3bcba457f38650c5f0a885e537ea1e810f52df71fafef835268d2c0808de1"
+    }
+  ]
+}

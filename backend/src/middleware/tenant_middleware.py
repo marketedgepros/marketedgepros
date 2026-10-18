@@ -1,216 +1,212 @@
+"""Configured-root tenant context for the single-brand launch.
+
+The launch mode deliberately has no request-selected tenant.  A tenant is only
+trusted when it is the active brand owned by the configured platform root.
+Expanded hierarchy/white-label routing remains a future feature and this module
+does not implement its legacy Host, header, or query-string routing.
 """
-Tenant Middleware for Multi-Tenant Support
-Automatically detects tenant from subdomain or custom domain
-"""
-from flask import request, g, abort
-from src.models.tenant import Tenant
 from functools import wraps
 import logging
+
+from flask import abort, current_app, g
+from sqlalchemy import false, select
+
+from src.database import db
 
 logger = logging.getLogger(__name__)
 
 
+class TenantContextError(ValueError):
+    """Base error for a missing or invalid trusted tenant context."""
+
+
+class TenantScopeError(TenantContextError):
+    """Raised when tenant filtering is requested for an unscoped model."""
+
+
+class TenantIsolationError(TenantContextError):
+    """Raised when caller-controlled data conflicts with trusted tenancy."""
+
+
+def _valid_tenant_id(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _mvp_single_brand_mode(app=None):
+    """Return true only for the explicitly configured single-brand launch mode."""
+    app = app or current_app
+    return app.config.get("EXPANDED_HIERARCHY_ENABLED", False) is False
+
+
 def get_tenant_from_request():
+    """Resolve the one launch brand, never a client-selected tenant.
+
+    This performs one joined owner-and-tenant query for the configured root.  It
+    intentionally does not inspect Host, ``X-Tenant-ID``, query parameters, or
+    any default/first-active row.  The explicit hierarchy bypass is confined to
+    this configuration bootstrap lookup; it is not an HTTP-selectable bypass.
     """
-    Get tenant from request based on:
-    1. Custom domain (e.g., client.com)
-    2. Subdomain (e.g., client.marketedgepros.com)
-    3. X-Tenant-ID header (for API testing)
-    4. tenant_id query parameter (for development)
-    
-    Returns:
-        Tenant: Tenant object or None
-    """
-    # Check X-Tenant-ID header (for API testing)
-    tenant_id_header = request.headers.get('X-Tenant-ID')
-    if tenant_id_header:
-        try:
-            tenant = Tenant.query.get(int(tenant_id_header))
-            if tenant and tenant.status == 'active':
-                return tenant
-        except (ValueError, TypeError):
-            pass
-    
-    # Check tenant_id query parameter (for development)
-    tenant_id_param = request.args.get('tenant_id')
-    if tenant_id_param:
-        try:
-            tenant = Tenant.query.get(int(tenant_id_param))
-            if tenant and tenant.status == 'active':
-                return tenant
-        except (ValueError, TypeError):
-            pass
-    
-    # Get host from request
-    host = request.host.lower()
-    
-    # Remove port if present
-    if ':' in host:
-        host = host.split(':')[0]
-    
-    # Check for custom domain
-    tenant = Tenant.query.filter_by(custom_domain=host, status='active').first()
-    if tenant:
-        return tenant
-    
-    # Check for subdomain
-    # Expected format: subdomain.marketedgepros.com
-    parts = host.split('.')
-    
-    if len(parts) >= 2:
-        # Extract subdomain (first part)
-        subdomain = parts[0]
-        
-        # Skip common subdomains
-        if subdomain not in ['www', 'api', 'admin', 'app']:
-            tenant = Tenant.query.filter_by(subdomain=subdomain, status='active').first()
-            if tenant:
-                return tenant
-    
-    # Default tenant (main platform)
-    # You can configure this in settings
-    default_tenant = Tenant.query.filter_by(subdomain='main', status='active').first()
-    if default_tenant:
-        return default_tenant
-    
-    # If no tenant found, return the first active tenant (fallback)
-    return Tenant.query.filter_by(status='active').first()
+    # Imports stay local because this middleware runs before authentication and
+    # model/service import order is otherwise easy to couple into an auth loop.
+    from src.models.tenant import Tenant
+    from src.models.user import User
+    from src.utils.hierarchy_scoping import (
+        configured_platform_root_id,
+        platform_root_scope,
+        tenant_hierarchy_scope,
+        without_hierarchy_scope,
+    )
+
+    owner_id = configured_platform_root_id()
+    if owner_id is None:
+        return None
+
+    statement = (
+        select(User, Tenant)
+        .join(Tenant, Tenant.id == User.tenant_id)
+        .where(User.id == owner_id, Tenant.status == "active")
+    )
+    # This middleware runs before token_required establishes a request scope.
+    # Keep the configuration lookup explicitly unscoped even if a prior handler
+    # set one, and do not retain either object beyond this request.
+    with db.session.no_autoflush, without_hierarchy_scope(db.session):
+        row = db.session.execute(
+            statement.execution_options(skip_hierarchy_scope=True, populate_existing=True)
+        ).one_or_none()
+
+    if row is None:
+        return None
+
+    owner, tenant = row
+    if (
+        not platform_root_scope(owner)
+        or not tenant_hierarchy_scope(owner)
+        or owner.tenant_id != tenant.id
+        or tenant.status != "active"
+    ):
+        return None
+    return tenant
 
 
 def tenant_context():
+    """Set only the configured launch-brand context for this request.
+
+    Missing configuration or an unavailable brand is intentionally non-fatal:
+    public health and configuration endpoints can respond, while callers that
+    require a tenant must use ``require_tenant`` or the fail-closed helpers.
     """
-    Middleware to set tenant context for each request
-    Should be registered in Flask app
-    """
-    import os
-    from flask import current_app
-    
-    # Skip in testing mode
-    if current_app.config.get('TESTING') or os.environ.get('FLASK_TESTING') == 'true':
-        g.tenant = None
-        g.tenant_id = None
-        return
-    
     tenant = get_tenant_from_request()
-    
-    if tenant:
-        g.tenant = tenant
-        g.tenant_id = tenant.id
-        logger.debug(f"Tenant context set: {tenant.name} (ID: {tenant.id})")
-    else:
+    if tenant is None:
         g.tenant = None
         g.tenant_id = None
-        logger.warning("No tenant found for request")
+        logger.warning("Configured single-brand tenant is unavailable")
+        return
+
+    g.tenant = tenant
+    g.tenant_id = tenant.id
+    logger.debug("Configured single-brand tenant context set")
 
 
 def require_tenant(f):
-    """
-    Decorator to require tenant context
-    Use on routes that must have a tenant
-    """
+    """Require an already resolved tenant context for a route."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not hasattr(g, 'tenant') or g.tenant is None:
-            logger.error("Tenant required but not found")
-            abort(400, description="Tenant not found. Please access via proper domain.")
+        if getattr(g, "tenant", None) is None:
+            logger.error("Tenant required but unavailable")
+            abort(400, description="Tenant context is unavailable.")
         return f(*args, **kwargs)
     return decorated_function
 
 
 def tenant_required(f):
-    """
-    Decorator to ensure tenant is set in g context
-    Alias for require_tenant
-    """
+    """Alias for :func:`require_tenant`."""
     return require_tenant(f)
 
 
 def get_current_tenant():
-    """
-    Get current tenant from Flask g context
-    
-    Returns:
-        Tenant: Current tenant or None
-    """
-    return getattr(g, 'tenant', None)
+    """Return the request's configured launch tenant, if available."""
+    return getattr(g, "tenant", None)
 
 
 def get_current_tenant_id():
-    """
-    Get current tenant ID from Flask g context
-    
-    Returns:
-        int: Current tenant ID or None
-    """
-    return getattr(g, 'tenant_id', None)
+    """Return the request's configured launch tenant ID, if available."""
+    return getattr(g, "tenant_id", None)
 
 
 def filter_by_tenant(query, model_class):
+    """Apply the trusted tenant predicate or refuse the query.
+
+    A model without a ``tenant_id`` attribute has no safe implicit global
+    interpretation.  A tenant-aware model without a resolved request tenant is
+    filtered by SQL false, rather than being returned unfiltered.
     """
-    Filter query by current tenant
-    
-    Args:
-        query: SQLAlchemy query object
-        model_class: Model class with tenant_id field
-        
-    Returns:
-        Filtered query
-    """
+    if not hasattr(model_class, "tenant_id"):
+        raise TenantScopeError("Tenant-scoped filtering requires a tenant-aware model")
+
     tenant_id = get_current_tenant_id()
-    if tenant_id and hasattr(model_class, 'tenant_id'):
-        return query.filter_by(tenant_id=tenant_id)
-    return query
+    if not _valid_tenant_id(tenant_id):
+        return query.filter(false())
+    return query.filter(getattr(model_class, "tenant_id") == tenant_id)
 
 
 def ensure_tenant_isolation(data, user=None):
+    """Return a copy of ``data`` bound to a trusted tenant.
+
+    Request context and an explicitly supplied authenticated user are both
+    trusted server-side sources.  They must agree when both are supplied; a
+    body-provided ``tenant_id`` is never allowed to choose or override either.
+    Errors happen before the caller's mapping is changed and contain no tenant
+    identifiers.
     """
-    Ensure data is isolated to current tenant
-    Adds tenant_id to data dict if not present
-    
-    Args:
-        data: Dictionary of data
-        user: Optional user object (to get tenant_id from)
-        
-    Returns:
-        Updated data dictionary
-    """
-    if 'tenant_id' not in data:
-        # Try to get from current context
-        tenant_id = get_current_tenant_id()
-        
-        # If not in context, try to get from user
-        if not tenant_id and user and hasattr(user, 'tenant_id'):
-            tenant_id = user.tenant_id
-        
-        if tenant_id:
-            data['tenant_id'] = tenant_id
-    
-    return data
+    if not isinstance(data, dict):
+        raise TenantIsolationError("Tenant-isolated input must be a dictionary")
+
+    context_tenant = get_current_tenant()
+    context_id = get_current_tenant_id()
+    if (
+        context_tenant is None
+        or getattr(context_tenant, "id", None) != context_id
+        or not _valid_tenant_id(context_id)
+    ):
+        context_id = None
+
+    user_id = None
+    if user is not None:
+        candidate_id = getattr(user, "tenant_id", None)
+        if not _valid_tenant_id(candidate_id):
+            raise TenantIsolationError("Trusted user tenant is required")
+        user_id = candidate_id
+
+    if context_id is not None and user_id is not None and context_id != user_id:
+        raise TenantIsolationError("Trusted tenant sources disagree")
+
+    trusted_tenant_id = context_id if context_id is not None else user_id
+    if trusted_tenant_id is None:
+        raise TenantIsolationError("Trusted tenant context is required")
+
+    if "tenant_id" in data and data["tenant_id"] != trusted_tenant_id:
+        raise TenantIsolationError("Tenant selection is not permitted")
+
+    isolated = dict(data)
+    isolated["tenant_id"] = trusted_tenant_id
+    return isolated
 
 
 def init_tenant_middleware(app):
+    """Register configured-root context in MVP mode, including opted-in tests.
+
+    Standard test fixtures use ``EXPANDED_HIERARCHY_ENABLED=True`` to retain
+    legacy hierarchy coverage, so they intentionally receive no middleware
+    registration.  Tests that explicitly opt into the launch mode with
+    ``False`` exercise the real before-request handler even when ``TESTING`` is
+    true.  No expanded-mode public brand routing is launched here.
     """
-    Initialize tenant middleware for Flask app
-    
-    Args:
-        app: Flask application instance
-    """
-    import os
-    
-    # Debug: Check testing flags
-    testing_flag = app.config.get('TESTING')
-    flask_testing_env = os.environ.get('FLASK_TESTING')
-    print(f"DEBUG: TESTING={testing_flag}, FLASK_TESTING={flask_testing_env}")
-    
-    # Skip tenant middleware in testing mode
-    if testing_flag or flask_testing_env == 'true':
-        print("DEBUG: Skipping tenant middleware (testing mode)")
-        logger.info("Tenant middleware skipped (testing mode)")
+    if not _mvp_single_brand_mode(app):
+        logger.info("Tenant middleware not registered outside single-brand MVP mode")
         return
-    
+
     @app.before_request
     def set_tenant_context():
         tenant_context()
-    
-    logger.info("Tenant middleware initialized")
 
+    logger.info("Configured-root tenant middleware initialized")

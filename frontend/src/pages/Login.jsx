@@ -1,12 +1,21 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { postLoginDestination } from '../services/navigationService.js';
 import Layout from '../components/layout/Layout';
 import useAuthStore from '../store/authStore';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, login2FA, error, clearError } = useAuthStore();
+  const location = useLocation();
+  const {
+    login,
+    login2FA,
+    pending2FA,
+    cancel2FA,
+    error,
+    clearError,
+  } = useAuthStore();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -17,6 +26,20 @@ export default function Login() {
   const [userId, setUserId] = useState(null);
   const [twoFactorToken, setTwoFactorToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const mountedRef = useRef(false);
+  const attemptRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      attemptRef.current += 1;
+      // A password-proof challenge must not survive leaving this route.
+      cancel2FA();
+    };
+  }, [cancel2FA]);
+
+  const isCurrentAttempt = (attempt) => mountedRef.current && attempt === attemptRef.current;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,73 +48,68 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     setIsLoading(true);
 
     try {
       const result = await login(formData.email, formData.password);
+      if (!isCurrentAttempt(attempt) || result?.stale) return;
 
       if (result.requires2FA) {
         setRequires2FA(true);
         setUserId(result.userId);
       } else {
-        // Redirect based on user role
-        const userRole = result.user?.role || 'user';
-        if (userRole === 'supermaster' || userRole === 'admin_master' || userRole === 'master') {
-          navigate('/admin');
-        } else if (userRole === 'affiliate') {
-          navigate('/affiliate');
-        } else if (userRole === 'user') {
-          navigate('/');
-        } else {
-          navigate('/dashboard');
-        }
+        navigate(postLoginDestination(result.user, location.search), { replace: true });
       }
-    } catch (err) {
+    } catch {
+      // authStore owns login errors; its state is rendered below.
+      if (!isCurrentAttempt(attempt)) return;
     } finally {
-      setIsLoading(false);
+      if (isCurrentAttempt(attempt)) setIsLoading(false);
     }
   };
 
   const handle2FASubmit = async (e) => {
     e.preventDefault();
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     setIsLoading(true);
 
     try {
       const result = await login2FA(userId, twoFactorToken);
-      // Redirect based on user role
-      const userRole = result.user?.role || 'user';
-      if (userRole === 'supermaster' || userRole === 'admin_master' || userRole === 'master') {
-        navigate('/admin');
-      } else if (userRole === 'affiliate') {
-        navigate('/affiliate');
-      } else if (userRole === 'user') {
-        navigate('/');
-      } else {
-        navigate('/dashboard');
-      }
+      if (!isCurrentAttempt(attempt) || result?.stale) return;
+      navigate(postLoginDestination(result.user, location.search), { replace: true });
     } catch (err) {
+      // Verification failures deliberately invalidate the single-use pending challenge.
+      if (!isCurrentAttempt(attempt)) return;
+      setRequires2FA(false);
+      setUserId(null);
+      setTwoFactorToken('');
     } finally {
-      setIsLoading(false);
+      if (isCurrentAttempt(attempt)) setIsLoading(false);
     }
   };
 
-  if (requires2FA) {
+  if (requires2FA && pending2FA) {
     return (
       <Layout>
-        <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="mep-screen min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12">
           <div className="max-w-md w-full">
-            <div className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
+            <div className="mep-panel backdrop-blur-xl border rounded-2xl shadow-2xl p-8">
               <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-full mb-4 border border-cyan-500/30">
-                  <Lock className="w-8 h-8 text-cyan-400" />
+                  <Lock className="w-8 h-8 text-cyan-400" aria-hidden="true" />
                 </div>
-                <h2 className="text-2xl font-bold text-white">Two-Factor Authentication</h2>
-                <p className="text-gray-400 mt-2">Enter the 6-digit code from your authenticator app</p>
+                <h1 className="mep-heading text-2xl font-bold text-white">Two-Factor Authentication</h1>
+                <label htmlFor="two-factor-code" className="block text-gray-400 mt-2">
+                  Enter the 6-digit code from your authenticator app
+                </label>
               </div>
 
               {error && (
-                <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div role="alert" className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                   <p className="text-sm text-red-300">{error}</p>
                 </div>
               )}
@@ -99,14 +117,18 @@ export default function Login() {
               <form onSubmit={handle2FASubmit} className="space-y-6">
                 <div>
                   <input
+                    id="two-factor-code"
                     type="text"
                     value={twoFactorToken}
                     onChange={(e) => {
-                      setTwoFactorToken(e.target.value);
+                      setTwoFactorToken(e.target.value.replace(/\D/g, ''));
                       clearError();
                     }}
                     placeholder="000000"
                     maxLength="6"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
                     className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-center text-2xl tracking-widest text-white placeholder-gray-500"
                     required
                     autoFocus
@@ -116,7 +138,7 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={isLoading || twoFactorToken.length !== 6}
-                  className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-3 px-4 rounded-lg font-semibold hover:from-cyan-600 hover:to-teal-600 transition-all shadow-lg shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mep-primary w-full py-3 px-4 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Verifying...' : 'Verify'}
                 </button>
@@ -124,7 +146,11 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => {
+                    attemptRef.current += 1;
+                    cancel2FA();
+                    setIsLoading(false);
                     setRequires2FA(false);
+                    setUserId(null);
                     setTwoFactorToken('');
                     clearError();
                   }}
@@ -142,7 +168,7 @@ export default function Login() {
 
   return (
     <Layout>
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="mep-screen min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full">
           {/* Decorative Background Elements */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -150,35 +176,37 @@ export default function Login() {
             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="relative bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
+          <div className="mep-panel relative backdrop-blur-xl border rounded-2xl shadow-2xl p-8">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-full mb-4 shadow-lg shadow-cyan-500/30">
-                <LogIn className="w-8 h-8 text-white" />
+                <LogIn className="w-8 h-8 text-white" aria-hidden="true" />
               </div>
-              <h2 className="text-3xl font-bold text-white">Welcome Back</h2>
+              <h1 className="mep-heading text-3xl font-bold text-white">Welcome Back</h1>
               <p className="text-gray-400 mt-2">Sign in to your MarketEdgePros account</p>
             </div>
 
             {error && (
-              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div role="alert" className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="login-email" className="block text-sm font-medium text-gray-300 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                   <input
+                    id="login-email"
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="you@example.com"
+                    autoComplete="email"
                     className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500"
                     required
                   />
@@ -186,28 +214,26 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="login-password" className="block text-sm font-medium text-gray-300 mb-2">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" aria-hidden="true" />
                   <input
+                    id="login-password"
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
+                    autoComplete="current-password"
                     className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white placeholder-gray-500"
                     required
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input type="checkbox" className="rounded border-gray-600 bg-slate-900/50 text-cyan-500 focus:ring-cyan-500" />
-                  <span className="ml-2 text-sm text-gray-400">Remember me</span>
-                </label>
+              <div className="flex justify-end">
                 <Link to="/forgot-password" className="text-sm text-cyan-400 hover:text-cyan-300 font-medium">
                   Forgot password?
                 </Link>
@@ -216,7 +242,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white py-3 px-4 rounded-lg font-semibold hover:from-cyan-600 hover:to-teal-600 transition-all shadow-lg shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mep-primary w-full py-3 px-4 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
@@ -236,4 +262,3 @@ export default function Login() {
     </Layout>
   );
 }
-

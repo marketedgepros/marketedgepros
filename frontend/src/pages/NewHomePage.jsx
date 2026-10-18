@@ -1,699 +1,104 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import SchemaMarkup from "../components/seo/SchemaMarkup";
 import { Link } from 'react-router-dom';
-import api from "../services/api";
+import CatalogPreview from '../components/programs/CatalogPreview';
 import Layout from '../components/layout/Layout';
+import useScrollReveal from '../hooks/useScrollReveal';
+import useAmbientMotion from '../hooks/useAmbientMotion';
+import PlatformShowcase from '../components/visual/PlatformShowcase';
+import '../components/visual/homeMotion.css';
 
 const NewHomePage = () => {
-  const [programs, setPrograms] = useState([]);
-  const [selectedPhase, setSelectedPhase] = useState('two');
-  const [stats, setStats] = useState({
-    countries: 0,
-    capital: 0,
-    traders: 0,
-    profitSplit: 0
-  });
-  const [imagesLoaded, setImagesLoaded] = useState(false);
-
-  const heroRef = useRef(null);
-  const statsRef = useRef(null);
-
-  // Preload images
-  useEffect(() => {
-    const images = [
-      '/images/abstract-trading-flow.webp',
-      '/images/hero-trading-3d.webp',
-      '/images/stats-globe-hologram.webp'
-    ];
-    
-    let loadedCount = 0;
-    images.forEach(src => {
-      const img = new Image();
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === images.length) {
-          setImagesLoaded(true);
-        }
-      };
-      img.src = src;
-    });
-  }, []);
-
-  // Fetch programs
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        const response = await api.get('/programs/');
-        const apiPrograms = response.data.programs || [];
-        
-        // If API returns empty, use static fallback
-        if (apiPrograms.length === 0) {
-          setPrograms([
-            // One Phase
-            { id: 1, account_size: 10000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-            { id: 2, account_size: 25000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-            { id: 3, account_size: 50000, profit_target: 8, max_daily_loss: 5, profit_split: 85, phases: 1 },
-            { id: 4, account_size: 100000, profit_target: 8, max_daily_loss: 5, profit_split: 90, phases: 1 },
-            // Two Phase
-            { id: 5, account_size: 10000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-            { id: 6, account_size: 25000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-            { id: 7, account_size: 50000, profit_target: 10, max_daily_loss: 5, profit_split: 85, phases: 2 },
-            { id: 8, account_size: 100000, profit_target: 10, max_daily_loss: 5, profit_split: 90, phases: 2 },
-            // Three Phase
-            { id: 9, account_size: 10000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-            { id: 10, account_size: 25000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-            { id: 11, account_size: 50000, profit_target: 12, max_daily_loss: 4, profit_split: 80, phases: 3 },
-            { id: 12, account_size: 100000, profit_target: 12, max_daily_loss: 4, profit_split: 85, phases: 3 },
-            // Instant Funding
-            { id: 13, account_size: 5000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-            { id: 14, account_size: 10000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-            { id: 15, account_size: 25000, profit_target: 0, max_daily_loss: 3, profit_split: 60, instant_funding: true },
-            { id: 16, account_size: 50000, profit_target: 0, max_daily_loss: 3, profit_split: 70, instant_funding: true },
-          ]);
-        } else {
-          setPrograms(apiPrograms);
-        }
-      } catch (error) {
-        console.error('Error fetching programs:', error);
-        // Fallback to static programs on error
-        setPrograms([
-          // One Phase
-          { id: 1, account_size: 10000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-          { id: 2, account_size: 25000, profit_target: 8, max_daily_loss: 5, profit_split: 80, phases: 1 },
-          { id: 3, account_size: 50000, profit_target: 8, max_daily_loss: 5, profit_split: 85, phases: 1 },
-          { id: 4, account_size: 100000, profit_target: 8, max_daily_loss: 5, profit_split: 90, phases: 1 },
-          // Two Phase
-          { id: 5, account_size: 10000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-          { id: 6, account_size: 25000, profit_target: 10, max_daily_loss: 5, profit_split: 80, phases: 2 },
-          { id: 7, account_size: 50000, profit_target: 10, max_daily_loss: 5, profit_split: 85, phases: 2 },
-          { id: 8, account_size: 100000, profit_target: 10, max_daily_loss: 5, profit_split: 90, phases: 2 },
-          // Three Phase
-          { id: 9, account_size: 10000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-          { id: 10, account_size: 25000, profit_target: 12, max_daily_loss: 4, profit_split: 75, phases: 3 },
-          { id: 11, account_size: 50000, profit_target: 12, max_daily_loss: 4, profit_split: 80, phases: 3 },
-          { id: 12, account_size: 100000, profit_target: 12, max_daily_loss: 4, profit_split: 85, phases: 3 },
-          // Instant Funding
-          { id: 13, account_size: 5000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-          { id: 14, account_size: 10000, profit_target: 0, max_daily_loss: 3, profit_split: 50, instant_funding: true },
-          { id: 15, account_size: 25000, profit_target: 0, max_daily_loss: 3, profit_split: 60, instant_funding: true },
-          { id: 16, account_size: 50000, profit_target: 0, max_daily_loss: 3, profit_split: 70, instant_funding: true },
-        ]);
-      }
-    };
-    fetchPrograms();
-  }, []);
-
-  // Animated counter
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            animateStats();
-          }
-        });
-      },
-      { threshold: 0.5 }
-    );
-
-    if (statsRef.current) {
-      observer.observe(statsRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  const animateStats = () => {
-    const duration = 2000;
-    const steps = 60;
-    const stepDuration = duration / steps;
-
-    const targets = {
-      countries: 200,
-      capital: 10,
-      traders: 5000,
-      profitSplit: 90
-    };
-
-    let currentStep = 0;
-
-    const interval = setInterval(() => {
-      currentStep++;
-      const progress = currentStep / steps;
-
-      setStats({
-        countries: Math.floor(targets.countries * progress),
-        capital: Math.floor(targets.capital * progress),
-        traders: Math.floor(targets.traders * progress),
-        profitSplit: Math.floor(targets.profitSplit * progress)
-      });
-
-      if (currentStep >= steps) {
-        clearInterval(interval);
-        setStats(targets);
-      }
-    }, stepDuration);
-  };
-
-  const filteredPrograms = Array.isArray(programs) ? programs.filter(p => {
-    if (selectedPhase === 'one') return p.type === 'one_phase' || p.phases === 1;
-    if (selectedPhase === 'two') return p.type === 'two_phase' || p.phases === 2;
-    if (selectedPhase === 'three') return p.type === 'three_phase' || p.phases === 3;
-    if (selectedPhase === 'instant') return p.type === 'instant_funding' || p.instant_funding;
-    return false;
-  }).sort((a, b) => (a.account_size || 0) - (b.account_size || 0)) : [];
+  const ambient = useAmbientMotion();
+  const globeMotion = useAmbientMotion();
+  const heroCopy = useScrollReveal();
+  const heroArtwork = useScrollReveal();
+  const heroDetails = useScrollReveal();
+  const catalogIntro = useScrollReveal();
+  const explorationSteps = useScrollReveal();
+  const supportPanel = useScrollReveal();
 
   return (
     <Layout>
-      <div className="min-h-screen overflow-hidden scroll-smooth">
+      <div data-visual-paused={ambient.reduced ? "true" : "false"} className="mep-screen home-motion min-h-screen overflow-hidden scroll-smooth text-white">
       <SchemaMarkup />
-        
-        {/* Hero Section */}
-        <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
-          {/* Animated Background */}
-          <div className="absolute inset-0 z-0">
-            <img 
-              src="/images/abstract-trading-flow.webp" 
-              alt="" 
-              loading="eager"
-              className="w-full h-full object-cover opacity-30"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black"></div>
+      <section ref={ambient.ref} data-motion-running={ambient.running ? "true" : "false"} className="premium-hero relative isolate flex min-h-[76vh] items-center overflow-hidden">
+        <div aria-hidden="true" className="home-motion__hero-background pointer-events-none absolute inset-0">
+          <img src="/images/abstract-trading-flow.webp" alt="" width="1536" height="1024" fetchpriority="high" decoding="async" className="h-full w-full object-cover opacity-[0.65]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/65 to-slate-950/30" />
+        </div>
+        <div aria-hidden="true" className="premium-hero__grid pointer-events-none absolute inset-0" />
+        <div aria-hidden="true" className="premium-hero__beam pointer-events-none absolute inset-0" />
+        <div aria-hidden="true" className="home-motion__ambient-ring pointer-events-none absolute -right-24 top-16 h-80 w-80 rounded-full border border-cyan-300/10" />
+        <div className="home-motion__content mx-auto grid w-full max-w-7xl gap-12 px-6 py-24 lg:grid-cols-[1.2fr_.8fr] lg:items-center lg:px-8">
+          <div ref={heroCopy.ref} className={heroCopy.className}>
+            <p className="mb-6 text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">MarketEdgePros · Trading programs</p>
+            <h1 className="mep-heading premium-hero__title max-w-3xl text-5xl font-bold leading-tight tracking-tight sm:text-6xl">Explore trading programs with <span className="text-cyan-300">clear information.</span></h1>
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300">Compare the programs currently shown in our catalog. Review each program’s displayed price and terms before requesting a quote.</p>
+            <div className="mt-9 flex flex-wrap gap-4">
+              <Link to="/programs" className="mep-primary px-6 py-3 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Explore programs</Link>
+              <Link to="/how-it-works" className="rounded-lg border border-slate-500 px-6 py-3 font-semibold text-white transition-colors hover:border-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">How it works</Link>
+            </div>
+            <p className="mt-6 max-w-2xl text-sm leading-6 text-slate-400">Catalog details may vary by program. A quote is not a payment, funded account, or account activation. Payment availability is checked separately for your account in checkout.</p>
           </div>
-
-          {/* 3D Trading Screens - Floating */}
-          <div className="absolute inset-0 z-10 pointer-events-none">
-            <img 
-              src="/images/hero-trading-3d.webp" 
-              alt="" 
-              loading="eager"
-              className="absolute top-1/4 left-1/4 w-96 h-auto opacity-60 animate-float"
-            />
+          <div className="min-w-0 space-y-5">
+            <figure ref={heroArtwork.ref} className={`${heroArtwork.className} home-motion__panel home-motion__image-panel premium-hero__artwork overflow-hidden rounded-2xl border border-cyan-200/15 bg-slate-950/70 shadow-2xl shadow-cyan-950/30`}>
+              <img src="/images/hero-trading-3d.webp" alt="Decorative illustration of trading charts on three screens" width="1536" height="1024" decoding="async" className="h-auto w-full object-contain" />
+              <figcaption className="border-t border-cyan-200/10 px-5 py-3 text-xs leading-5 text-slate-300">Illustrative artwork, not a live platform view or account performance.</figcaption>
+            </figure>
+            <aside ref={heroDetails.ref} className={`${heroDetails.className} home-motion__panel rounded-2xl border border-cyan-200/20 bg-slate-900/85 p-6`}>
+              <div className="mb-4 h-1 w-14 rounded bg-cyan-400" />
+              <h2 className="mep-heading text-xl font-semibold">Start with the published details</h2>
+              <ol className="mt-5 space-y-4 text-sm leading-6 text-slate-300">
+                <li className="flex gap-4"><span className="font-mono text-cyan-300">01</span><span>Browse programs available in the catalog.</span></li>
+                <li className="flex gap-4"><span className="font-mono text-cyan-300">02</span><span>Check the displayed price and program-specific terms.</span></li>
+                <li className="flex gap-4"><span className="font-mono text-cyan-300">03</span><span>Request a quote if that option is available.</span></li>
+              </ol>
+            </aside>
           </div>
+        </div>
+      </section>
 
-          {/* Content */}
-          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            
-            {/* Main Heading */}
-            <h1 className="text-6xl md:text-8xl font-bold mb-8 leading-tight">
-              Where <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-cyan-400 animate-gradient-shift">Talent</span>
-              <br />
-              Meets <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 animate-gradient-shift">Capital</span>
-            </h1>
-
-            {/* Subheading */}
-            <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto">
-              Trade with up to <span className="text-cyan-400 font-bold">$400,000</span> in capital.
-              Keep up to <span className="text-purple-400 font-bold">90%</span> of your profits.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-              <Link
-                to="/programs"
-                className="group relative px-12 py-5 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full text-lg font-bold transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-cyan-500/50"
-              >
-                <span className="relative z-10">Get Funded Now</span>
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-600 to-teal-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </Link>
-              
-              <Link
-                to="/free-course"
-                className="px-12 py-5 border-2 border-white/20 rounded-full text-lg font-semibold backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
-              >
-                Start Free Course
-              </Link>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">✓</span>
-                <span>Instant Payouts</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">✓</span>
-                <span>No Time Limits</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">✓</span>
-                <span>Trade Your Way</span>
-              </div>
-            </div>
+      <section id="programs" className="border-y border-white/5 bg-slate-900/50 py-20">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div ref={catalogIntro.ref} className={`${catalogIntro.className} mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end`}>
+            <div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Current catalog</p><h2 className="mep-heading mt-3 text-3xl font-bold sm:text-4xl">Review available programs</h2></div>
+            <p className="max-w-xl text-sm leading-6 text-slate-400">Only catalog information returned for display is shown here. Availability of programs and their terms depends on the current catalog data.</p>
           </div>
-        </section>
+          <CatalogPreview interactive />
+        </div>
+      </section>
 
-        {/* Stats Section */}
-        <section ref={statsRef} className="relative py-32 overflow-hidden">
-          {/* Background */}
-          <div className="absolute inset-0 z-0">
-            <img 
-              src="/images/stats-globe-hologram.webp" 
-              alt="" 
-              className="w-full h-full object-cover opacity-20"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black"></div>
+      <PlatformShowcase />
+
+      <section id="how-it-works" className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-[.7fr_1.3fr]">
+          <div><p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">A transparent starting point</p><h2 className="mep-heading mt-3 text-3xl font-bold">How to explore</h2></div>
+          <div ref={explorationSteps.ref} className={`${explorationSteps.className} grid gap-5 sm:grid-cols-3`}>
+            {[['Browse','Open the catalog to see the programs currently listed.'],['Review','Read the displayed price and terms for the specific program.'],['Understand','A quote does not itself take payment or activate an account.']].map(([title, text], index) => <article key={title} className="mep-panel home-motion__panel rounded-xl border p-6"><p className="font-mono text-sm text-cyan-300">0{index + 1}</p><h3 className="mt-4 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{text}</p></article>)}
           </div>
+        </div>
+      </section>
 
-          {/* Content */}
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              {/* Stat 1 */}
-              <div className="text-center">
-                <div className="text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 mb-2">
-                  {stats.countries}+
-                </div>
-                <div className="text-gray-400 text-lg">Countries</div>
-              </div>
-
-              {/* Stat 2 */}
-              <div className="text-center">
-                <div className="text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-2">
-                  ${stats.capital}M+
-                </div>
-                <div className="text-gray-400 text-lg">Capital Funded</div>
-              </div>
-
-              {/* Stat 3 */}
-              <div className="text-center">
-                <div className="text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 mb-2">
-                  {stats.traders}+
-                </div>
-                <div className="text-gray-400 text-lg">Active Traders</div>
-              </div>
-
-              {/* Stat 4 */}
-              <div className="text-center">
-                <div className="text-5xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-2">
-                  {stats.profitSplit}%
-                </div>
-                <div className="text-gray-400 text-lg">Profit Split</div>
-              </div>
-            </div>
+      <section id="home-help" ref={globeMotion.ref} data-motion-running={globeMotion.running ? "true" : "false"} className="home-help-globe border-t border-white/5" aria-labelledby="home-help-heading">
+        <div aria-hidden="true" className="home-help-globe__scene">
+          <div className="home-help-globe__light" />
+          <div className="home-help-globe__orbit"><img src="/images/stats-globe-hologram.webp" alt="" width="1024" height="1024" loading="lazy" decoding="async" className="home-help-globe__image" /></div>
+        </div>
+        <div ref={supportPanel.ref} className={`${supportPanel.className} home-help-globe__copy mx-auto max-w-4xl px-6 text-center lg:px-8`}>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Clarity before commitment</p>
+          <h2 id="home-help-heading" className="mep-heading mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Questions before you decide?</h2>
+          <p className="mt-4 text-base leading-relaxed text-slate-300 sm:text-lg">Review the available help and program information.</p>
+          <div className="mt-7 flex flex-wrap justify-center gap-x-6 gap-y-3">
+            <Link to="/faq" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Read FAQs</Link>
+            <Link to="/support" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Visit support</Link>
+            <Link to="/programs" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-cyan-300 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Browse programs</Link>
           </div>
-        </section>
-
-        {/* How It Works Section */}
-        <section id="how-it-works" className="relative py-32">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-20">
-              <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                How It <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Works</span>
-              </h2>
-              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-                Get funded in 3 simple steps and start trading with our capital
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-              {/* Step 1 */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-teal-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-300 hover:scale-105">
-                  <div className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 mb-6">01</div>
-                  <h3 className="text-2xl font-bold mb-4">Choose Your Challenge</h3>
-                  <p className="text-gray-400">
-                    Select from our range of funding programs. From $10K to $400K accounts.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-300 hover:scale-105">
-                  <div className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-6">02</div>
-                  <h3 className="text-2xl font-bold mb-4">Pass The Evaluation</h3>
-                  <p className="text-gray-400">
-                    Trade and hit the profit targets while following our simple rules.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
-                <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-300 hover:scale-105">
-                  <div className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 mb-6">03</div>
-                  <h3 className="text-2xl font-bold mb-4">Get Funded & Trade</h3>
-                  <p className="text-gray-400">
-                    Receive your funded account and keep up to 90% of your profits.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Programs Section */}
-        <section id="programs" className="relative py-32 bg-gradient-to-b from-transparent via-white/5 to-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                Choose Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Challenge</span>
-              </h2>
-            </div>
-
-            {/* Phase Tabs */}
-            <div className="flex flex-wrap justify-center gap-4 mb-16">
-              <button
-                onClick={() => setSelectedPhase('one')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'one'
-                    ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-2xl shadow-cyan-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                1️⃣ One Phase
-              </button>
-              <button
-                onClick={() => setSelectedPhase('two')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'two'
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-2xl shadow-purple-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                2️⃣ Two Phase
-              </button>
-              <button
-                onClick={() => setSelectedPhase('three')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'three'
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-2xl shadow-orange-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                3️⃣ Three Phase
-              </button>
-              <button
-                onClick={() => setSelectedPhase('instant')}
-                className={`px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 ${
-                  selectedPhase === 'instant'
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-2xl shadow-blue-500/50'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-              >
-                4️⃣ Instant Funding
-              </button>
-            </div>
-
-            {/* Programs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredPrograms.map((program) => (
-                <div
-                  key={program.id}
-                  className="group relative bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/30"
-                >
-                  <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 mb-4">
-                    ${(program.account_size / 1000).toFixed(0)}K
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Profit Target:</span>
-                      <span className="text-white font-semibold">{program.profit_target}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Max Daily Loss:</span>
-                      <span className="text-white font-semibold">{program.max_daily_loss}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Profit Split:</span>
-                      <span className="text-cyan-400 font-bold">{program.profit_split}%</span>
-                    </div>
-                  </div>
-                  <Link
-                    to={`/programs/${program.id}`}
-                    className="mt-6 block w-full py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full text-center font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50"
-                  >
-                    Get Started
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="relative py-32">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-20">
-              <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                Why Choose <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Us</span>
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {/* Feature 1 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">⚡</div>
-                <h3 className="text-2xl font-bold mb-4">Instant Payouts</h3>
-                <p className="text-gray-400">
-                  Request payouts anytime. Get paid within 24 hours.
-                </p>
-              </div>
-
-              {/* Feature 2 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">🎯</div>
-                <h3 className="text-2xl font-bold mb-4">No Time Limits</h3>
-                <p className="text-gray-400">
-                  Trade at your own pace. No pressure, no deadlines.
-                </p>
-              </div>
-
-              {/* Feature 3 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">📈</div>
-                <h3 className="text-2xl font-bold mb-4">Scale Your Account</h3>
-                <p className="text-gray-400">
-                  Grow your account up to $400K based on performance.
-                </p>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">🛡️</div>
-                <h3 className="text-2xl font-bold mb-4">Simple Rules</h3>
-                <p className="text-gray-400">
-                  Clear, straightforward rules. No hidden conditions.
-                </p>
-              </div>
-
-              {/* Feature 5 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">💰</div>
-                <h3 className="text-2xl font-bold mb-4">Up to 90% Profit Split</h3>
-                <p className="text-gray-400">
-                  Keep the majority of your profits. You deserve it.
-                </p>
-              </div>
-
-              {/* Feature 6 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">🌍</div>
-                <h3 className="text-2xl font-bold mb-4">Global Community</h3>
-                <p className="text-gray-400">
-                  Join traders from 200+ countries worldwide.
-                </p>
-              </div>
-
-              {/* Feature 7 - MT4/MT5 */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">💻</div>
-                <h3 className="text-2xl font-bold mb-4">MT4 & MT5 Platforms</h3>
-                <p className="text-gray-400">
-                  Trade on industry-standard MetaTrader 4 & 5 platforms. TradingView coming soon.
-                </p>
-              </div>
-
-              {/* Feature 8 - Payout Policy */}
-              <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8">
-                <div className="text-4xl mb-4">💵</div>
-                <h3 className="text-2xl font-bold mb-4">Low Minimum Withdrawal</h3>
-                <p className="text-gray-400">
-                  Withdraw your profits starting from just $50. Flexible payout frequency options.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials Section */}
-        <section className="relative py-32">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-20">
-              <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                What Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Traders Say</span>
-              </h2>
-              <p className="text-xl text-gray-300">Join thousands of successful funded traders</p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                {
-                  name: "Alex Thompson",
-                  role: "Funded Trader",
-                  image: "AT",
-                  text: "MarketEdgePros changed my trading career. Fast payouts, fair rules, and excellent support. I scaled from $25K to $100K in 4 months!"
-                },
-                {
-                  name: "Maria Garcia",
-                  role: "Professional Trader",
-                  image: "MG",
-                  text: "Best prop firm I've worked with. No time pressure, realistic targets, and they actually care about trader success. Highly recommended!"
-                },
-                {
-                  name: "James Wilson",
-                  role: "Full-Time Trader",
-                  image: "JW",
-                  text: "The instant funding option was perfect for me. Started trading with real capital immediately and now making consistent profits with 90% split."
-                }
-              ].map((testimonial, index) => (
-                <div key={index} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-cyan-500/50 transition-all">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                      {testimonial.image}
-                    </div>
-                    <div>
-                      <h4 className="text-white font-bold text-lg">{testimonial.name}</h4>
-                      <p className="text-gray-400 text-sm">{testimonial.role}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} className="w-5 h-5 fill-cyan-400" viewBox="0 0 20 20">
-                        <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <p className="text-gray-300 italic">"{testimonial.text}"</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Trust Badges Section */}
-        <section className="relative py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h3 className="text-2xl font-bold text-gray-400 mb-8">Trusted by traders worldwide</h3>
-              <div className="flex flex-wrap justify-center items-center gap-12">
-                {[
-                  { icon: "🏆", text: "Top Rated 2024" },
-                  { icon: "✓", text: "Verified Payouts" },
-                  { icon: "🔒", text: "Secure Platform" },
-                  { icon: "⚡", text: "Fast Support" },
-                  { icon: "🌍", text: "200+ Countries" }
-                ].map((badge, index) => (
-                  <div key={index} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-full px-6 py-3">
-                    <span className="text-2xl">{badge.icon}</span>
-                    <span className="text-white font-semibold">{badge.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Quick FAQ Section */}
-        <section className="relative py-32">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                Quick <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Answers</span>
-              </h2>
-              <p className="text-xl text-gray-300">Common questions from new traders</p>
-            </div>
-
-            <div className="space-y-6">
-              {[
-                {
-                  q: "How fast can I get funded?",
-                  a: "With instant funding, you can start trading immediately. For evaluation programs, most traders complete them in 2-4 weeks."
-                },
-                {
-                  q: "Are there any time limits?",
-                  a: "No! Unlike other firms, we don't impose time limits on evaluations. Trade at your own pace and comfort level."
-                },
-                {
-                  q: "How do payouts work?",
-                  a: "Request payouts anytime after your first profitable trade. We process all payout requests within 24 hours on business days."
-                },
-                {
-                  q: "Can I scale my account?",
-                  a: "Absolutely! Consistent traders can scale up to $400K and increase their profit split to 90% based on performance."
-                }
-              ].map((faq, index) => (
-                <div key={index} className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 hover:border-cyan-500/50 transition-all">
-                  <h4 className="text-xl font-bold text-white mb-3">{faq.q}</h4>
-                  <p className="text-gray-300">{faq.a}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="text-center mt-12">
-              <Link to="/faq" className="text-cyan-400 hover:text-cyan-300 font-semibold text-lg">
-                View All FAQs →
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="relative py-32">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-5xl md:text-6xl font-bold mb-8">
-              Ready to Start <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">Trading</span>?
-            </h2>
-            <p className="text-xl text-gray-300 mb-12">
-              Join thousands of traders worldwide and get funded today
-            </p>
-            <Link
-              to="/programs"
-              className="inline-block px-16 py-6 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-full text-xl font-bold transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-purple-500/50"
-            >
-              Get Funded Now
-            </Link>
-          </div>
-        </section>
-
-        {/* Custom Animations */}
-        <style jsx>{`
-          @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-          }
-
-          @keyframes gradient-shift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-          }
-
-          @keyframes pulse-slow {
-            0%, 100% { opacity: 0.6; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.05); }
-          }
-
-          .animate-float {
-            animation: float 6s ease-in-out infinite;
-          }
-
-          .animate-gradient-shift {
-            background-size: 200% 200%;
-            animation: gradient-shift 3s ease infinite;
-          }
-
-          .animate-pulse-slow {
-            animation: pulse-slow 4s ease-in-out infinite;
-          }
-        `}</style>
-
+        </div>
+      </section>
       </div>
     </Layout>
   );
 };
 
 export default NewHomePage;
-

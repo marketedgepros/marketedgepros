@@ -1,383 +1,117 @@
-import { useEffect, useState } from 'react';
-import { Search, Filter, Eye, Mail, Phone, TrendingUp, Award } from 'lucide-react';
-import AffiliateLayout from '../../components/affiliate/AffiliateLayout';
-import api from '../../services/api';
+import { useState } from 'react';
+import useAuthStore from '../../store/authStore';
+import { AFFILIATE_RECORD_PAGE_SIZE, AFFILIATE_REFERRAL_STATUSES, affiliateRecordError } from '../../services/affiliateRecordViewService.js';
+import { useAffiliateRecordRead } from '../../hooks/useAffiliateAccountRead.js';
+import {
+  AffiliateExactAmount,
+  AffiliateRecordBoundary,
+  AffiliateRecordHeader,
+  AffiliateRecordPagination,
+  AffiliateRecordReadState,
+  AffiliateStatusPill,
+  affiliateRecordDate,
+  affiliateRecordPanel,
+} from '../../components/affiliate/AffiliateRecordUI.jsx';
 
-export default function TradersManagement() {
-  const [traders, setTraders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [selectedTrader, setSelectedTrader] = useState(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+const tenantSelector = (state) => state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null;
 
-  useEffect(() => {
-    loadTraders();
-  }, []);
-
-  const loadTraders = async () => {
-    try {
-      setIsLoading(true);
-      const response = await api.get('/affiliate/traders');
-      setTraders(response.data.traders || []);
-    } catch (error) {
-      // Mock data for development
-      setTraders([
-        {
-          id: 1,
-          name: 'John Trader',
-          email: 'john@example.com',
-          phone: '+1 234 567 8900',
-          status: 'active',
-          program: 'Two Phase $100K',
-          enrolled_date: '2024-10-01',
-          current_balance: 102450,
-          profit_loss: 2450,
-          total_trades: 47,
-          win_rate: 68.5,
-          challenge_phase: 'Phase 2',
-        },
-        {
-          id: 2,
-          name: 'Jane Smith',
-          email: 'jane@example.com',
-          phone: '+1 234 567 8901',
-          status: 'active',
-          program: 'One Phase $50K',
-          enrolled_date: '2024-10-05',
-          current_balance: 51230,
-          profit_loss: 1230,
-          total_trades: 32,
-          win_rate: 71.2,
-          challenge_phase: 'Phase 1',
-        },
-        {
-          id: 3,
-          name: 'Bob Wilson',
-          email: 'bob@example.com',
-          phone: '+1 234 567 8902',
-          status: 'funded',
-          program: 'Instant Funding $200K',
-          enrolled_date: '2024-09-15',
-          current_balance: 215890,
-          profit_loss: 15890,
-          total_trades: 124,
-          win_rate: 74.3,
-          challenge_phase: 'Funded',
-        },
-        {
-          id: 4,
-          name: 'Alice Brown',
-          email: 'alice@example.com',
-          phone: '+1 234 567 8903',
-          status: 'failed',
-          program: 'Two Phase $100K',
-          enrolled_date: '2024-09-20',
-          current_balance: 0,
-          profit_loss: -10000,
-          total_trades: 28,
-          win_rate: 42.8,
-          challenge_phase: 'Failed',
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filteredTraders = traders.filter((trader) => {
-    const matchesSearch =
-      trader.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trader.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || trader.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'funded':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'pending':
-        return 'bg-slate-700/50 text-gray-100';
-      default:
-        return 'bg-slate-700/50 text-gray-100';
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <AffiliateLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-            <p className="text-gray-300 mt-4">Loading traders...</p>
-          </div>
-        </div>
-      </AffiliateLayout>
-    );
-  }
-
+export function AffiliateReferralsView({ view, loading, error, onRefresh, onPage, onStatus }) {
+  const referrals = view?.referrals ?? [];
+  const status = view?.filters?.status ?? null;
   return (
-    <AffiliateLayout>
-      <div className="min-h-screen bg-slate-900">
-        {/* Header */}
-        <div className="bg-slate-800/50 border-b border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <h1 className="text-3xl font-bold text-white">My Traders</h1>
-            <p className="text-gray-300 mt-2">Manage and monitor your traders' performance</p>
+    <div className="mep-screen min-h-screen text-white">
+      <AffiliateRecordHeader
+        eyebrow="Affiliate records"
+        title="Referral activity"
+        summary="Server-filtered referral activity for the signed-in affiliate account. Person-level information is intentionally not included."
+        onRefresh={onRefresh}
+        refreshing={loading}
+      />
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <AffiliateRecordBoundary />
+        <section className={`${affiliateRecordPanel} mt-6 p-4 sm:p-5`} aria-labelledby="referral-filter-heading">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 id="referral-filter-heading" className="mep-heading font-semibold text-white">Server status filter</h2>
+              <p className="mt-1 text-sm text-slate-400">Changing the status starts again at page one; this read-only view has no local record search.</p>
+            </div>
+            <label className="flex shrink-0 items-center gap-3 text-sm text-slate-200" htmlFor="referral-status">
+              Status
+              <select id="referral-status" value={status ?? 'all'} onChange={(event) => onStatus(event.target.value)} className="rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200">
+                <option value="all">All statuses</option>
+                {AFFILIATE_REFERRAL_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
           </div>
-        </div>
+        </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="card">
-              <p className="text-sm text-gray-300">Total Traders</p>
-              <p className="text-2xl font-bold text-white mt-1">{traders.length}</p>
-            </div>
-            <div className="card">
-              <p className="text-sm text-gray-300">Active</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">
-                {traders.filter(t => t.status === 'active').length}
-              </p>
-            </div>
-            <div className="card">
-              <p className="text-sm text-gray-300">Funded</p>
-              <p className="text-2xl font-bold text-yellow-600 mt-1">
-                {traders.filter(t => t.status === 'funded').length}
-              </p>
-            </div>
-            <div className="card">
-              <p className="text-sm text-gray-300">Avg Win Rate</p>
-              <p className="text-2xl font-bold text-white mt-1">
-                {(traders.reduce((acc, t) => acc + t.win_rate, 0) / traders.length).toFixed(1)}%
-              </p>
-            </div>
-          </div>
+        <div className="mt-6"><AffiliateRecordReadState loading={loading} error={error ? affiliateRecordError(error) : null} onRetry={onRefresh} /></div>
 
-          {/* Filters */}
-          <div className="bg-slate-800/50 rounded-lg shadow-sm p-4 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search traders by name or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input pl-10 w-full"
-                />
+        {!loading && !error && view && (
+          <>
+            <section className={`${affiliateRecordPanel} mt-6 overflow-hidden`} aria-labelledby="referral-records-heading">
+              <div className="border-b border-white/10 px-5 py-4 sm:px-6">
+                <h2 id="referral-records-heading" className="mep-heading text-xl font-semibold">Referral records</h2>
+                <p className="mt-1 text-sm text-slate-400">Record IDs and exact API values only. Currency remains unavailable.</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-gray-400" />
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="input"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="funded">Funded</option>
-                  <option value="failed">Failed</option>
-                  <option value="pending">Pending</option>
-                </select>
+              <div role="region" aria-label="Referral records table" tabIndex="0" className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-200">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <caption className="sr-only">Referral records for the signed-in affiliate account</caption>
+                  <thead className="bg-slate-950/50 text-xs uppercase tracking-[0.14em] text-slate-400">
+                    <tr>
+                      <th scope="col" className="px-5 py-3 font-medium sm:px-6">Record ID</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Legacy API status</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Click date</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Conversion date</th>
+                      <th scope="col" className="px-5 py-3 text-right font-medium">Purchase amount</th>
+                      <th scope="col" className="px-5 py-3 text-right font-medium sm:px-6">Reported commission</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {referrals.map((referral) => (
+                      <tr key={referral.id} className="align-top transition-colors hover:bg-white/[0.025] motion-reduce:transition-none">
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300 sm:px-6">#{referral.id}</td>
+                        <td className="px-5 py-4"><AffiliateStatusPill status={referral.status} /></td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(referral.clickDate)}</td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(referral.conversionDate)}</td>
+                        <td className="px-5 py-4"><AffiliateExactAmount value={referral.purchaseAmount} align="right" /></td>
+                        <td className="px-5 py-4 sm:px-6"><AffiliateExactAmount value={referral.commissionAmount} align="right" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </div>
-
-          {/* Traders Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredTraders.map((trader) => (
-              <div key={trader.id} className="card">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-primary-600 font-semibold text-lg">
-                        {trader.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">{trader.name}</h3>
-                      <p className="text-sm text-gray-300">{trader.email}</p>
-                    </div>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(trader.status)}`}>
-                    {trader.status}
-                  </span>
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">Program</span>
-                    <span className="text-sm font-medium text-white">{trader.program}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">Phase</span>
-                    <span className="text-sm font-medium text-white">{trader.challenge_phase}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">Current Balance</span>
-                    <span className="text-sm font-bold text-white">
-                      ${trader.current_balance.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">P&L</span>
-                    <span className={`text-sm font-bold ${trader.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {trader.profit_loss >= 0 ? '+' : ''}${trader.profit_loss.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-slate-900 rounded-lg">
-                  <div>
-                    <p className="text-xs text-gray-300">Total Trades</p>
-                    <p className="text-lg font-bold text-white">{trader.total_trades}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-300">Win Rate</p>
-                    <p className="text-lg font-bold text-white">{trader.win_rate}%</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedTrader(trader);
-                      setShowDetailsModal(true);
-                    }}
-                    className="flex-1 btn btn-secondary text-sm flex items-center justify-center gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View Details
-                  </button>
-                  <button className="btn btn-secondary text-sm p-2">
-                    <Mail className="w-4 h-4" />
-                  </button>
-                  <button className="btn btn-secondary text-sm p-2">
-                    <Phone className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {filteredTraders.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-300">No traders found</p>
-            </div>
-          )}
-        </div>
+              {referrals.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-400 sm:px-6">No referral records were returned for this server-filtered page.</p>}
+            </section>
+            <div className="mt-6"><AffiliateRecordPagination pagination={view.pagination} onPage={onPage} /></div>
+          </>
+        )}
       </div>
-
-      {/* Details Modal */}
-      {showDetailsModal && selectedTrader && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800/50 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-white/10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                    <span className="text-primary-600 font-semibold text-lg">
-                      {selectedTrader.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">{selectedTrader.name}</h2>
-                    <p className="text-gray-300">{selectedTrader.email}</p>
-                  </div>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedTrader.status)}`}>
-                  {selectedTrader.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4">Account Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-300">Program</p>
-                      <p className="font-medium text-white">{selectedTrader.program}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-300">Challenge Phase</p>
-                      <p className="font-medium text-white">{selectedTrader.challenge_phase}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-300">Enrolled Date</p>
-                      <p className="font-medium text-white">
-                        {new Date(selectedTrader.enrolled_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-300">Phone</p>
-                      <p className="font-medium text-white">{selectedTrader.phone}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4">Performance Metrics</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-300">Current Balance</p>
-                      <p className="text-2xl font-bold text-white">
-                        ${selectedTrader.current_balance.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-300">Profit/Loss</p>
-                      <p className={`text-2xl font-bold ${selectedTrader.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {selectedTrader.profit_loss >= 0 ? '+' : ''}${selectedTrader.profit_loss.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-300">Total Trades</p>
-                        <p className="text-xl font-bold text-white">{selectedTrader.total_trades}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-300">Win Rate</p>
-                        <p className="text-xl font-bold text-white">{selectedTrader.win_rate}%</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-white/10">
-                <div className="flex gap-3">
-                  <button className="btn btn-primary flex-1 flex items-center justify-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    View Trading History
-                  </button>
-                  <button className="btn btn-secondary flex-1 flex items-center justify-center gap-2">
-                    <Award className="w-5 h-5" />
-                    View Commissions
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-white/10">
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="btn btn-secondary w-full"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </AffiliateLayout>
+    </div>
   );
 }
 
+export default function TradersManagement() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const tenantId = useAuthStore(tenantSelector);
+  const role = useAuthStore((state) => state.user?.role ?? null);
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState(null);
+  const read = useAffiliateRecordRead({
+    kind: 'referrals',
+    isAuthenticated,
+    userId,
+    tenantId,
+    role,
+    page,
+    perPage: AFFILIATE_RECORD_PAGE_SIZE,
+    status,
+  });
+
+  const changeStatus = (nextStatus) => {
+    setStatus(nextStatus === 'all' ? null : nextStatus);
+    setPage(1);
+  };
+  return <AffiliateReferralsView view={read.view} loading={read.loading} error={read.error} onRefresh={read.refresh} onPage={setPage} onStatus={changeStatus} />;
+}

@@ -1,5 +1,5 @@
 """
-Database optimization configuration for PropTradePro
+Database optimization configuration for MarketEdgePros
 Connection pooling, query optimization, and performance tuning
 """
 

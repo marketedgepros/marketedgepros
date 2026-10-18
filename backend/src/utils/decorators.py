@@ -1,5 +1,6 @@
 """Decorators for authentication and authorization"""
 from functools import wraps
+from inspect import signature, Parameter
 from flask import request, jsonify, g
 from src.models import User
 from src.services.auth_service import AuthService
@@ -9,6 +10,12 @@ from src.database import db
 
 def token_required(f):
     """Decorator to require valid JWT token (supports both cookies and headers)"""
+    # Both handler styles exist: explicit current_user and request-local g.
+    # Inspect once at registration, never catch/retry a handler TypeError.
+    parameters = signature(f).parameters
+    user_argument = 'current_user' if 'current_user' in parameters else 'user' if 'user' in parameters else None
+    user_parameter = parameters.get(user_argument)
+    first_parameter = next(iter(parameters), None)
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -18,29 +25,28 @@ def token_required(f):
         
         # Fallback to Authorization header (backward compatibility)
         if not token and 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            try:
-                token = auth_header.split(' ')[1]  # Bearer <token>
-            except IndexError:
+            parts = request.headers['Authorization'].split()
+            if len(parts) != 2 or parts[0].lower() != 'bearer':
                 return jsonify({'error': 'Invalid token format'}), 401
-        
+            token = parts[1]
+
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
         
-        # Check if token is blacklisted
-        if AuthService.is_token_blacklisted(token):
-            return jsonify({'error': 'Token has been revoked'}), 401
-        
-        # Verify token
-        payload = User.verify_token(token, token_type='access')
-        if not payload:
-            return jsonify({'error': 'Invalid or expired token'}), 401
-        
-        # Get user
-        current_user = User.query.get(payload['user_id'])
-        if not current_user or not current_user.is_active:
-            return jsonify({'error': 'User not found or inactive'}), 401
-        
+        try:
+            from src.services.session_service import SessionService
+            with db.session.no_autoflush:
+                current_user, payload = SessionService.authenticate(token, 'access')
+        except ValueError:
+            return jsonify({'error': 'Invalid or revoked session'}), 401
+        except Exception:
+            return jsonify({'error': 'Authentication unavailable'}), 503
+
+        if request.cookies.get('access_token') and request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+            from src.middleware.csrf_middleware import validate_session_csrf
+            if not validate_session_csrf(token):
+                return jsonify({'error': 'CSRF validation failed', 'code': 'CSRF_INVALID'}), 403
+
         # Store user in g
         g.current_user = current_user
         g.token = token
@@ -48,7 +54,11 @@ def token_required(f):
         # Enable hierarchy scoping for this request
         set_request_hierarchy_scope(db.session, current_user)
         
-        return f(current_user, *args, **kwargs)
+        if user_parameter is not None:
+            if first_parameter == user_argument and user_parameter.kind in {Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD}:
+                return f(current_user, *args, **kwargs)
+            kwargs[user_argument] = current_user
+        return f(*args, **kwargs)
     
     return decorated
 

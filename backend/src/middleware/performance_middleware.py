@@ -1,5 +1,5 @@
 """
-Performance Middleware for PropTradePro
+Performance Middleware for MarketEdgePros
 Adds caching headers and optimizations
 """
 

@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-10-18",
+  "deployed_sha": "306bfe5680fd43100c987805aa3fc5ac9d38e165",
+  "previous_sha": "9724ae16a610da6f9daf7c938a5bd2838f64a276",
+  "ci_run": 39121383332,
+  "ci_result": "success",
+  "manifest_sha256": "8a62434a7cd69fc5f0ae383dba404c4920a1dcb6d5f3b9b3538d3ac2307d5490",
+  "manifest_files": 1268,
+  "retained_prior_hashed_assets": 294,
+  "schema_revision": "20261013_000002",
+  "schema_changed": false,
+  "runtime_delta": [
+    "DEPLOYMENT_SHA"
+  ],
+  "public_https_domains": [
+    "marketedgepros.com",
+    "www.marketedgepros.com"
+  ],
+  "public_https_live_ready_verified": true,
+  "registration_preserved": true,
+  "owner_pilot_only": true,
+  "existing_ipn_preserved": true,
+  "dropins_unchanged": true,
+  "financial_records_identical": true,
+  "verified_receipts": 1,
+  "settlement_journals": 1,
+  "balanced_settlement_entries": 2,
+  "purchase_grants": 1,
+  "user_browser_payment_confirmed": true,
+  "user_browser_trader_purchase_record_visible": true,
+  "real_administrator_readonly_records_validated": true,
+  "live_dto_es2015_mapping_validated": true,
+  "additional_payment_created": false,
+  "funds_transferred": false,
+  "database_restored": false,
+  "first_attempt_code_only_rollback_verified": true,
+  "final_attempt_public_identity_wait_reviewed": true,
+  "scope_not_extended_to_customers": true,
+  "trading_provisioned": false,
+  "payouts_enabled": false,
+  "pii_wallet_addresses_credentials_omitted": true
+}

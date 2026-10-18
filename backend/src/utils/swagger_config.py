@@ -1,5 +1,5 @@
 """
-Swagger/OpenAPI configuration for PropTradePro API
+Swagger/OpenAPI configuration for MarketEdgePros API
 Add this to app.py after app creation
 """
 
@@ -26,15 +26,14 @@ def init_swagger(app):
     swagger_template = {
         "swagger": "2.0",
         "info": {
-            "title": "PropTradePro API",
+            "title": "MarketEdgePros API",
             "description": "Professional Trading Challenge Platform API Documentation",
             "contact": {
-                "email": "info@proptradepro.com",
-                "url": "https://proptradepro.com"
+                "url": "https://marketedgepros.com"
             },
             "version": "1.0.0"
         },
-        "host": "api.proptradepro.com",  # Change to your domain
+        "host": "marketedgepros.com",
         "basePath": "/api",
         "schemes": [
             "https",

@@ -1,673 +1,676 @@
-"""
-CRM routes for lead management
-"""
-from flask import Blueprint, request, jsonify, g
+"""Canonical CRM routes for tenant-bound lead management."""
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+import logging
+import re
+
+from flask import Blueprint, jsonify, request
+from sqlalchemy import func
+
 from src.database import db
 from src.models.lead import Lead, LeadActivity, LeadNote
-from src.models.user import User
+from src.services.admin_closure_crm import (
+    AdminClosureCrmArgumentError,
+    AdminClosureCrmService,
+)
+from src.utils import crm_scope
 from src.utils.decorators import token_required
 from src.utils.permissions import PermissionManager
-from datetime import datetime, timedelta
-from sqlalchemy import or_, func
-import logging
+
 
 crm_bp = Blueprint('crm', __name__)
 logger = logging.getLogger(__name__)
+
+_ALLOWED_STATUSES = {
+    'new', 'contacted', 'qualified', 'proposal', 'negotiation', 'converted', 'lost',
+}
+_ACTIVITY_TYPES = {'call', 'meeting', 'follow_up', 'other'}
+_EMAIL_PATTERN = re.compile(r'^[^@\s]{1,64}@[^@\s]{1,253}\.[^@\s]+$')
+_MAX_BUDGET = Decimal('99999999.99')
+
+
+def _error(message, status, code=None):
+    payload = {'error': message}
+    if code:
+        payload['code'] = code
+    return jsonify(payload), status
+
+
+def _internal_error():
+    """Keep unexpected database/validation internals out of CRM responses."""
+    return _error('Unable to process CRM request', 500)
+
+
+def _crm_actor(current_user, *, manage=False):
+    """Apply role and positive tenant context after JWT/CSRF/hierarchy decoration."""
+    policy = PermissionManager.can_manage_leads if manage else PermissionManager.can_access_crm
+    if not policy(current_user):
+        return None
+    try:
+        AdminClosureCrmService.require_owner(current_user)
+    except PermissionError:
+        return None
+    return current_user
+
+
+def _json_object():
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
+
+
+def _positive_id(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.isascii() and value.isdecimal() and int(value) > 0:
+        return int(value)
+    return None
+
+
+def _clean_string(value, *, maximum, required=False):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if (required and not value) or len(value) > maximum or any(ord(character) < 32 for character in value):
+        return None
+    return value
+
+
+def _valid_email(value):
+    email = _clean_string(value, maximum=255, required=True)
+    if not email or not _EMAIL_PATTERN.fullmatch(email):
+        return None
+    return email.lower()
+
+
+def _budget(value):
+    if value is None or value == '':
+        return None
+    if isinstance(value, bool):
+        return False
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+    if not amount.is_finite() or amount < 0 or amount > _MAX_BUDGET:
+        return False
+    return amount
+
+
+def _datetime_value(value):
+    if not isinstance(value, str) or not value.strip() or len(value) > 64:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    # The mapped fields intentionally store naive wall time; never alter it silently.
+    if parsed.tzinfo is not None:
+        return None
+    return parsed
+
+
+def _get_visible_lead(current_user, lead_id):
+    """Fetch one lead through the same tenant/hierarchy scope as all CRM actions."""
+    with db.session.no_autoflush:
+        lead = crm_scope.get_scoped_lead(current_user, lead_id)
+    if lead is None:
+        # Do not create an existence oracle across tenant or hierarchy boundaries.
+        return None, _error('Lead not found', 404)
+    return lead, None
+
+
+def _target_user(current_user, value):
+    target_id = _positive_id(value)
+    if target_id is None:
+        return None, _error('assigned_to must be a positive integer', 400)
+    with db.session.no_autoflush:
+        target = crm_scope.get_assignment_target(current_user, target_id)
+    if target is None:
+        return None, _error('Assignment target is not available', 403)
+    return target, None
+
+
+def _target_program(current_user, value):
+    if value is None:
+        return None, None
+    program_id = _positive_id(value)
+    if program_id is None:
+        return None, _error('interested_program_id must be a positive integer', 400)
+    with db.session.no_autoflush:
+        program = crm_scope.get_tenant_program(current_user, program_id)
+    if program is None:
+        return None, _error('Interested program is not available', 403)
+    return program, None
+
+
+def _assigned_user(current_user, assigned_to):
+    if assigned_to is None:
+        return None
+    with db.session.no_autoflush:
+        return crm_scope.get_assignment_target(current_user, assigned_to)
+
+
+def _lead_response(actor, lead, message, status=200):
+    return jsonify({
+        'message': message,
+        'lead': AdminClosureCrmService.serialize_lead(lead, _assigned_user(actor, lead.assigned_to)),
+        'owner_context': AdminClosureCrmService.owner_context(actor),
+    }), status
+
+
+def _note_response(actor, note, message, status=201):
+    return jsonify({
+        'message': message,
+        'note': AdminClosureCrmService.serialize_note(note, actor),
+        'owner_context': AdminClosureCrmService.owner_context(actor),
+    }), status
+
+
+def _activity_response(actor, activity, message, status=201):
+    return jsonify({
+        'message': message,
+        'activity': AdminClosureCrmService.serialize_activity(activity, actor),
+        'owner_context': AdminClosureCrmService.owner_context(actor),
+    }), status
+
+
+def _request_matches_version(lead, data):
+    """Return False only for a supplied optimistic version that is stale or malformed."""
+    if 'expected_updated_at' not in data:
+        return True
+    expected = data['expected_updated_at']
+    if expected is not None and (not isinstance(expected, str) or _datetime_value(expected) is None):
+        return None
+    current = AdminClosureCrmService.iso_or_none(lead.updated_at)
+    return expected == current
+
+
+def _record_update_activity(lead, actor, changed):
+    activity_type = 'status_change' if changed == ['status'] else 'lead_updated'
+    db.session.add(LeadActivity(
+        lead_id=lead.id,
+        activity_type=activity_type,
+        description='Lead updated: ' + ', '.join(changed),
+        user_id=actor.id,
+    ))
 
 
 @crm_bp.route('/leads', methods=['GET'])
 @token_required
 def get_leads(current_user):
-    """Get all leads with filtering"""
+    """List a bounded, owner-scoped lead page from a coherent read snapshot."""
+    actor = _crm_actor(current_user)
+    if actor is None:
+        return _error('Access denied', 403)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        # Get filters
-        status = request.args.get('status')
-        source = request.args.get('source')
-        assigned_to = request.args.get('assigned_to')
-        search = request.args.get('search', '')
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 20))
-        
-        # Build query
-        query = Lead.query
-        
-        # Apply permission filter
-        query = PermissionManager.filter_leads_by_permission(current_user, query)
-        
-        # Apply filters
-        if status:
-            query = query.filter_by(status=status)
-        
-        if source:
-            query = query.filter_by(source=source)
-        
-        if assigned_to:
-            query = query.filter_by(assigned_to=int(assigned_to))
-        
-        if search:
-            query = query.filter(
-                or_(
-                    Lead.first_name.ilike(f'%{search}%'),
-                    Lead.last_name.ilike(f'%{search}%'),
-                    Lead.email.ilike(f'%{search}%'),
-                    Lead.phone.ilike(f'%{search}%')
-                )
-            )
-        
-        # Order by score (high to low) and created date
-        query = query.order_by(Lead.score.desc(), Lead.created_at.desc())
-        
-        # Paginate
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        
-        leads = []
-        for lead in pagination.items:
-            lead_data = lead.to_dict()
-            
-            # Add assigned user info
-            if lead.assigned_to:
-                assigned_user = User.query.get(lead.assigned_to)
-                if assigned_user:
-                    lead_data['assigned_user'] = {
-                        'id': assigned_user.id,
-                        'name': f"{assigned_user.first_name} {assigned_user.last_name}",
-                        'email': assigned_user.email
-                    }
-            
-            leads.append(lead_data)
-        
-        return jsonify({
-            'leads': leads,
-            'total': pagination.total,
-            'pages': pagination.pages,
-            'current_page': page,
-            'per_page': per_page
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        arguments = AdminClosureCrmService.parse_list_arguments(request.args)
+        payload = AdminClosureCrmService.list_leads(actor, arguments)
+        # Retain the established pagination aliases while the dedicated UI-4 client
+        # consumes the explicit nested contract.
+        payload.update({
+            'total': payload['pagination']['total'],
+            'pages': payload['pagination']['pages'],
+            'current_page': payload['pagination']['page'],
+            'per_page': payload['pagination']['per_page'],
+        })
+        return jsonify(payload), 200
+    except AdminClosureCrmArgumentError:
+        return _error('Invalid CRM query', 400, 'INVALID_CRM_QUERY')
+    except PermissionError:
+        return _error('Access denied', 403)
+    except Exception:
+        logger.exception('CRM lead listing failed')
+        return _internal_error()
 
 
 @crm_bp.route('/leads', methods=['POST'])
 @token_required
 def create_lead(current_user):
-    """Create new lead"""
+    """Create a scoped lead after validating the full allow-list before DML."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    data = _json_object()
+    if data is None:
+        return _error('JSON object required', 400)
+    allowed = {
+        'first_name', 'last_name', 'email', 'phone', 'country_code', 'source', 'status',
+        'assigned_to', 'interested_program_id', 'budget', 'company', 'job_title', 'notes', 'tags',
+    }
+    if set(data) - allowed:
+        return _error('Unsupported lead fields', 400)
+
+    first_name = _clean_string(data.get('first_name'), maximum=100, required=True)
+    last_name = _clean_string(data.get('last_name'), maximum=100, required=True)
+    email = _valid_email(data.get('email'))
+    if not first_name or not last_name or not email:
+        return _error('Valid first_name, last_name, and email are required', 400)
+    phone = data.get('phone')
+    if phone is not None:
+        phone = _clean_string(phone, maximum=20)
+        if phone is None:
+            return _error('Invalid phone', 400)
+    country_code = data.get('country_code')
+    if country_code is not None:
+        country_code = _clean_string(country_code, maximum=2, required=True)
+        if country_code is None or not country_code.isalpha():
+            return _error('Invalid country_code', 400)
+        country_code = country_code.upper()
+    source = _clean_string(data.get('source', 'manual'), maximum=50, required=True)
+    status = data.get('status', 'new')
+    if not source or not isinstance(status, str) or status not in _ALLOWED_STATUSES:
+        return _error('Invalid source or status', 400)
+    budget = _budget(data.get('budget'))
+    if budget is False:
+        return _error('Invalid budget', 400)
+    values = {}
+    for field, maximum in (('company', 200), ('job_title', 100), ('notes', 10_000), ('tags', 500)):
+        value = data.get(field)
+        if value is not None and (not isinstance(value, str) or len(value) > maximum):
+            return _error(f'Invalid {field}', 400)
+        values[field] = value
+
+    target, target_error = _target_user(actor, data.get('assigned_to', actor.id))
+    if target_error:
+        return target_error
+    program, program_error = _target_program(actor, data.get('interested_program_id'))
+    if program_error:
+        return program_error
     try:
-        logger.info('=== CREATE LEAD START ===')
-        current_user = g.current_user
-        logger.info(f'Current user: {current_user.id} - {current_user.email}')
-        
-        if not PermissionManager.can_manage_leads(current_user):
-            logger.warning('Access denied')
-            return jsonify({'error': 'Access denied'}), 403
-        
-        data = request.get_json()
-        logger.info(f'Request data: {data}')
-        
-        # Validate required fields
-        required = ['first_name', 'last_name', 'email']
-        for field in required:
-            if field not in data:
-                logger.warning(f'Missing required field: {field}')
-                return jsonify({'error': f'{field} is required'}), 400
-        
-        # Check if lead exists
-        existing = Lead.query.filter_by(email=data['email']).first()
+        with db.session.no_autoflush:
+            existing = crm_scope.scoped_leads(actor).filter(func.lower(Lead.email) == email).first()
         if existing:
-            logger.warning(f'Lead already exists: {data["email"]}')
-            return jsonify({'error': 'Lead with this email already exists'}), 400
-        
-        # Process budget
-        budget = None
-        if data.get('budget'):
-            try:
-                budget = float(data.get('budget'))
-            except (ValueError, TypeError):
-                logger.warning(f'Invalid budget value: {data.get("budget")}')
-                budget = None
-        
-        # Create lead
-        logger.info('Creating Lead object...')
+            return _error('Lead with this email already exists', 400)
         lead = Lead(
-            first_name=data['first_name'],
-            last_name=data['last_name'],
-            email=data['email'],
-            phone=data.get('phone'),
-            country_code=data.get('country_code'),
-            source=data.get('source', 'manual'),
-            status=data.get('status', 'new'),
-            assigned_to=data.get('assigned_to', current_user.id),
-            assigned_at=datetime.utcnow(),
-            interested_program_id=data.get('interested_program_id'),
-            budget=budget,
-            company=data.get('company'),
-            job_title=data.get('job_title'),
-            notes=data.get('notes'),
-            tags=data.get('tags', '')
+            first_name=first_name, last_name=last_name, email=email, phone=phone,
+            country_code=country_code, source=source, status=status, assigned_to=target.id,
+            assigned_at=datetime.utcnow(), interested_program_id=program.id if program else None,
+            budget=budget, **values,
         )
-        
-        logger.info('Adding lead to session...')
         db.session.add(lead)
-        logger.info('Flushing session...')
         db.session.flush()
-        logger.info(f'Lead flushed with ID: {lead.id}')
-        
-        # Calculate score
-        logger.info('Calculating score...')
         lead.calculate_score()
-        logger.info(f'Score calculated: {lead.score}')
-        
-        # Create activity
-        logger.info('Creating activity...')
-        activity = LeadActivity(
-            lead_id=lead.id,
-            user_id=current_user.id,
-            activity_type='note',
-            subject='Lead created',
-            description=f'Lead created by {current_user.first_name} {current_user.last_name}'
-        )
-        db.session.add(activity)
-        logger.info('Committing transaction...')
+        db.session.add(LeadActivity(
+            lead_id=lead.id, user_id=actor.id, activity_type='lead_created',
+            subject='Lead created', description='Lead created',
+        ))
         db.session.commit()
-        logger.info('=== CREATE LEAD SUCCESS ===')
-        
-        return jsonify({
-            'message': 'Lead created successfully',
-            'lead': lead.to_dict()
-        }), 201
-        
-    except Exception as e:
-        logger.error(f'=== CREATE LEAD ERROR: {str(e)} ===')
-        logger.exception(e)
+        return _lead_response(actor, lead, 'Lead created successfully', 201)
+    except Exception:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-# Add these endpoints to crm.py
+        logger.exception('CRM lead creation failed')
+        return _internal_error()
+
 
 @crm_bp.route('/leads/<int:lead_id>', methods=['GET'])
 @token_required
 def get_lead_details(current_user, lead_id):
-    """Get lead details by ID"""
+    """Read one scoped lead; the response includes a server owner context."""
+    actor = _crm_actor(current_user)
+    if actor is None:
+        return _error('Access denied', 403)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        # Permission already checked via can_access_crm
-        
-        lead_data = lead.to_dict()
-        
-        # Add assigned user info
-        if lead.assigned_to:
-            assigned_user = User.query.get(lead.assigned_to)
-            if assigned_user:
-                lead_data['assigned_user'] = {
-                    'id': assigned_user.id,
-                    'name': f"{assigned_user.first_name} {assigned_user.last_name}",
-                    'email': assigned_user.email
-                }
-        
-        # Add activity count
-        lead_data['activity_count'] = LeadActivity.query.filter_by(lead_id=lead_id).count()
-        lead_data['notes_count'] = LeadNote.query.filter_by(lead_id=lead_id).count()
-        
-        return jsonify(lead_data), 200
-        
-    except Exception as e:
-        logger.error(f'Error getting lead details: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        payload = AdminClosureCrmService.lead_detail(actor, lead_id)
+        if payload is None:
+            return _error('Lead not found', 404)
+        return jsonify(payload), 200
+    except PermissionError:
+        return _error('Access denied', 403)
+    except Exception:
+        logger.exception('CRM lead detail lookup failed')
+        return _internal_error()
 
 
 @crm_bp.route('/leads/<int:lead_id>/notes', methods=['GET'])
 @token_required
 def get_lead_notes(current_user, lead_id):
-    """Get all notes for a lead"""
+    """List bounded notes only after the parent lead has passed scope checks."""
+    actor = _crm_actor(current_user)
+    if actor is None:
+        return _error('Access denied', 403)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        # Permission already checked via can_access_crm
-        
-        notes = LeadNote.query.filter_by(lead_id=lead_id).order_by(LeadNote.created_at.desc()).all()
-        
-        notes_data = []
-        for note in notes:
-            note_data = {
-                'id': note.id,
-                'content': note.content,
-                'created_at': note.created_at.isoformat() if note.created_at else None,
-                'created_by': None
-            }
-            
-            # Add creator info
-            if note.created_by:
-                creator = User.query.get(note.created_by)
-                if creator:
-                    note_data['created_by'] = f"{creator.first_name} {creator.last_name}"
-            
-            notes_data.append(note_data)
-        
-        return jsonify({'notes': notes_data}), 200
-        
-    except Exception as e:
-        logger.error(f'Error getting lead notes: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        arguments = AdminClosureCrmService.parse_child_arguments(request.args)
+        payload = AdminClosureCrmService.list_notes(actor, lead_id, arguments)
+        if payload is None:
+            return _error('Lead not found', 404)
+        return jsonify(payload), 200
+    except AdminClosureCrmArgumentError:
+        return _error('Invalid CRM query', 400, 'INVALID_CRM_QUERY')
+    except PermissionError:
+        return _error('Access denied', 403)
+    except Exception:
+        logger.exception('CRM lead notes lookup failed')
+        return _internal_error()
 
 
 @crm_bp.route('/leads/<int:lead_id>/notes', methods=['POST'])
 @token_required
 def add_lead_note(current_user, lead_id):
-    """Add a note to a lead"""
+    """Persist an explicitly supplied note and return that persisted row."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    data = _json_object()
+    if data is None:
+        return _error('JSON object required', 400)
+    if set(data) != {'content'}:
+        return _error('Unsupported note fields', 400)
+    content = _clean_string(data.get('content'), maximum=10_000, required=True)
+    if not content:
+        return _error('Note content is required', 400)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        # Permission already checked via can_access_crm
-        
-        data = request.get_json()
-        content = data.get('content', '').strip()
-        
-        if not content:
-            return jsonify({'error': 'Note content is required'}), 400
-        
-        # Create note
-        note = LeadNote(
-            lead_id=lead_id,
-            content=content,
-            user_id=current_user.id,
-            created_at=datetime.utcnow()
-        )
-        
+        lead, lead_error = _get_visible_lead(actor, lead_id)
+        if lead_error:
+            return lead_error
+        note = LeadNote(lead_id=lead.id, content=content, user_id=actor.id)
         db.session.add(note)
-        
-        # Create activity
-        activity = LeadActivity(
-            lead_id=lead_id,
-            activity_type='note_added',
-            description=f'Note added: {content[:50]}...' if len(content) > 50 else f'Note added: {content}',
-            user_id=current_user.id,
-            created_at=datetime.utcnow()
-        )
-        
-        db.session.add(activity)
+        db.session.add(LeadActivity(
+            lead_id=lead.id, activity_type='note_added', description='Note added', user_id=actor.id,
+        ))
         db.session.commit()
-        
-        return jsonify({
-            'message': 'Note added successfully',
-            'note': {
-                'id': note.id,
-                'content': note.content,
-                'created_at': note.created_at.isoformat(),
-                'created_by': f"{current_user.first_name} {current_user.last_name}"
-            }
-        }), 201
-        
-    except Exception as e:
+        return _note_response(actor, note, 'Note added successfully')
+    except Exception:
         db.session.rollback()
-        logger.error(f'Error adding lead note: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        logger.exception('CRM lead note creation failed')
+        return _internal_error()
 
 
-@crm_bp.route('/leads/<int:lead_id>', methods=['PATCH', 'PUT'])
+@crm_bp.route('/leads/<int:lead_id>/activities', methods=['GET'])
 @token_required
-def update_lead(current_user, lead_id):
-    """Update lead details"""
+def get_lead_activities(current_user, lead_id):
+    """Read persisted activity history; it does not invent provider/email events."""
+    actor = _crm_actor(current_user)
+    if actor is None:
+        return _error('Access denied', 403)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        # Permission already checked via can_access_crm
-        
-        data = request.get_json()
-        
-        # Track changes for activity log
-        changes = []
-        
-        # Update allowed fields
-        allowed_fields = ['status', 'score', 'budget', 'assigned_to', 'next_followup', 'notes']
-        
-        for field in allowed_fields:
-            if field in data:
-                old_value = getattr(lead, field)
-                new_value = data[field]
-                
-                if old_value != new_value:
-                    setattr(lead, field, new_value)
-                    changes.append(f'{field}: {old_value} → {new_value}')
-        
-        if changes:
-            lead.updated_at = datetime.utcnow()
-            
-            # Create activity
-            activity = LeadActivity(
-                lead_id=lead_id,
-                activity_type='lead_updated',
-                description=f'Lead updated: {", ".join(changes)}',
-                user_id=current_user.id,
-                created_at=datetime.utcnow()
-            )
-            
-            db.session.add(activity)
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Lead updated successfully',
-            'lead': lead.to_dict()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f'Error updating lead: {str(e)}')
-        return jsonify({'error': str(e)}), 500
-
-
-@crm_bp.route('/leads/<int:lead_id>', methods=['DELETE'])
-@token_required
-def delete_lead(current_user, lead_id):
-    """Delete a lead"""
-    try:
-        current_user = g.current_user
-        
-        # Check permission - only admins can delete
-        if current_user.role not in ['admin', 'supermaster']:
-            return jsonify({'error': 'Admin access required'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        # Delete related records
-        LeadNote.query.filter_by(lead_id=lead_id).delete()
-        LeadActivity.query.filter_by(lead_id=lead_id).delete()
-        
-        # Delete lead
-        db.session.delete(lead)
-        db.session.commit()
-        
-        return jsonify({'message': 'Lead deleted successfully'}), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f'Error deleting lead: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        arguments = AdminClosureCrmService.parse_child_arguments(request.args)
+        payload = AdminClosureCrmService.list_activities(actor, lead_id, arguments)
+        if payload is None:
+            return _error('Lead not found', 404)
+        return jsonify(payload), 200
+    except AdminClosureCrmArgumentError:
+        return _error('Invalid CRM query', 400, 'INVALID_CRM_QUERY')
+    except PermissionError:
+        return _error('Access denied', 403)
+    except Exception:
+        logger.exception('CRM lead activity lookup failed')
+        return _internal_error()
 
 
 @crm_bp.route('/leads/<int:lead_id>/activities', methods=['POST'])
 @token_required
 def add_lead_activity(current_user, lead_id):
-    """Add activity to a lead"""
+    """Persist a bounded internal CRM activity; scheduled_at is not a reminder service."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    data = _json_object()
+    if data is None:
+        return _error('JSON object required', 400)
+    # ``metadata`` is an accepted legacy no-op.  The mapped LeadActivity model
+    # has no metadata column, so it is deliberately never persisted.
+    allowed = {'activity_type', 'subject', 'description', 'outcome', 'scheduled_at', 'metadata'}
+    if set(data) - allowed:
+        return _error('Unsupported activity fields', 400)
+    activity_type = _clean_string(data.get('activity_type'), maximum=50, required=True)
+    if activity_type not in _ACTIVITY_TYPES:
+        return _error('Unsupported activity_type', 400)
+    subject = data.get('subject')
+    description = data.get('description', '')
+    outcome = data.get('outcome')
+    if subject is not None and _clean_string(subject, maximum=200) is None:
+        return _error('Invalid subject', 400)
+    if _clean_string(description, maximum=10_000) is None:
+        return _error('Invalid description', 400)
+    if outcome is not None and _clean_string(outcome, maximum=50) is None:
+        return _error('Invalid outcome', 400)
+    scheduled_at = None
+    if 'scheduled_at' in data:
+        scheduled_at = _datetime_value(data['scheduled_at'])
+        if scheduled_at is None:
+            return _error('Invalid scheduled_at', 400)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        data = request.get_json()
-        
-        # Validate required fields
-        if not data or 'activity_type' not in data:
-            return jsonify({'error': 'activity_type is required'}), 400
-        
-        # Create activity
+        lead, lead_error = _get_visible_lead(actor, lead_id)
+        if lead_error:
+            return lead_error
         activity = LeadActivity(
-            lead_id=lead_id,
-            user_id=current_user.id,
-            activity_type=data.get('activity_type'),
-            description=data.get('description', ''),
-            metadata=data.get('metadata', {})
+            lead_id=lead.id, user_id=actor.id, activity_type=activity_type, subject=subject,
+            description=description, outcome=outcome, scheduled_at=scheduled_at,
         )
-        
         db.session.add(activity)
         db.session.commit()
-        
-        return jsonify({
-            'message': 'Activity added successfully',
-            'activity': activity.to_dict()
-        }), 201
-        
-    except Exception as e:
+        return _activity_response(actor, activity, 'Activity added successfully')
+    except Exception:
         db.session.rollback()
-        logger.error(f'Error adding activity: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        logger.exception('CRM lead activity creation failed')
+        return _internal_error()
+
+
+@crm_bp.route('/leads/<int:lead_id>', methods=['PATCH', 'PUT'])
+@token_required
+def update_lead(current_user, lead_id):
+    """Apply an allow-listed update only when its supplied version remains current."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    data = _json_object()
+    if data is None:
+        return _error('JSON object required', 400)
+    allowed = {
+        'assigned_to', 'interested_program_id', 'status', 'score', 'budget', 'notes',
+        'next_follow_up', 'next_followup', 'expected_updated_at',
+    }
+    if not data or set(data) - allowed:
+        return _error('Unsupported lead fields', 400)
+    if 'next_follow_up' in data and 'next_followup' in data:
+        return _error('Provide one follow-up field', 400)
+    try:
+        lead, lead_error = _get_visible_lead(actor, lead_id)
+        if lead_error:
+            return lead_error
+        version_match = _request_matches_version(lead, data)
+        if version_match is None:
+            return _error('Invalid expected_updated_at', 400)
+        if not version_match:
+            return _error('Lead changed; reload before saving', 409, 'CRM_LEAD_STALE')
+
+        updates = {}
+        assignment_target = None
+        if 'assigned_to' in data:
+            assignment_target, target_error = _target_user(actor, data['assigned_to'])
+            if target_error:
+                return target_error
+            updates['assigned_to'] = assignment_target.id
+        if 'interested_program_id' in data:
+            program, program_error = _target_program(actor, data['interested_program_id'])
+            if program_error:
+                return program_error
+            updates['interested_program_id'] = program.id if program else None
+        if 'status' in data:
+            if not isinstance(data['status'], str) or data['status'] not in _ALLOWED_STATUSES:
+                return _error('Invalid status', 400)
+            updates['status'] = data['status']
+        if 'score' in data:
+            score = data['score']
+            if isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 100:
+                return _error('Invalid score', 400)
+            updates['score'] = score
+        if 'budget' in data:
+            budget = _budget(data['budget'])
+            if budget is False:
+                return _error('Invalid budget', 400)
+            updates['budget'] = budget
+        if 'notes' in data:
+            if data['notes'] is not None and _clean_string(data['notes'], maximum=10_000) is None:
+                return _error('Invalid notes', 400)
+            updates['notes'] = data['notes']
+        if 'next_follow_up' in data or 'next_followup' in data:
+            raw_follow_up = data.get('next_follow_up', data.get('next_followup'))
+            if raw_follow_up is None:
+                updates['next_follow_up'] = None
+            else:
+                follow_up = _datetime_value(raw_follow_up)
+                if follow_up is None:
+                    return _error('Invalid next_follow_up', 400)
+                updates['next_follow_up'] = follow_up
+
+        changed = []
+        for field, value in updates.items():
+            if getattr(lead, field) != value:
+                setattr(lead, field, value)
+                changed.append(field)
+        if assignment_target is not None and 'assigned_to' in changed:
+            lead.assigned_at = datetime.utcnow()
+        if changed:
+            lead.updated_at = datetime.utcnow()
+            _record_update_activity(lead, actor, changed)
+        db.session.commit()
+        return _lead_response(actor, lead, 'Lead updated successfully')
+    except Exception:
+        db.session.rollback()
+        logger.exception('CRM lead update failed')
+        return _internal_error()
+
+
+@crm_bp.route('/leads/<int:lead_id>', methods=['DELETE'])
+@token_required
+def delete_lead(current_user, lead_id):
+    """Retain the existing server-authoritative supermaster/admin delete policy."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    if actor.role not in ['admin', 'supermaster']:
+        return _error('Admin access required', 403)
+    try:
+        lead, lead_error = _get_visible_lead(actor, lead_id)
+        if lead_error:
+            return lead_error
+        LeadNote.query.filter(LeadNote.lead_id == lead.id).delete(synchronize_session=False)
+        LeadActivity.query.filter(LeadActivity.lead_id == lead.id).delete(synchronize_session=False)
+        db.session.delete(lead)
+        db.session.commit()
+        return jsonify({
+            'message': 'Lead deleted successfully',
+            'lead_id': lead_id,
+            'owner_context': AdminClosureCrmService.owner_context(actor),
+        }), 200
+    except Exception:
+        db.session.rollback()
+        logger.exception('CRM lead deletion failed')
+        return _internal_error()
 
 
 @crm_bp.route('/leads/<int:lead_id>/convert', methods=['POST'])
 @token_required
 def convert_lead(current_user, lead_id):
-    """Convert lead to customer"""
+    """Mark a scoped record converted; this endpoint never creates a user account."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    data = _json_object()
+    if data not in (None, {}):
+        return _error('No conversion payload is supported', 400)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        # Update lead status to converted
-        lead.status = 'converted'
-        lead.converted_at = datetime.utcnow()
-        lead.converted_by = current_user.id
-        
-        # Add activity
-        activity = LeadActivity(
-            lead_id=lead_id,
-            user_id=current_user.id,
-            activity_type='converted',
-            description='Lead converted to customer'
-        )
-        
-        db.session.add(activity)
+        lead, lead_error = _get_visible_lead(actor, lead_id)
+        if lead_error:
+            return lead_error
+        if lead.status != 'converted':
+            lead.status = 'converted'
+            lead.converted_at = datetime.utcnow()
+            lead.updated_at = datetime.utcnow()
+            db.session.add(LeadActivity(
+                lead_id=lead.id, user_id=actor.id, activity_type='status_change',
+                description='Lead status set to converted',
+            ))
         db.session.commit()
-        
-        return jsonify({
-            'message': 'Lead converted successfully',
-            'lead': lead.to_dict()
-        }), 200
-        
-    except Exception as e:
+        return _lead_response(actor, lead, 'Lead marked converted')
+    except Exception:
         db.session.rollback()
-        logger.error(f'Error converting lead: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        logger.exception('CRM lead conversion failed')
+        return _internal_error()
 
 
 @crm_bp.route('/leads/<int:lead_id>/lost', methods=['POST'])
 @token_required
 def mark_lead_lost(current_user, lead_id):
-    """Mark lead as lost"""
+    """Keep the existing explicit lost transition while avoiding untrusted log text."""
+    actor = _crm_actor(current_user, manage=True)
+    if actor is None:
+        return _error('Access denied', 403)
+    data = _json_object()
+    if data is None:
+        data = {}
+    if set(data) - {'reason'}:
+        return _error('Unsupported lost fields', 400)
+    reason = data.get('reason', '')
+    if not isinstance(reason, str) or len(reason) > 50 or any(ord(character) < 32 for character in reason):
+        return _error('Invalid reason', 400)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        lead = Lead.query.get(lead_id)
-        
-        if not lead:
-            return jsonify({'error': 'Lead not found'}), 404
-        
-        data = request.get_json() or {}
-        
-        # Update lead status to lost
+        lead, lead_error = _get_visible_lead(actor, lead_id)
+        if lead_error:
+            return lead_error
         lead.status = 'lost'
-        lead.lost_reason = data.get('reason', '')
+        lead.lost_reason = reason
         lead.lost_at = datetime.utcnow()
-        
-        # Add activity
-        activity = LeadActivity(
-            lead_id=lead_id,
-            user_id=current_user.id,
-            activity_type='lost',
-            description=f"Lead marked as lost: {data.get('reason', 'No reason provided')}"
-        )
-        
-        db.session.add(activity)
+        lead.updated_at = datetime.utcnow()
+        db.session.add(LeadActivity(
+            lead_id=lead.id, user_id=actor.id, activity_type='status_change',
+            description='Lead status set to lost',
+        ))
         db.session.commit()
-        
-        return jsonify({
-            'message': 'Lead marked as lost',
-            'lead': lead.to_dict()
-        }), 200
-        
-    except Exception as e:
+        return _lead_response(actor, lead, 'Lead marked lost')
+    except Exception:
         db.session.rollback()
-        logger.error(f'Error marking lead as lost: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        logger.exception('CRM lead lost update failed')
+        return _internal_error()
 
 
 @crm_bp.route('/stats', methods=['GET'])
 @token_required
 def get_crm_stats(current_user):
-    """Get CRM statistics"""
+    """Return only scoped status counts; unavailable data is never represented as zero."""
+    actor = _crm_actor(current_user)
+    if actor is None:
+        return _error('Access denied', 403)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        # Build base query with permission filter
-        base_query = Lead.query
-        base_query = PermissionManager.filter_leads_by_permission(current_user, base_query)
-        
-        # Get counts by status
-        total_leads = base_query.count()
-        new_leads = base_query.filter_by(status='new').count()
-        contacted_leads = base_query.filter_by(status='contacted').count()
-        qualified_leads = base_query.filter_by(status='qualified').count()
-        converted_leads = base_query.filter_by(status='converted').count()
-        lost_leads = base_query.filter_by(status='lost').count()
-        
-        # Get conversion rate
-        conversion_rate = (converted_leads / total_leads * 100) if total_leads > 0 else 0
-        
-        # Get leads created in last 30 days
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        recent_leads = base_query.filter(Lead.created_at >= thirty_days_ago).count()
-        
-        # Get average score
-        avg_score = db.session.query(func.avg(Lead.score)).filter(
-            Lead.id.in_([l.id for l in base_query.all()])
-        ).scalar() or 0
-        
-        return jsonify({
-            'total_leads': total_leads,
-            'new_leads': new_leads,
-            'contacted_leads': contacted_leads,
-            'qualified_leads': qualified_leads,
-            'converted_leads': converted_leads,
-            'lost_leads': lost_leads,
-            'conversion_rate': round(conversion_rate, 2),
-            'recent_leads_30d': recent_leads,
-            'average_score': round(float(avg_score), 2)
-        }), 200
-        
-    except Exception as e:
-        logger.error(f'Error getting CRM stats: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+        return jsonify(AdminClosureCrmService.stats(actor)), 200
+    except PermissionError:
+        return _error('Access denied', 403)
+    except Exception:
+        logger.exception('CRM statistics lookup failed')
+        return _internal_error()
 
 
 @crm_bp.route('/pipeline', methods=['GET'])
 @token_required
 def get_crm_pipeline(current_user):
-    """Get CRM pipeline view"""
+    """Compatibility projection: a bounded first page, not an unbounded pipeline dump."""
+    actor = _crm_actor(current_user)
+    if actor is None:
+        return _error('Access denied', 403)
     try:
-        current_user = g.current_user
-        
-        # Check permission
-        if not PermissionManager.can_access_crm(current_user):
-            return jsonify({'error': 'Access denied'}), 403
-        
-        # Build base query with permission filter
-        base_query = Lead.query
-        base_query = PermissionManager.filter_leads_by_permission(current_user, base_query)
-        
-        # Group leads by status
-        pipeline = {
-            'new': [],
-            'contacted': [],
-            'qualified': [],
-            'proposal': [],
-            'negotiation': [],
-            'converted': [],
-            'lost': []
-        }
-        
-        # Get all leads
-        leads = base_query.order_by(Lead.score.desc()).all()
-        
-        for lead in leads:
-            status = lead.status or 'new'
-            if status in pipeline:
-                lead_data = lead.to_dict()
-                
-                # Add assigned user info
-                if lead.assigned_to:
-                    assigned_user = User.query.get(lead.assigned_to)
-                    if assigned_user:
-                        lead_data['assigned_user'] = {
-                            'id': assigned_user.id,
-                            'name': f"{assigned_user.first_name} {assigned_user.last_name}"
-                        }
-                
-                pipeline[status].append(lead_data)
-        
-        # Get counts
-        counts = {status: len(leads) for status, leads in pipeline.items()}
-        
+        arguments = AdminClosureCrmService.parse_list_arguments(request.args)
+        if arguments.page != 1:
+            return _error('Pipeline supports only the first bounded page', 400, 'INVALID_CRM_QUERY')
+        arguments = arguments.__class__(1, 100, arguments.status, arguments.source, arguments.search)
+        result = AdminClosureCrmService.list_leads(actor, arguments)
+        pipeline = {status: [] for status in sorted(_ALLOWED_STATUSES)}
+        for lead in result['leads']:
+            pipeline[lead['status']].append(lead)
         return jsonify({
+            'owner_context': result['owner_context'],
             'pipeline': pipeline,
-            'counts': counts
+            'counts': {status: len(rows) for status, rows in pipeline.items()},
+            'pagination': result['pagination'],
+            'filters': result['filters'],
+            'truncated': result['pagination']['total'] > len(result['leads']),
         }), 200
-        
-    except Exception as e:
-        logger.error(f'Error getting pipeline: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+    except AdminClosureCrmArgumentError:
+        return _error('Invalid CRM query', 400, 'INVALID_CRM_QUERY')
+    except PermissionError:
+        return _error('Access denied', 403)
+    except Exception:
+        logger.exception('CRM pipeline lookup failed')
+        return _internal_error()

@@ -13,82 +13,69 @@ class AuthService:
     
     @staticmethod
     def register_user(email, password, first_name, last_name, referral_code=None, **kwargs):
-        """Register a new user"""
+        """Atomically register within the configured owner's existing brand."""
         from src.models import Agent, Referral
-        from flask import request
-        
-        # Check if user already exists
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_user:
-            raise ValueError('Email already registered')
-        
-        # Create new user
-        user = User(
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            **kwargs
-        )
-        user.set_password(password)
-        
-        db.session.add(user)
-        db.session.flush()  # Get user.id before update_tree_path()
-        
-        # Assign to root user (for MLM hierarchy)
-        root_user = User.query.filter_by(
-            parent_id=None,
-            role='supermaster',
-            can_create_same_role=True
-        ).first()
-        if root_user:
-            user.parent_id = root_user.id
+        from flask import has_request_context, request
+        from src.utils.hierarchy_scoping import configured_platform_root_id, platform_root_scope, tenant_hierarchy_scope
+
+        notify_upline = None
+        try:
+            root_id = configured_platform_root_id()
+            root_user = User.query.filter(User.id == root_id).first() if root_id else None
+            if root_user is None or not platform_root_scope(root_user) or not tenant_hierarchy_scope(root_user):
+                raise ValueError('Registration is unavailable until platform ownership is configured')
+            if 'tenant_id' in kwargs and kwargs['tenant_id'] != root_user.tenant_id:
+                raise ValueError('Invalid registration ownership')
+            kwargs.setdefault('role', 'trader')
+            if kwargs.get('role', 'guest') not in {'guest', 'trader'}:
+                raise ValueError('Invalid registration role')
+            if User.query.filter_by(email=email).first():
+                raise ValueError('Email already registered')
+            kwargs['tenant_id'] = root_user.tenant_id
+            parent = root_user
+            agent = None
+            if referral_code:
+                agent = Agent.query.filter_by(agent_code=referral_code, is_active=True).with_for_update().first()
+                if agent is not None:
+                    parent = User.query.filter(User.id == agent.user_id, User.tenant_id == root_user.tenant_id).first()
+                    if parent is None or not parent.is_active or not tenant_hierarchy_scope(parent):
+                        raise ValueError('Invalid registration ownership')
+                    if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False) and parent.role not in {'affiliate', 'agent'}:
+                        raise ValueError('Referral owner is unavailable in launch mode')
+            user = User(email=email, first_name=first_name, last_name=last_name, **kwargs)
+            user.set_password(password)
+            user.parent_id = parent.id
+            db.session.add(user)
+            db.session.flush()
             user.update_tree_path()
-        db.session.commit()
-        
-        # Handle referral code if provided
-        if referral_code:
-            agent = Agent.query.filter_by(agent_code=referral_code, is_active=True).first()
-            if agent:
-                # Create referral record
-                referral = Referral(
-                    agent_id=agent.id,
-                    referred_user_id=user.id,
-                    referral_code=referral_code,
-                    ip_address=request.remote_addr if request else None,
-                    user_agent=request.headers.get('User-Agent') if request else None,
+            if agent is not None:
+                db.session.add(Referral(
+                    agent_id=agent.id, referred_user_id=user.id, referral_code=referral_code,
+                    ip_address=request.remote_addr if has_request_context() else None,
+                    user_agent=request.headers.get('User-Agent') if has_request_context() else None,
                     status='pending'
-                )
-                db.session.add(referral)
-                
-                # Set parent relationship
-                user.parent_id = agent.user_id
-                user.update_tree_path()
-                
-                # Update agent stats
+                ))
                 agent.referral_count += 1
-                db.session.commit()
-                
-                # Send email notification to upline (agent owner)
-                try:
-                    from src.services.email_service import EmailService
-                    upline_user = agent.user
-                    EmailService.send_new_downline_email(upline_user, user)
-                except Exception as e:
-                    # Log error but don't fail registration
-                    import logging
-                    logging.error(f'Failed to send downline notification email: {str(e)}')
-        
-        # Generate email verification token
-        verification_token = EmailVerificationToken(user.id)
-        db.session.add(verification_token)
-        db.session.commit()
-        
+                notify_upline = parent
+            verification_token = EmailVerificationToken(user.id)
+            db.session.add(verification_token)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        # External notification occurs only after successful commit.
+        if notify_upline is not None:
+            try:
+                from src.services.email_service import EmailService
+                EmailService.send_new_downline_email(notify_upline, user)
+            except Exception:
+                current_app.logger.warning('Downline notification unavailable after registration')
         return user, verification_token
-    
+
     @staticmethod
     def login_user(email, password, ip_address=None):
         """Login user with email and password"""
-        user = User.query.filter_by(email=email).first()
+        user = User.query.filter_by(email=email).with_for_update().populate_existing().first()
         
         if not user or not user.check_password(password):
             raise ValueError('Invalid email or password')
@@ -98,12 +85,14 @@ class AuthService:
         
         if not user.is_verified:
             raise ValueError("Please verify your email address before logging in")
+        from src.services.session_service import SessionService
+        user = SessionService.principal({'user_id': user.id, 'token_version': user.token_version or 0})
         
         # Update last login
         user.last_login_at = datetime.utcnow()
         if ip_address:
             user.last_login_ip = ip_address
-        db.session.commit()
+        # Caller signs tokens/challenge then commits while the User lock is held.
         
         return user
     
@@ -121,6 +110,7 @@ class AuthService:
     @staticmethod
     def enable_2fa(user):
         """Enable 2FA for user"""
+        user = User.query.filter_by(id=user.id).with_for_update().populate_existing().one()
         if user.two_factor_enabled:
             raise ValueError('2FA is already enabled')
         
@@ -133,6 +123,7 @@ class AuthService:
     @staticmethod
     def confirm_2fa(user, token):
         """Confirm and activate 2FA"""
+        user = User.query.filter_by(id=user.id).with_for_update().populate_existing().one()
         if user.two_factor_enabled:
             raise ValueError('2FA is already enabled')
         
@@ -143,6 +134,7 @@ class AuthService:
             raise ValueError('Invalid 2FA token')
         
         user.two_factor_enabled = True
+        user.token_version = (user.token_version or 0) + 1
         db.session.commit()
         
         return True
@@ -150,246 +142,65 @@ class AuthService:
     @staticmethod
     def disable_2fa(user, password):
         """Disable 2FA for user"""
+        user = User.query.filter_by(id=user.id).with_for_update().populate_existing().one()
         if not user.check_password(password):
             raise ValueError('Invalid password')
         
         user.two_factor_enabled = False
         user.two_factor_secret = None
+        user.token_version = (user.token_version or 0) + 1
         db.session.commit()
         
         return True
     
     @staticmethod
     def verify_email(token_string):
-        """Verify email with token (URL-based)"""
-        token = EmailVerificationToken.query.filter_by(token=token_string).first()
-        
-        if not token or not token.is_valid():
-            raise ValueError('Invalid or expired token')
-        
-        user = token.user
-        user.is_verified = True
-        user.email_verified_at = datetime.utcnow()
-        token.mark_as_used()
-        
-        db.session.commit()
-        
-        return user
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.verify_email(token_string)
+
     @staticmethod
     def verify_email_with_code(email, code):
-        """Verify email with 6-digit code"""
-        user = User.query.filter_by(email=email).first()
-        
-        if not user:
-            raise ValueError('User not found')
-        
-        # Find valid verification token with matching code
-        token = EmailVerificationToken.query.filter_by(
-            user_id=user.id,
-            code=code,
-            used=False
-        ).order_by(EmailVerificationToken.created_at.desc()).first()
-        
-        if not token or not token.is_valid():
-            raise ValueError('Invalid or expired verification code')
-        
-        user.is_verified = True
-        user.email_verified_at = datetime.utcnow()
-        token.mark_as_used()
-        
-        db.session.commit()
-        
-        return user
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.verify_email_with_code(email, code)
+
     @staticmethod
     def resend_verification_code(email):
-        """Resend verification code to email"""
-        user = User.query.filter_by(email=email).first()
-        
-        if not user:
-            # Don't reveal if email exists
-            return None
-        
-        if user.is_verified:
-            raise ValueError('Email is already verified')
-        
-        # Check if there's a recent unused token (within last 2 minutes)
-        recent_token = EmailVerificationToken.query.filter_by(
-            user_id=user.id,
-            used=False
-        ).filter(
-            EmailVerificationToken.created_at > datetime.utcnow() - timedelta(minutes=2)
-        ).first()
-        
-        if recent_token:
-            # Return existing token instead of creating new one
-            return recent_token
-        
-        # Create new verification token
-        verification_token = EmailVerificationToken(user.id)
-        db.session.add(verification_token)
-        db.session.commit()
-        
-        return verification_token
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.resend_verification_code(email)
+
     @staticmethod
     def request_password_reset(email):
-        """Request password reset"""
-        user = User.query.filter_by(email=email).first()
-        
-        if not user:
-            # Don't reveal if email exists
-            return None
-        
-        # Create reset token
-        reset_token = PasswordResetToken(user.id)
-        db.session.add(reset_token)
-        db.session.commit()
-        
-        return reset_token
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.request_password_reset(email)
+
     @staticmethod
     def reset_password(token_string, new_password):
-        """Reset password with token (URL-based)"""
-        token = PasswordResetToken.query.filter_by(token=token_string).first()
-        
-        if not token or not token.is_valid():
-            raise ValueError('Invalid or expired token')
-        
-        user = token.user
-        user.set_password(new_password)
-        token.mark_as_used()
-        
-        db.session.commit()
-        
-        return user
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.reset_password(token_string, new_password)
+
     @staticmethod
     def verify_reset_code(email, code):
-        """Verify password reset code"""
-        user = User.query.filter_by(email=email).first()
-        
-        if not user:
-            raise ValueError('User not found')
-        
-        # Find valid reset token with matching code
-        token = PasswordResetToken.query.filter_by(
-            user_id=user.id,
-            code=code,
-            used=False
-        ).order_by(PasswordResetToken.created_at.desc()).first()
-        
-        if not token or not token.is_valid():
-            raise ValueError('Invalid or expired reset code')
-        
-        return token
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.verify_reset_code(email, code)
+
     @staticmethod
     def reset_password_with_code(email, code, new_password):
-        """Reset password with 6-digit code"""
-        user = User.query.filter_by(email=email).first()
-        
-        if not user:
-            raise ValueError('User not found')
-        
-        # Find valid reset token with matching code
-        token = PasswordResetToken.query.filter_by(
-            user_id=user.id,
-            code=code,
-            used=False
-        ).order_by(PasswordResetToken.created_at.desc()).first()
-        
-        if not token or not token.is_valid():
-            raise ValueError('Invalid or expired reset code')
-        
-        user.set_password(new_password)
-        token.mark_as_used()
-        
-        db.session.commit()
-        
-        return user
-    
+        from src.services.auth_token_service import AuthTokenService
+        return AuthTokenService.reset_password_with_code(email, code, new_password)
+
     @staticmethod
     def refresh_access_token(refresh_token):
-        """Refresh access token using refresh token"""
-        payload = User.verify_token(refresh_token, token_type='refresh')
-        
-        if not payload:
-            raise ValueError('Invalid refresh token')
-        
-        user = User.query.get(payload['user_id'])
-        
-        if not user or not user.is_active:
-            raise ValueError('User not found or inactive')
-        
-        return user.generate_access_token()
-    
+        # Legacy callers receive access only; public refresh returns both tokens.
+        from src.services.session_service import SessionService
+        access, rotated = SessionService.rotate(refresh_token)
+        return access
+
     @staticmethod
     def revoke_token(token):
-        """Revoke a token by adding it to blacklist (Redis + Database)"""
-        from src.models.token_blacklist import TokenBlacklist
-        import jwt
-        
-        try:
-            # Decode token to get jti and user_id
-            payload = jwt.decode(
-                token,
-                current_app.config['JWT_SECRET_KEY'],
-                algorithms=["HS256"]
-            )
-            
-            jti = payload.get('jti')
-            user_id = payload.get('user_id')
-            token_type = payload.get('type', 'access')
-            exp = datetime.fromtimestamp(payload['exp'])
-            
-            if not jti or not user_id:
-                return False
-            
-            # Add to database blacklist (permanent record)
-            TokenBlacklist.revoke_token(jti, token_type, user_id, exp)
-            
-            # Also add to Redis for fast lookup (optional, for performance)
-            redis_client = get_redis()
-            if redis_client:
-                ttl = int((exp - datetime.utcnow()).total_seconds())
-                if ttl > 0:
-                    redis_client.setex(f'blacklist:{jti}', ttl, '1')
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error revoking token: {e}")
-            return False
-    
+        from src.services.session_service import SessionService
+        return SessionService.revoke(token)
+
     @staticmethod
     def is_token_blacklisted(token):
-        """Check if token is blacklisted (checks Redis first, then Database)"""
-        from src.models.token_blacklist import TokenBlacklist
-        import jwt
-        
-        try:
-            # Decode token to get jti
-            payload = jwt.decode(
-                token,
-                current_app.config['JWT_SECRET_KEY'],
-                algorithms=["HS256"],
-                options={"verify_exp": False}  # Don't fail on expired tokens
-            )
-            
-            jti = payload.get('jti')
-            if not jti:
-                return False
-            
-            # Check Redis first (faster)
-            redis_client = get_redis()
-            if redis_client and redis_client.exists(f'blacklist:{jti}'):
-                return True
-            
-            # Check database (fallback)
-            return TokenBlacklist.is_token_revoked(jti)
-            
-        except Exception:
-            return False
-
+        from src.services.session_service import SessionService
+        return SessionService.is_revoked(token)

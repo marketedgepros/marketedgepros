@@ -1,378 +1,164 @@
-import { useEffect, useState } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, Download, Calendar } from 'lucide-react';
-import AffiliateLayout from '../../components/affiliate/AffiliateLayout';
-import api from '../../services/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import useAuthStore from '../../store/authStore';
+import {
+  AFFILIATE_COMMISSION_STATUSES,
+  AFFILIATE_RECORD_PAGE_SIZE,
+  affiliateRecordError,
+  downloadAffiliateCommissionsPage,
+} from '../../services/affiliateRecordViewService.js';
+import { useAffiliateRecordRead } from '../../hooks/useAffiliateAccountRead.js';
+import {
+  AffiliateExactAmount,
+  AffiliateExportButton,
+  AffiliateRecordBoundary,
+  AffiliateRecordHeader,
+  AffiliateRecordPagination,
+  AffiliateRecordReadState,
+  AffiliateStatusPill,
+  affiliateRecordDate,
+  affiliateRecordPanel,
+} from '../../components/affiliate/AffiliateRecordUI.jsx';
 
-export default function Commissions() {
-  const [commissions, setCommissions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [filterPeriod, setFilterPeriod] = useState('all');
-  const [stats, setStats] = useState({
-    totalEarned: 0,
-    pendingCommissions: 0,
-    paidCommissions: 0,
-    thisMonth: 0,
-  });
+const tenantSelector = (state) => state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null;
 
-  useEffect(() => {
-    loadCommissions();
-  }, []);
-
-  const loadCommissions = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch commissions from real API
-      const commissionsResponse = await api.get('/api/v1/commissions');
-      const commissionsData = commissionsResponse.data.commissions || [];
-      
-      // Transform API data to match component format
-      const transformedCommissions = commissionsData.map(commission => ({
-        id: commission.id,
-        date: commission.created_at,
-        trader: {
-          name: commission.referral?.referred_user?.name || 'N/A',
-          email: commission.referral?.referred_user?.email || 'N/A'
-        },
-        type: 'enrollment', // Default type
-        program: `Challenge #${commission.challenge_id}`,
-        amount: commission.commission_amount,
-        rate: commission.commission_rate,
-        status: commission.status,
-        payout_date: commission.paid_at
-      }));
-      
-      setCommissions(transformedCommissions);
-      
-      // Fetch stats from real API
-      const statsResponse = await api.get('/api/v1/commissions/stats');
-      const statsData = statsResponse.data;
-      
-      setStats({
-        totalEarned: statsData.total_earned || 0,
-        pendingCommissions: statsData.pending_balance || 0,
-        paidCommissions: statsData.paid?.amount || 0,
-        thisMonth: statsData.pending?.amount || 0 // Approximation
-      });
-      
-    } catch (error) {
-      setCommissions([]);
-      setStats({
-        totalEarned: 0,
-        pendingCommissions: 0,
-        paidCommissions: 0,
-        thisMonth: 0
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Removed calculateStats - now fetched from API
-
-  const exportCommissions = () => {
-    const headers = ['Date', 'Trader', 'Type', 'Program', 'Amount', 'Rate', 'Status', 'Payout Date'];
-    const rows = filteredCommissions.map((commission) => [
-      new Date(commission.date).toLocaleDateString(),
-      commission.trader.name,
-      commission.type,
-      commission.program,
-      commission.amount,
-      `${commission.rate}%`,
-      commission.status,
-      commission.payout_date ? new Date(commission.payout_date).toLocaleDateString() : 'Pending',
-    ]);
-
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `commissions-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
-
-  const filteredCommissions = commissions.filter((commission) => {
-    if (filterPeriod === 'all') return true;
-    
-    const commissionDate = new Date(commission.date);
-    const now = new Date();
-    
-    if (filterPeriod === 'this_month') {
-      return commissionDate.getMonth() === now.getMonth() && 
-             commissionDate.getFullYear() === now.getFullYear();
-    } else if (filterPeriod === 'last_month') {
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-      return commissionDate.getMonth() === lastMonth.getMonth() && 
-             commissionDate.getFullYear() === lastMonth.getFullYear();
-    } else if (filterPeriod === 'this_year') {
-      return commissionDate.getFullYear() === now.getFullYear();
-    }
-    
-    return true;
-  });
-
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'enrollment':
-        return 'bg-blue-100 text-blue-800';
-      case 'profit_share':
-        return 'bg-green-100 text-green-800';
-      case 'renewal':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-slate-700/50 text-gray-100';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-slate-700/50 text-gray-100';
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <AffiliateLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-            <p className="text-gray-300 mt-4">Loading commissions...</p>
-          </div>
-        </div>
-      </AffiliateLayout>
-    );
-  }
-
+export function AffiliateCommissionsView({ view, pagination, loading, error, exportError, onRefresh, onPage, onStatus, onExport, requestedPage, selectedStatus }) {
+  const commissions = view?.commissions ?? [];
+  const status = view?.filters?.status ?? selectedStatus;
+  const canExport = Boolean(view && !loading && !error);
   return (
-    <AffiliateLayout>
-      <div className="min-h-screen bg-slate-900">
-        {/* Header */}
-        <div className="bg-slate-800/50 border-b border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white">Commissions</h1>
-                <p className="text-gray-300 mt-2">Track your earnings and payouts</p>
-              </div>
-              <button
-                onClick={exportCommissions}
-                className="btn btn-primary flex items-center gap-2"
-              >
-                <Download className="w-5 h-5" />
-                Export
-              </button>
+    <div className="mep-screen min-h-screen text-white">
+      <AffiliateRecordHeader
+        eyebrow="Affiliate records"
+        title="Commission activity"
+        summary="A server-filtered, read-only page of legacy commission records for the signed-in affiliate account."
+        onRefresh={onRefresh}
+        refreshing={loading}
+        action={<AffiliateExportButton disabled={!canExport} onClick={onExport} />}
+      />
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <AffiliateRecordBoundary />
+        {exportError && (
+          <section role="alert" className="mt-5 rounded-2xl border border-rose-300/30 bg-rose-950/30 p-4 text-sm text-rose-50">
+            <p className="font-semibold">Current-page export could not be created</p>
+            <p className="mt-1 break-words text-rose-100/85">{exportError}</p>
+          </section>
+        )}
+        <section className={`${affiliateRecordPanel} mt-6 p-4 sm:p-5`} aria-labelledby="commission-filter-heading">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 id="commission-filter-heading" className="mep-heading font-semibold text-white">Server status filter</h2>
+              <p className="mt-1 text-sm text-slate-400">Changing the status starts again at page one. Export contains only the current verified page.</p>
             </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-300">Total Earned</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    ${stats.totalEarned.toLocaleString()}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-300">This Month</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    ${stats.thisMonth.toLocaleString()}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-300">Pending</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    ${stats.pendingCommissions.toLocaleString()}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-300">Paid Out</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    ${stats.paidCommissions.toLocaleString()}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter */}
-          <div className="bg-slate-800/50 rounded-lg shadow-sm p-4 mb-6">
-            <div className="flex items-center gap-4">
-              <Calendar className="w-5 h-5 text-gray-400" />
-              <select
-                value={filterPeriod}
-                onChange={(e) => setFilterPeriod(e.target.value)}
-                className="input"
-              >
-                <option value="all">All Time</option>
-                <option value="this_month">This Month</option>
-                <option value="last_month">Last Month</option>
-                <option value="this_year">This Year</option>
+            <label className="flex shrink-0 items-center gap-3 text-sm text-slate-200" htmlFor="commission-status">
+              Status
+              <select id="commission-status" value={status ?? 'all'} disabled={loading} onChange={(event) => onStatus(event.target.value)} className="rounded-lg border border-white/15 bg-slate-950 px-3 py-2 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-60">
+                <option value="all">All statuses</option>
+                {AFFILIATE_COMMISSION_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-            </div>
+            </label>
           </div>
+        </section>
 
-          {/* Commissions Table */}
-          <div className="bg-slate-800/50 rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-900 border-b border-white/10">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Trader
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Program
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Rate
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Payout Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-slate-800/50 divide-y divide-gray-200">
-                  {filteredCommissions.map((commission) => (
-                    <tr key={commission.id} className="hover:bg-slate-900">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                        {new Date(commission.date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-white">{commission.trader.name}</div>
-                        <div className="text-sm text-gray-400">{commission.trader.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(commission.type)}`}>
-                          {commission.type.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-white">
-                        {commission.program}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                        {commission.rate}%
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
-                        ${commission.amount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(commission.status)}`}>
-                          {commission.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                        {commission.payout_date 
-                          ? new Date(commission.payout_date).toLocaleDateString()
-                          : 'Pending'}
-                      </td>
+        <div className="mt-6"><AffiliateRecordReadState loading={loading} error={error ? affiliateRecordError(error) : null} onRetry={onRefresh} /></div>
+
+        {!loading && !error && view && (
+          <>
+            <section className={`${affiliateRecordPanel} mt-6 overflow-hidden`} aria-labelledby="commission-records-heading">
+              <div className="border-b border-white/10 px-5 py-4 sm:px-6">
+                <h2 id="commission-records-heading" className="mep-heading text-xl font-semibold">Commission records</h2>
+                <p className="mt-1 text-sm text-slate-400">Exact API strings are displayed without a currency, total, or payment inference.</p>
+              </div>
+              <div role="region" aria-label="Commission records table" tabIndex="0" className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-cyan-200">
+                <table className="w-full min-w-[820px] text-left text-sm">
+                  <caption className="sr-only">Commission records for the signed-in affiliate account</caption>
+                  <thead className="bg-slate-950/50 text-xs uppercase tracking-[0.14em] text-slate-400">
+                    <tr>
+                      <th scope="col" className="px-5 py-3 font-medium sm:px-6">Record ID</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Legacy API type</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Legacy API status</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Created</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Approved</th>
+                      <th scope="col" className="px-5 py-3 font-medium">Paid</th>
+                      <th scope="col" className="px-5 py-3 text-right font-medium sm:px-6">Amount</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredCommissions.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-300">No commissions found</p>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {commissions.map((commission) => (
+                      <tr key={commission.id} className="align-top transition-colors hover:bg-white/[0.025] motion-reduce:transition-none">
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300 sm:px-6">#{commission.id}</td>
+                        <td className="px-5 py-4 text-slate-300">{commission.type}</td>
+                        <td className="px-5 py-4"><AffiliateStatusPill status={commission.status} /></td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(commission.createdAt)}</td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(commission.approvedAt)}</td>
+                        <td className="px-5 py-4 font-mono text-xs tabular-nums text-slate-300">{affiliateRecordDate(commission.paidAt)}</td>
+                        <td className="px-5 py-4 sm:px-6"><AffiliateExactAmount value={commission.amount} align="right" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-
-          {/* Commission Types Info */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-blue-600" />
-                </div>
-                <h3 className="font-bold text-white">Enrollment Commission</h3>
-              </div>
-              <p className="text-sm text-gray-300">
-                Earn commission when a trader enrolls in a program through your referral link.
-              </p>
-              <p className="text-lg font-bold text-blue-600 mt-2">30% Rate</p>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                </div>
-                <h3 className="font-bold text-white">Profit Share Commission</h3>
-              </div>
-              <p className="text-sm text-gray-300">
-                Earn commission from the profits generated by your traders on funded accounts.
-              </p>
-              <p className="text-lg font-bold text-green-600 mt-2">10% Rate</p>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-purple-600" />
-                </div>
-                <h3 className="font-bold text-white">Renewal Commission</h3>
-              </div>
-              <p className="text-sm text-gray-300">
-                Earn commission when your traders renew their challenge or upgrade their account.
-              </p>
-              <p className="text-lg font-bold text-purple-600 mt-2">20% Rate</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </AffiliateLayout>
+              {commissions.length === 0 && <p className="px-5 py-10 text-center text-sm text-slate-400 sm:px-6">No commission records were returned for this server-filtered page.</p>}
+            </section>
+          </>
+        )}
+        {!error && pagination && <div className="mt-6"><AffiliateRecordPagination pagination={pagination} onPage={onPage} disabled={loading} loadingPage={loading ? requestedPage : null} /></div>}
+      </main>
+    </div>
   );
 }
 
+export default function Commissions() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const tenantId = useAuthStore(tenantSelector);
+  const role = useAuthStore((state) => state.user?.role ?? null);
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState(null);
+  const [exportError, setExportError] = useState(null);
+  const [lastPagination, setLastPagination] = useState(null);
+  const pendingPageRef = useRef(null);
+  const read = useAffiliateRecordRead({
+    kind: 'commissions',
+    isAuthenticated,
+    userId,
+    tenantId,
+    role,
+    page,
+    perPage: AFFILIATE_RECORD_PAGE_SIZE,
+    status,
+  });
+
+  useEffect(() => {
+    if (read.view?.pagination) setLastPagination({ principalKey: read.principalKey, pagination: read.view.pagination });
+  }, [read.principalKey, read.view]);
+  useEffect(() => {
+    if (!read.loading) pendingPageRef.current = null;
+  }, [read.loading]);
+
+  const pagination = read.view?.pagination ?? (lastPagination?.principalKey === read.principalKey ? lastPagination.pagination : null);
+
+  const changeStatus = (nextStatus) => {
+    if (read.loading || pendingPageRef.current !== null) return;
+    pendingPageRef.current = 'status';
+    setExportError(null);
+    setStatus(nextStatus === 'all' ? null : nextStatus);
+    setPage(1);
+  };
+  const changePage = (nextPage) => {
+    if (read.loading || pendingPageRef.current !== null || nextPage === page) return;
+    pendingPageRef.current = nextPage;
+    setExportError(null);
+    setPage(nextPage);
+  };
+  const exportCurrentPage = useCallback(() => {
+    setExportError(null);
+    try {
+      if (!read.view || read.loading || read.error) throw new Error('The current verified commissions page is not available for export.');
+      downloadAffiliateCommissionsPage(read.view);
+    } catch (error) {
+      setExportError(error?.message || 'The current verified commissions page could not be exported.');
+    }
+  }, [read.error, read.loading, read.view]);
+
+  return <AffiliateCommissionsView view={read.view} pagination={pagination} loading={read.loading} error={read.error} exportError={exportError} onRefresh={read.refresh} onPage={changePage} onStatus={changeStatus} onExport={exportCurrentPage} requestedPage={page} selectedStatus={status} />;
+}

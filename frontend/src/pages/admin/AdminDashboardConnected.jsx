@@ -1,346 +1,91 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback } from "react";
+import { Link, useLocation } from "react-router-dom";
+import useAuthStore from "../../store/authStore.js";
+import { loadAdminInsight } from "../../services/adminInsightViewService.js";
+import useAdminInsightRead from "../../hooks/useAdminInsightRead.js";
 import {
-  Users,
-  DollarSign,
-  TrendingUp,
-  FileText,
-  Activity,
-  UserCheck,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Clock,
-} from 'lucide-react';
-import DashboardCard from '../../components/dashboard/DashboardCard';
-import DashboardTable from '../../components/dashboard/DashboardTable';
-import api from "../../services/api";
+  AdminInsightBoundary,
+  AdminInsightCountCards,
+  AdminInsightDistribution,
+  AdminInsightReadState,
+  AdminInsightRecentPaymentsTable,
+  AdminInsightRecentUsersTable,
+  AdminInsightSectionTitle,
+  adminInsightButton,
+} from "../../components/admin/AdminInsightUI.jsx";
 
-export default function AdminDashboard() {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const quickLinks = [
+  ["Dashboard", "/admin/dashboard"], ["Users", "/admin/users"], ["Challenges", "/admin/challenges"],
+  ["KYC approval", "/admin/kyc-approval"], ["Payments", "/admin/payments"], ["Analytics", "/admin/analytics"],
+];
 
-  useEffect(() => {
-    fetchDashboardStats();
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchDashboardStats();
-    }, 30000); // 30 seconds
-    
-    // Cleanup interval on unmount
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchDashboardStats = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/admin/dashboard/stats');
-      
-      setStats(response.data);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to load dashboard:', err);
-      setError('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-cyan-500 border-t-transparent mb-4"></div>
-          <p className="text-gray-300 text-lg">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Error Loading Dashboard</h2>
-          <p className="text-gray-400 mb-6">{error}</p>
-          <button
-            onClick={fetchDashboardStats}
-            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return null;
-  }
-
-  // Stats cards data
-  const statsCards = [
-    {
-      title: 'Total Users',
-      value: stats.users.total.toLocaleString(),
-      subtitle: `${stats.users.active} active users`,
-      icon: Users,
-      color: 'cyan',
-      trend: 'up',
-      trendValue: '+12.5%',
-      onClick: () => navigate('/admin/users'),
-    },
-    {
-      title: 'Total Revenue',
-      value: `$${stats.revenue.total.toLocaleString()}`,
-      subtitle: `$${stats.revenue.monthly.toLocaleString()} this month`,
-      icon: DollarSign,
-      color: 'green',
-      trend: 'up',
-      trendValue: '+18.2%',
-      onClick: () => navigate('/admin/payments'),
-    },
-    {
-      title: 'Active Challenges',
-      value: stats.challenges.active.toLocaleString(),
-      subtitle: `${stats.challenges.completed} completed`,
-      icon: TrendingUp,
-      color: 'blue',
-      trend: 'up',
-      trendValue: '+8.3%',
-      onClick: () => navigate('/admin/programs'),
-    },
-    {
-      title: 'Pending KYC',
-      value: stats.users.pending_kyc.toLocaleString(),
-      subtitle: 'Requires review',
-      icon: FileText,
-      color: 'amber',
-      onClick: () => navigate('/admin/kyc-approval'),
-    },
-  ];
-
-  // Challenge stats
-  const challengeStats = [
-    {
-      title: 'Completed',
-      value: stats.challenges.completed,
-      total: stats.challenges.total,
-      color: 'green',
-      icon: CheckCircle,
-    },
-    {
-      title: 'Failed',
-      value: stats.challenges.failed,
-      total: stats.challenges.total,
-      color: 'red',
-      icon: XCircle,
-    },
-    {
-      title: 'Funded',
-      value: stats.challenges.funded,
-      total: stats.challenges.total,
-      color: 'blue',
-      icon: UserCheck,
-    },
-  ];
-
-  // Table columns
-  const recentUsersColumns = [
-    {
-      field: 'name',
-      headerName: 'Name',
-      render: (value, row) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 flex items-center justify-center text-white font-semibold text-sm">
-            {value?.charAt(0)?.toUpperCase() || '?'}
-          </div>
-          <span className="font-medium text-white">{value}</span>
-        </div>
-      ),
-    },
-    { field: 'email', headerName: 'Email' },
-    {
-      field: 'role',
-      headerName: 'Role',
-      render: (value) => (
-        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-          {value}
-        </span>
-      ),
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      render: (value) => {
-        const colors = {
-          active: 'bg-green-500/10 border-green-500/30 text-green-400',
-          inactive: 'bg-gray-500/10 border-gray-500/30 text-gray-400',
-          pending: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-        };
-        return (
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${colors[value] || colors.inactive}`}>
-            {value}
-          </span>
-        );
-      },
-    },
-    { field: 'created_at', headerName: 'Joined' },
-  ];
-
-  const recentPaymentsColumns = [
-    { field: 'user_id', headerName: 'User ID' },
-    {
-      field: 'amount',
-      headerName: 'Amount',
-      render: (value) => (
-        <span className="font-semibold text-white">{value}</span>
-      ),
-    },
-    { field: 'type', headerName: 'Type' },
-    {
-      field: 'status',
-      headerName: 'Status',
-      render: (value) => {
-        const colors = {
-          completed: 'bg-green-500/10 border-green-500/30 text-green-400',
-          pending: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-          failed: 'bg-red-500/10 border-red-500/30 text-red-400',
-        };
-        return (
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${colors[value] || colors.pending}`}>
-            {value}
-          </span>
-        );
-      },
-    },
-    { field: 'created_at', headerName: 'Date' },
-  ];
-
-  // Format data for tables
-  const recentUsersData = stats.recent_users.map(user => ({
-    ...user,
-    created_at: new Date(user.created_at).toLocaleDateString()
-  }));
-
-  const recentPaymentsData = stats.recent_payments.map(payment => ({
-    ...payment,
-    amount: `$${payment.amount.toFixed(2)}`,
-    created_at: new Date(payment.created_at).toLocaleDateString()
-  }));
-
+export function AdminInsightQuickLinks({ current }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-      </div>
+    <nav aria-label="Administrator record views" className="flex max-w-full flex-wrap gap-2">
+      {quickLinks.map(([label, href]) => <Link key={href} to={href} aria-current={current === href ? "page" : undefined} className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${current === href ? "border-cyan-300/50 bg-cyan-300/15 text-cyan-100" : "border-white/10 text-slate-300 hover:border-cyan-300/30 hover:text-cyan-100"}`}>{label}</Link>)}
+    </nav>
+  );
+}
 
-      {/* Content */}
-      <div className="relative z-10 p-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-400 text-lg">
-              Overview of platform metrics and activity
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/admin/analytics')}
-            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 flex items-center gap-2"
-          >
-            <Activity className="w-5 h-5" />
-            View Analytics
-          </button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statsCards.map((stat, index) => (
-            <DashboardCard key={index} {...stat} />
-          ))}
-        </div>
-
-        {/* Challenge Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {challengeStats.map((stat, index) => {
-            const percentage = ((stat.value / stat.total) * 100) || 0;
-            const Icon = stat.icon;
-            
-            return (
-              <div key={index} className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-slate-800/70 transition-all duration-300">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">{stat.title}</h3>
-                  <Icon className={`w-6 h-6 text-${stat.color}-400`} />
-                </div>
-                
-                <p className={`text-4xl font-bold text-${stat.color}-400 mb-4`}>
-                  {stat.value.toLocaleString()}
-                </p>
-                
-                <div className="relative w-full h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className={`absolute inset-y-0 left-0 bg-gradient-to-r from-${stat.color}-500 to-${stat.color}-400 rounded-full transition-all duration-500`}
-                    style={{ width: `${percentage}%` }}
-                  ></div>
-                </div>
-                
-                <p className="text-sm text-gray-400 mt-3">
-                  {percentage.toFixed(1)}% of total challenges
-                </p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Recent Users */}
+export function AdminDashboardInsightContent({ read, currentPath = "/admin/dashboard" }) {
+  const insight = read.value;
+  const isEmpty = Boolean(insight && insight.counts.users === 0 && insight.counts.challenges === 0 && insight.counts.payments === 0);
+  return (
+    <div className="space-y-5 p-4 sm:p-6">
+      <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-white">Recent Users</h2>
-            <button
-              onClick={() => navigate('/admin/users')}
-              className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
-            >
-              View All →
-            </button>
-          </div>
-          <DashboardTable
-            columns={recentUsersColumns}
-            data={recentUsersData}
-            pageSize={5}
-            searchable={true}
-            onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
-          />
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Administrator record view</p>
+          <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Recorded platform overview</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">A server-scoped snapshot of record counts and recorded statuses. It contains no revenue, funding, conversion, ranking, or identity conclusion.</p>
         </div>
-
-        {/* Recent Payments */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-white">Recent Payments</h2>
-            <button
-              onClick={() => navigate('/admin/payments')}
-              className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
-            >
-              View All →
-            </button>
-          </div>
-          <DashboardTable
-            columns={recentPaymentsColumns}
-            data={recentPaymentsData}
-            pageSize={5}
-            searchable={true}
-          />
-        </div>
-      </div>
+        <button type="button" className={adminInsightButton} onClick={read.refresh} disabled={read.loading}>Refresh records</button>
+      </header>
+      <AdminInsightQuickLinks current={currentPath} />
+      {insight && <AdminInsightBoundary asOf={insight.asOf} />}
+      <AdminInsightReadState
+        loading={read.loading}
+        error={read.error}
+        onRetry={read.refresh}
+        empty={isEmpty}
+        emptyTitle="No recorded rows in this snapshot"
+        emptyMessage="The server returned zero recorded users, challenges, and payments for this scope. This is a record count only, not a financial, settlement, identity, or entitlement conclusion."
+      />
+      {!read.loading && !read.error && insight && !isEmpty && <>
+        <AdminInsightCountCards counts={insight.counts} />
+        <section className="grid gap-5 lg:grid-cols-2" aria-label="Current recorded status counts">
+          <AdminInsightDistribution title="User roles" rows={insight.distributions.userRoles} description="Current recorded role values in the snapshot." />
+          <AdminInsightDistribution title="Recorded KYC statuses" rows={insight.distributions.userKyc} description="Recorded status values only; they do not prove identity verification." />
+          <AdminInsightDistribution title="Challenge statuses" rows={insight.distributions.challengeStatus} description="Current recorded challenge status counts, not activity or funding events." />
+          <AdminInsightDistribution title="Payment statuses" rows={insight.distributions.paymentStatus} description="Current recorded payment status counts; no money is summed or converted." />
+        </section>
+        <section className="space-y-3" aria-labelledby="recent-recorded-users">
+          <AdminInsightSectionTitle id="recent-recorded-users" title="Recent recorded users" description="IDs and recorded fields only. Names, email, contact details, and hierarchy are intentionally excluded." />
+          <AdminInsightRecentUsersTable users={insight.recentUsers} />
+        </section>
+        <section className="space-y-3" aria-labelledby="recent-recorded-payments">
+          <AdminInsightSectionTitle id="recent-recorded-payments" title="Recent recorded payments" description="Amounts remain exact strings with their recorded currency. They are never summed, converted, or treated as settlement evidence." />
+          <AdminInsightRecentPaymentsTable payments={insight.recentPayments} />
+        </section>
+      </>}
     </div>
   );
 }
 
+export default function AdminDashboardConnected() {
+  const { user, isAuthenticated } = useAuthStore();
+  const location = useLocation();
+  const role = user?.role;
+  const load = useCallback((expectedOwner, signal) => loadAdminInsight({
+    kind: "dashboard", expectedOwner, days: null, signal,
+  }), []);
+  const read = useAdminInsightRead({
+    isAuthenticated,
+    userId: user?.id,
+    tenantId: user?.tenant_id,
+    role,
+    kind: "dashboard",
+    days: null,
+    load,
+  });
+  return <AdminDashboardInsightContent read={read} currentPath={location.pathname === "/admin" ? "/admin/dashboard" : location.pathname} />;
+}

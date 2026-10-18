@@ -1,280 +1,208 @@
-import { useState } from 'react';
-import { Send, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle, Loader, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/layout/Layout';
 import SEO from '../../components/SEO';
-import api from "../../services/api";
+import useAuthStore from '../../store/authStore';
+import {
+  CUSTOMER_TICKET_CATEGORIES,
+  CUSTOMER_TICKET_PRIORITIES,
+  createMySupportTicket,
+  isSupportTicketRequestCanceled,
+  supportPrincipalFromAuth,
+} from '../../services/supportTicketViewService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://marketedgepros.com/api/v1';
+const EMPTY_DRAFT = { subject: '', category: 'general', priority: 'medium', description: '' };
 
-export default function CreateTicket() {
+const CATEGORY_LABELS = {
+  general: 'General inquiry',
+  technical: 'Technical support',
+  billing: 'Billing and payments',
+  account: 'Account management',
+};
+
+const PRIORITY_LABELS = {
+  low: 'Low — general question',
+  medium: 'Medium — need assistance',
+  high: 'High — urgent issue',
+  urgent: 'Urgent — critical problem',
+};
+
+const displayAccountName = (user) => {
+  const firstName = typeof user?.first_name === 'string' ? user.first_name.trim() : '';
+  const lastName = typeof user?.last_name === 'string' ? user.last_name.trim() : '';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ');
+  return fullName || (typeof user?.name === 'string' && user.name.trim() ? user.name.trim() : '');
+};
+
+const getErrorMessage = (error, fallback) => (
+  error?.response?.data?.error || error?.response?.data?.message || error?.message || fallback
+);
+
+const SupportUnavailable = () => (
+  <Layout>
+    <SEO title="Support" description="Access support resources for your account." />
+    <main className="min-h-screen bg-black px-4 pt-28 sm:px-6 sm:pt-32">
+      <section className="mep-panel mx-auto max-w-xl rounded-xl border p-6 text-center sm:p-8" role="status">
+        <h1 className="mep-heading text-2xl font-bold text-white">Support is unavailable</h1>
+        <p className="mt-3 text-gray-400">Please sign in with a verified account context before creating a support ticket.</p>
+      </section>
+    </main>
+  </Layout>
+);
+
+export function CreateTicketView({ user, expectedOwner }) {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const submitControllerRef = useRef(null);
+  const mutationInFlightRef = useRef(false);
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [ticketNumber, setTicketNumber] = useState('');
+  const [createdTicket, setCreatedTicket] = useState(null);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    category: 'general',
-    priority: 'medium',
-    description: ''
-  });
+  const accountName = displayAccountName(user);
+  const accountEmail = typeof user?.email === 'string' && user.email.trim() ? user.email.trim() : '';
 
-  const categories = [
-    { value: 'general', label: 'General Inquiry' },
-    { value: 'technical', label: 'Technical Support' },
-    { value: 'billing', label: 'Billing & Payments' },
-    { value: 'account', label: 'Account Management' },
-    { value: 'trading', label: 'Trading Issues' }
-  ];
+  useEffect(() => () => submitControllerRef.current?.abort(), []);
 
-  const priorities = [
-    { value: 'low', label: 'Low - General question' },
-    { value: 'medium', label: 'Medium - Need assistance' },
-    { value: 'high', label: 'High - Urgent issue' },
-    { value: 'urgent', label: 'Urgent - Critical problem' }
-  ];
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setDraft((current) => ({ ...current, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!expectedOwner) return;
+    if (mutationInFlightRef.current) return;
+
+    const controller = new AbortController();
+    const isCurrentSubmit = () => submitControllerRef.current === controller && !controller.signal.aborted;
+    mutationInFlightRef.current = true;
+    submitControllerRef.current = controller;
+    setIsSubmitting(true);
     setError('');
 
     try {
-      const response = await axios.post(`${API_URL}/support/tickets/`, formData);
-      setTicketNumber(response.data.ticket.ticket_number);
-      setSuccess(true);
-      
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        subject: '',
-        category: 'general',
-        priority: 'medium',
-        description: ''
+      // Identity is not part of this body; the backend derives it from authentication.
+      const ticket = await createMySupportTicket(draft, undefined, {
+        signal: controller.signal,
+        expectedOwner,
       });
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create ticket. Please try again.');
+      if (isCurrentSubmit()) setCreatedTicket(ticket);
+    } catch (requestError) {
+      if (isCurrentSubmit() && !isSupportTicketRequestCanceled(requestError)) {
+        setError(getErrorMessage(
+          requestError,
+          'We could not confirm whether the ticket was created. Check My tickets before submitting again.',
+        ));
+      }
     } finally {
-      setLoading(false);
+      if (submitControllerRef.current === controller) {
+        submitControllerRef.current = null;
+        mutationInFlightRef.current = false;
+        if (!controller.signal.aborted) setIsSubmitting(false);
+      }
     }
   };
 
-  if (success) {
+  if (!expectedOwner) return <SupportUnavailable />;
+
+  if (createdTicket) {
     return (
       <Layout>
-        <SEO title="Ticket Created Successfully" />
-        <section className="min-h-screen bg-black flex items-center justify-center py-20">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-12">
-              <div className="w-20 h-20 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-12 h-12 text-cyan-400" />
-              </div>
-              <h1 className="text-4xl font-bold text-white mb-4">
-                Ticket Created Successfully!
-              </h1>
-              <p className="text-xl text-gray-300 mb-2">
-                Your ticket number is:
-              </p>
-              <p className="text-3xl font-mono font-bold text-cyan-400 mb-6">
-                #{ticketNumber}
-              </p>
-              <p className="text-gray-400 mb-8">
-                We've sent a confirmation email to <span className="text-white font-medium">{formData.email}</span>.
-                Our support team will respond within 24 hours.
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center">
-                <button
-                  onClick={() => navigate(`/support/ticket/${ticketNumber}?email=${formData.email}`)}
-                  className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all"
-                >
-                  View Ticket
-                </button>
-                <button
-                  onClick={() => {
-                    setSuccess(false);
-                    setTicketNumber('');
-                  }}
-                  className="px-8 py-4 bg-slate-700 text-white rounded-xl font-semibold hover:bg-slate-600 transition-all"
-                >
-                  Create Another Ticket
-                </button>
-              </div>
+        <SEO title="Support" description="Access support resources for your account." />
+        <main className="min-h-screen bg-black px-4 py-16 sm:px-6 sm:py-20">
+          <section className="mep-panel mx-auto max-w-2xl rounded-2xl border p-6 text-center sm:p-10">
+            <CheckCircle className="mx-auto mb-5 h-12 w-12 text-cyan-400" aria-hidden="true" />
+            <h1 className="mep-heading text-3xl font-bold text-white">Ticket created</h1>
+            <p className="mt-4 text-gray-300">Your ticket number is:</p>
+            <p className="mt-2 break-all font-mono text-2xl font-bold text-cyan-400">#{createdTicket.ticketNumber}</p>
+            <p className="mt-5 text-gray-400">You can review this request and customer-visible replies in your ticket list.</p>
+            <div className="mt-7 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={() => navigate(`/support/ticket/${encodeURIComponent(createdTicket.ticketNumber)}`)} className="mep-primary px-6 py-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950">
+                View ticket
+              </button>
+              <button type="button" onClick={() => { setCreatedTicket(null); setDraft(EMPTY_DRAFT); setError(''); }} className="rounded-xl bg-slate-700 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950">
+                Create another ticket
+              </button>
             </div>
-          </div>
-        </section>
+          </section>
+        </main>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <SEO
-        title="Create Support Ticket"
-        description="Need help? Create a support ticket and our team will assist you as soon as possible."
-        keywords="support ticket, help, customer service, contact support"
-      />
+      <SEO title="Support" description="Access support resources for your account." />
+      <main className="min-h-screen bg-black">
+        <header className="border-b border-slate-800 px-4 pb-8 pt-24 sm:px-6 sm:pb-10 sm:pt-28 lg:px-8">
+          <div className="mx-auto max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-400">Support</p>
+            <h1 className="mep-heading mt-2 text-3xl font-bold text-white sm:text-4xl">Create a support ticket</h1>
+            <p className="mt-3 max-w-2xl text-base text-gray-300 sm:text-lg">Describe an issue for the account you are signed in to. The support service associates the request with that account.</p>
+          </div>
+        </header>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-12 overflow-hidden bg-black">
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"></div>
-        </div>
+        <section className="px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+          <div className="mx-auto max-w-3xl">
+            {error && <div role="alert" className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-300"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><p className="break-words">{error}</p></div>}
 
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-            Create Support <span className="bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">Ticket</span>
-          </h1>
-          <p className="text-xl text-gray-300">
-            Describe your issue and our support team will get back to you within 24 hours
-          </p>
-        </div>
-      </section>
-
-      {/* Form Section */}
-      <section className="py-12 bg-black">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-red-400">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 space-y-6">
-            {/* Name & Email */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Your Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-black border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  placeholder="John Doe"
-                />
+            <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-slate-700 bg-slate-900/50 p-4 sm:p-7">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-300" htmlFor="ticket-account-name">Signed-in account</label>
+                  <input id="ticket-account-name" type="text" value={accountName || 'Authenticated account'} readOnly disabled={isSubmitting} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-gray-300 disabled:opacity-60" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-300" htmlFor="ticket-account-email">Account email</label>
+                  <input id="ticket-account-email" type="text" value={accountEmail || 'Account email unavailable'} readOnly disabled={isSubmitting} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-gray-300 disabled:opacity-60" />
+                </div>
               </div>
+              <p className="-mt-3 text-sm text-gray-400">Account identity is derived by the support service and is not sent from this form.</p>
+
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-black border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  placeholder="john@example.com"
-                />
+                <label className="mb-2 block text-sm font-medium text-gray-300" htmlFor="ticket-subject">Subject *</label>
+                <input id="ticket-subject" type="text" name="subject" value={draft.subject} onChange={handleChange} required maxLength={500} disabled={isSubmitting} className="w-full rounded-xl border border-slate-700 bg-black px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" placeholder="Brief description of your issue" />
               </div>
-            </div>
 
-            {/* Subject */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Subject *
-              </label>
-              <input
-                type="text"
-                name="subject"
-                value={formData.subject}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 bg-black border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="Brief description of your issue"
-              />
-            </div>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-300" htmlFor="ticket-category">Category *</label>
+                  <select id="ticket-category" name="category" value={draft.category} onChange={handleChange} disabled={isSubmitting} className="w-full rounded-xl border border-slate-700 bg-black px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60">
+                    {CUSTOMER_TICKET_CATEGORIES.map((category) => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-300" htmlFor="ticket-priority">Priority *</label>
+                  <select id="ticket-priority" name="priority" value={draft.priority} onChange={handleChange} disabled={isSubmitting} className="w-full rounded-xl border border-slate-700 bg-black px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60">
+                    {CUSTOMER_TICKET_PRIORITIES.map((priority) => <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>)}
+                  </select>
+                </div>
+              </div>
 
-            {/* Category & Priority */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Category *
-                </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-black border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  {categories.map(cat => (
-                    <option key={cat.value} value={cat.value}>{cat.label}</option>
-                  ))}
-                </select>
+                <label className="mb-2 block text-sm font-medium text-gray-300" htmlFor="ticket-description">Description *</label>
+                <textarea id="ticket-description" name="description" value={draft.description} onChange={handleChange} required rows={6} maxLength={20000} disabled={isSubmitting} className="w-full resize-none rounded-xl border border-slate-700 bg-black px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" placeholder="Please provide as much detail as possible about your issue..." />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Priority *
-                </label>
-                <select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-black border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  {priorities.map(pri => (
-                    <option key={pri.value} value={pri.value}>{pri.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Description *
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-                rows={6}
-                className="w-full px-4 py-3 bg-black border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
-                placeholder="Please provide as much detail as possible about your issue..."
-              />
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Creating Ticket...
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Submit Ticket
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-      </section>
+              <button type="submit" disabled={isSubmitting} className="mep-primary flex w-full items-center justify-center gap-2 px-6 py-3 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
+                {isSubmitting ? <><Loader className="h-5 w-5 animate-spin" aria-hidden="true" />Creating ticket…</> : <><Send className="h-5 w-5" aria-hidden="true" />Submit ticket</>}
+              </button>
+            </form>
+          </div>
+        </section>
+      </main>
     </Layout>
   );
+}
+
+export default function CreateTicket() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+  const principal = useMemo(
+    () => supportPrincipalFromAuth(user, isAuthenticated === true),
+    [isAuthenticated, user?.id, user?.tenant_id, user?.role],
+  );
+  return <CreateTicketView key={principal?.key ?? 'support-unavailable'} user={user} expectedOwner={principal?.owner} />;
 }

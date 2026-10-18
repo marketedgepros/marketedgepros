@@ -59,7 +59,7 @@ export const ToastProvider = ({ children }) => {
 
 const ToastContainer = ({ toasts, removeToast }) => {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+    <div className="fixed top-4 inset-x-4 sm:left-auto sm:w-96 z-50 space-y-2 pointer-events-none" aria-label="Status messages">
       {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
       ))}
@@ -100,22 +100,23 @@ const Toast = ({ toast, onClose }) => {
 
   return (
     <div
+      role={type === 'error' ? 'alert' : 'status'}
       className={`
-        flex items-center gap-3 p-4 rounded-lg border backdrop-blur-sm
+        flex min-w-0 items-center gap-3 p-4 rounded-lg border bg-slate-950
         ${getBgColor()}
         shadow-lg pointer-events-auto
-        animate-in slide-in-from-right-full duration-300
       `}
     >
       <div className="flex-shrink-0">{getIcon()}</div>
-      <p className="text-sm text-slate-100 font-medium flex-1">{message}</p>
+      <p className="min-w-0 break-words text-sm text-slate-100 font-medium flex-1">{message}</p>
       <button
+        type="button"
+        aria-label="Dismiss status message"
         onClick={onClose}
-        className="flex-shrink-0 text-slate-400 hover:text-slate-100 transition-colors"
+        className="flex-shrink-0 rounded-lg p-2 text-slate-400 hover:text-slate-100 transition-colors"
       >
         <X className="w-4 h-4" />
       </button>
     </div>
   );
 };
-

@@ -1,300 +1,80 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
-import api from "../../services/api";
-import LineChartComponent from '../../components/charts/LineChartComponent';
-import BarChartComponent from '../../components/charts/BarChartComponent';
-import PieChartComponent from '../../components/charts/PieChartComponent';
-// AdminLayout removed - wrapped in App.jsx
-// // AdminLayout removed - wrapped in App.jsx
-// import AdminLayout from '../../components/admin/AdminLayout';
+import { useCallback, useMemo, useState } from "react";
+import useAuthStore from "../../store/authStore.js";
+import { ADMIN_INSIGHT_DAYS, loadAdminInsight } from "../../services/adminInsightViewService.js";
+import useAdminInsightRead from "../../hooks/useAdminInsightRead.js";
+import {
+  AdminInsightBoundary,
+  AdminInsightCountCards,
+  AdminInsightDailyTable,
+  AdminInsightDistribution,
+  AdminInsightReadState,
+  AdminInsightSectionTitle,
+  adminInsightButton,
+} from "../../components/admin/AdminInsightUI.jsx";
+import { AdminInsightQuickLinks } from "./AdminDashboardConnected.jsx";
 
+const dayLabels = { 7: "Last 7 UTC calendar days", 30: "Last 30 UTC calendar days", 90: "Last 90 UTC calendar days", 180: "Last 180 UTC calendar days", 365: "Last 365 UTC calendar days" };
 
-const AnalyticsDashboard = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [timeRange, setTimeRange] = useState(30);
-  const [analyticsData, setAnalyticsData] = useState(null);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [timeRange]);
-
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await api.get(`/analytics/comprehensive?days=${timeRange}`);
-      
-      setAnalyticsData(response.data.data);
-    } catch (err) {
-      setError('Failed to load analytics data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTimeRangeChange = (event) => {
-    setTimeRange(event.target.value);
-  };
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-8">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-600 dark:text-gray-300" />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-8">
-        <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
-          <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
-          <div className="text-sm">{error}</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!analyticsData) {
-    return null;
-  }
-
-  // Prepare data for charts
-  const revenueData = analyticsData.revenue_over_time || [];
-  const userGrowthData = analyticsData.user_growth || [];
-  const challengeStats = analyticsData.challenge_statistics || {};
-  const kycStats = analyticsData.kyc_statistics || {};
-  const referralStats = analyticsData.referral_statistics || {};
-  const paymentStats = analyticsData.payment_statistics || {};
-
-  // Transform challenge status distribution for pie chart
-  const challengeStatusData = (challengeStats.status_distribution || []).map(item => ({
-    name: item.status.charAt(0).toUpperCase() + item.status.slice(1),
-    value: item.count
-  }));
-
-  // Transform KYC distribution for pie chart
-  const kycDistributionData = (kycStats.distribution || []).map(item => ({
-    name: item.status.charAt(0).toUpperCase() + item.status.slice(1).replace('_', ' '),
-    value: item.count
-  }));
-
-  // Transform payment method distribution for bar chart
-  const paymentMethodData = (paymentStats.method_distribution || []).map(item => ({
-    name: item.method.charAt(0).toUpperCase() + item.method.slice(1),
-    count: item.count,
-    amount: item.total_amount
-  }));
-
+export function AnalyticsDashboardInsightContent({ read, days, onDaysChange }) {
+  const insight = read.value;
+  const isEmpty = Boolean(insight && insight.counts.users === 0 && insight.counts.challenges === 0 && insight.counts.payments === 0);
   return (
-    
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8 mb-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-gray-100">
-          Analytics Dashboard
-        </h1>
-        <div className="w-full sm:w-auto">
-          <label htmlFor="timeRange" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Time Range
-          </label>
-          <select
-            id="timeRange"
-            value={timeRange}
-            onChange={handleTimeRangeChange}
-            className="block w-full sm:min-w-[200px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-gray-100 dark:focus:ring-gray-100/10"
-          >
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-            <option value={180}>Last 6 months</option>
-            <option value={365}>Last year</option>
-          </select>
+    <div className="space-y-5 p-4 sm:p-6">
+      <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Administrator record view</p>
+          <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Recorded activity by UTC day</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Daily counts show record creation only. Recorded status distributions are current values within the selected bounded scope, not status-transition events.</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-12 gap-6">
-        {/* Revenue Over Time */}
-        <div className="col-span-12 lg:col-span-6">
-          <LineChartComponent
-            data={revenueData}
-            title="Revenue Over Time"
-            dataKeys={[
-              { key: 'revenue', name: 'Revenue ($)' },
-              { key: 'transactions', name: 'Transactions' }
-            ]}
-            colors={['#00C49F', '#8884D8']}
-            height={350}
-            yAxisLabel="Amount ($)"
-          />
+        <button type="button" className={adminInsightButton} onClick={read.refresh} disabled={read.loading}>Refresh records</button>
+      </header>
+      <AdminInsightQuickLinks current="/admin/analytics" />
+      <section className="mep-panel rounded-2xl border p-4 sm:p-5" aria-labelledby="analytics-scope-title">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div><h2 id="analytics-scope-title" className="mep-heading text-base font-semibold text-white">UTC calendar-day scope</h2><p className="mt-1 text-sm leading-6 text-slate-400">The server returns every day in this bounded UTC range, including recorded zero counts.</p></div>
+          <div className="w-full sm:w-auto"><label htmlFor="admin-insight-days" className="mb-2 block text-sm font-medium text-slate-200">Days</label><select id="admin-insight-days" value={days} onChange={(event) => onDaysChange(Number(event.target.value))} className="w-full rounded-xl border border-white/15 bg-slate-950/50 px-3 py-2.5 text-sm text-white outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-300 sm:min-w-64">{ADMIN_INSIGHT_DAYS.map((value) => <option key={value} value={value}>{dayLabels[value]}</option>)}</select></div>
         </div>
-
-        {/* User Growth */}
-        <div className="col-span-12 lg:col-span-6">
-          <LineChartComponent
-            data={userGrowthData}
-            title="User Growth"
-            dataKeys={[
-              { key: 'registrations', name: 'New Users' },
-              { key: 'cumulative', name: 'Total Users' }
-            ]}
-            colors={['#0088FE', '#FFBB28']}
-            height={350}
-            yAxisLabel="Users"
-          />
-        </div>
-
-        {/* Challenge Status Distribution */}
-        <div className="col-span-12 md:col-span-6 lg:col-span-4">
-          <PieChartComponent
-            data={challengeStatusData}
-            title="Challenge Status Distribution"
-            dataKey="value"
-            nameKey="name"
-            height={300}
-          />
-        </div>
-
-        {/* KYC Status Distribution */}
-        <div className="col-span-12 md:col-span-6 lg:col-span-4">
-          <PieChartComponent
-            data={kycDistributionData}
-            title="KYC Status Distribution"
-            dataKey="value"
-            nameKey="name"
-            height={300}
-          />
-        </div>
-
-        {/* Payment Methods */}
-        <div className="col-span-12 md:col-span-12 lg:col-span-4">
-          <BarChartComponent
-            data={paymentMethodData}
-            title="Payment Methods"
-            dataKeys={[
-              { key: 'count', name: 'Transactions' }
-            ]}
-            colors={['#8884D8']}
-            height={300}
-            xAxisKey="name"
-            layout="vertical"
-          />
-        </div>
-
-        {/* Challenge Daily Statistics */}
-        {challengeStats.daily_data && challengeStats.daily_data.length > 0 && (
-          <div className="col-span-12">
-            <LineChartComponent
-              data={challengeStats.daily_data}
-              title="Challenge Activity"
-              dataKeys={[
-                { key: 'created', name: 'Created' },
-                { key: 'completed', name: 'Completed' },
-                { key: 'funded', name: 'Funded' }
-              ]}
-              colors={['#8884D8', '#00C49F', '#FFBB28']}
-              height={350}
-              yAxisLabel="Challenges"
-            />
-          </div>
-        )}
-
-        {/* Top Performing Affiliates */}
-        {referralStats.top_affiliates && referralStats.top_affiliates.length > 0 && (
-          <div className="col-span-12">
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Top Performing Affiliates
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b-2 border-gray-200 dark:border-gray-800">
-                      <th className="py-3 px-3 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Name</th>
-                      <th className="py-3 px-3 text-left text-sm font-medium text-gray-600 dark:text-gray-300">Email</th>
-                      <th className="py-3 px-3 text-right text-sm font-medium text-gray-600 dark:text-gray-300">Referrals</th>
-                      <th className="py-3 px-3 text-right text-sm font-medium text-gray-600 dark:text-gray-300">Total Commission</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {referralStats.top_affiliates.map((affiliate) => (
-                      <tr key={affiliate.affiliate_id} className="border-b border-gray-100 dark:border-gray-800">
-                        <td className="py-3 px-3 text-sm text-gray-900 dark:text-gray-100">{affiliate.name}</td>
-                        <td className="py-3 px-3 text-sm text-gray-900 dark:text-gray-100">{affiliate.email}</td>
-                        <td className="py-3 px-3 text-sm text-right text-gray-900 dark:text-gray-100">{affiliate.referrals}</td>
-                        <td className="py-3 px-3 text-sm text-right text-gray-900 dark:text-gray-100">
-                          ${affiliate.total_commission.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Referral Statistics Summary */}
-        <div className="col-span-12 md:col-span-4">
-          <div className="h-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Referral Statistics
-            </h2>
-            <div className="mt-2">
-              <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Total Referrals
-              </div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                {referralStats.total_referrals || 0}
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Active Referrals
-              </div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                {referralStats.active_referrals || 0}
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                Conversion Rate
-              </div>
-              <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                {referralStats.conversion_rate || 0}%
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Statistics Summary */}
-        <div className="col-span-12 md:col-span-8">
-          <div className="h-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Payment Status Distribution
-            </h2>
-            <div className="mt-4 flex flex-wrap gap-6">
-              {(paymentStats.status_distribution || []).map((item) => (
-                <div key={item.status} className="min-w-[150px]">
-                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                  </div>
-                  <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                    {item.count}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
+      {insight && <AdminInsightBoundary asOf={insight.asOf} analytics />}
+      <AdminInsightReadState
+        loading={read.loading}
+        error={read.error}
+        onRetry={read.refresh}
+        empty={isEmpty}
+        emptyTitle="No records were created in this UTC range"
+        emptyMessage="The server returned zero recorded users, challenges, and payments in the selected UTC calendar-day scope. This does not establish a financial, settlement, identity, or entitlement result."
+      />
+      {!read.loading && !read.error && insight && !isEmpty && <>
+        <AdminInsightCountCards counts={insight.counts} />
+        <section className="grid gap-5 lg:grid-cols-2" aria-label="Current recorded statuses in selected scope">
+          <AdminInsightDistribution title="User roles" rows={insight.distributions.userRoles} description="Current recorded role values among records created in the selected scope." />
+          <AdminInsightDistribution title="Recorded KYC statuses" rows={insight.distributions.userKyc} description="Current recorded KYC status only; it is not provider verification evidence." />
+          <AdminInsightDistribution title="Challenge statuses" rows={insight.distributions.challengeStatus} description="Current recorded statuses, not challenge status-transition events." />
+          <AdminInsightDistribution title="Payment statuses" rows={insight.distributions.paymentStatus} description="Current recorded statuses, not payment completion or settlement events." />
+        </section>
+        <section className="space-y-3" aria-labelledby="daily-record-creation-title">
+          <AdminInsightSectionTitle id="daily-record-creation-title" icon="activity" title="Daily record creation" description="Each row is a UTC calendar day. Counts represent records created on that day; zero is shown only when returned by the server." />
+          <AdminInsightDailyTable rows={insight.dailyActivity} />
+        </section>
+      </>}
     </div>
-    
   );
-};
+}
 
-export default AnalyticsDashboard;
+export default function AnalyticsDashboard() {
+  const { user, isAuthenticated } = useAuthStore();
+  const [days, setDays] = useState(30);
+  const role = user?.role;
+  const load = useCallback((expectedOwner, signal) => loadAdminInsight({ kind: "analytics", expectedOwner, days, signal }), [days]);
+  const queryDays = useMemo(() => days, [days]);
+  const read = useAdminInsightRead({
+    isAuthenticated,
+    userId: user?.id,
+    tenantId: user?.tenant_id,
+    role,
+    kind: "analytics",
+    days: queryDays,
+    load,
+  });
+  return <AnalyticsDashboardInsightContent read={read} days={days} onDaysChange={setDays} />;
+}

@@ -1,16 +1,19 @@
 """
 Main Flask application factory
 """
+import os
 # GPT-5 FIX #3: Make gevent cooperative for true async concurrency
 # MUST be at the very top before any other imports
-import gevent.monkey
-gevent.monkey.patch_all()
+if os.environ.get('FLASK_TESTING', '').lower() != 'true':
+    import gevent.monkey
+    gevent.monkey.patch_all()
 
-# Patch psycopg2 to work with gevent
-from psycogreen.gevent import patch_psycopg
-patch_psycopg()
+    # Production-only cooperative I/O. Tests retain normal socket semantics
+    # so their outbound-network deny fixture cannot be bypassed by patching.
+    from psycogreen.gevent import patch_psycopg
+    patch_psycopg()
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -19,12 +22,16 @@ from flask_talisman import Talisman
 from src.extensions import limiter
 from src.config import get_config
 from src.database import db, init_db
+from src.production_safety import (
+    validate_demo_release_configuration,
+    validate_production_configuration,
+)
 from src.middleware.tenant_middleware import init_tenant_middleware
 import logging
 from prometheus_flask_exporter import PrometheusMetrics
 
 
-def create_app(config_name=None):
+def create_app(config_name=None, *, config_overrides=None):
     """Create and configure Flask application"""
     app = Flask(__name__)
     
@@ -35,10 +42,57 @@ def create_app(config_name=None):
     else:
         config_class = get_config()
         app.config.from_object(config_class)
-    
+
+    # Overrides must precede extension initialization (not be applied later by
+    # a fixture, when the production engine has already been constructed).
+    testing_requested = bool(app.config.get('TESTING')) or config_name == 'testing'
+    if config_overrides is not None:
+        if testing_requested and not config_overrides.get('TESTING', True):
+            raise ValueError('Testing configuration cannot be disabled by overrides')
+        app.config.update(config_overrides)
+    from src.testing_safety import validate_testing_resources
+    validate_testing_resources(app.config)
+    # Validate the final application config, including controlled test overrides,
+    # before an extension can construct a database or Redis client.
+    validate_production_configuration(app.config)
+    validate_demo_release_configuration(app.config)
+
+    # This must precede tenant middleware and route decorators.  In particular,
+    # a blocked request cannot deserialize its body, resolve a tenant, touch SQL,
+    # invoke an auth service, or contact an email/provider service.
+    if app.config.get('DEMO_RELEASE_ENABLED') is True:
+        @app.before_request
+        def enforce_demo_release_boundary():
+            path = request.path
+            blocked_auth_action = (
+                path in {
+                    '/api/v1/auth/register',
+                    '/api/v1/auth/resend-verification',
+                    '/api/v1/auth/password/reset-request',
+                    '/api/v1/auth/password/reset',
+                    '/api/v1/auth/password/verify-code',
+                    '/api/v1/auth/password/reset-with-code',
+                }
+                or path == '/api/v1/auth/verify-email'
+                or path.startswith('/api/v1/auth/verify-email/')
+            )
+            # Demo remains closed unless the independently validated account
+            # access profile is deliberately enabled. This does not relax
+            # chat, payment, order, or MT5 containment in any way.
+            if blocked_auth_action and app.config.get('PUBLIC_ACCOUNT_ACCESS_ENABLED') is not True:
+                return jsonify({
+                    'error': 'Registration and email actions are unavailable in this demo release.',
+                    'code': 'DEMO_ACTION_UNAVAILABLE',
+                }), 503
+            if path == '/api/v1/chat' or path.startswith('/api/v1/chat/'):
+                return jsonify({
+                    'error': 'Chat provider is unavailable in this demo release.',
+                    'code': 'DEMO_ACTION_UNAVAILABLE',
+                }), 503
+
     # Initialize extensions
     # Initialize Prometheus metrics
-    metrics = PrometheusMetrics(app, group_by="endpoint")
+    metrics = PrometheusMetrics(app, group_by="endpoint") if not app.testing else None
     init_db(app)
     
     # Initialize hierarchy scoping system
@@ -49,7 +103,7 @@ def create_app(config_name=None):
     
     # Initialize caching
     from src import cache
-    cache.init_app(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': 'redis://localhost:6379/0', 'CACHE_DEFAULT_TIMEOUT': 300})
+    cache.init_app(app)
     
     # Initialize tenant middleware
     init_tenant_middleware(app)
@@ -69,7 +123,7 @@ def create_app(config_name=None):
          resources={r"/api/*": {
              "origins": cors_origins,
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
+             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token", "Idempotency-Key"],
              "supports_credentials": True
          }})
     
@@ -85,8 +139,7 @@ def create_app(config_name=None):
         app.limiter = limiter
     
     # Initialize Talisman for security headers (skip in testing)
-    import os
-    if not os.environ.get('FLASK_TESTING') == 'true':
+    if not app.testing:
         Talisman(app, force_https=False)
 
     @app.after_request
@@ -113,6 +166,7 @@ def create_app(config_name=None):
     from src.routes.profile import profile_bp
     from src.routes.programs import programs_bp
     from src.routes.payments import payments_bp
+    from src.routes.orders import orders_bp
     from src.routes.uploads import uploads_bp
     from src.routes.agents import agents_bp
     from src.routes.admin import admin_bp
@@ -146,6 +200,7 @@ def create_app(config_name=None):
     app.register_blueprint(profile_bp, url_prefix='/api/v1/profile')
     app.register_blueprint(programs_bp, url_prefix='/api/v1/programs')
     app.register_blueprint(payments_bp, url_prefix='/api/v1/payments')
+    app.register_blueprint(orders_bp, url_prefix='/api/v1/orders')
     app.register_blueprint(payouts_bp)
     app.register_blueprint(scaling_bp)
     app.register_blueprint(uploads_bp, url_prefix='/api/v1/uploads')

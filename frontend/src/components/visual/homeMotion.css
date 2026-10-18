@@ -1,0 +1,219 @@
+/* Homepage-only motion: it remains visible until JavaScript confirms observer support. */
+.home-motion {
+  position: relative;
+}
+
+.home-motion__hero-background {
+  z-index: 0;
+}
+
+.home-motion__content {
+  position: relative;
+  z-index: 1;
+}
+
+.scroll-reveal {
+  will-change: opacity, transform;
+}
+
+.scroll-reveal--pending {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+}
+
+.scroll-reveal--revealed {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition: opacity 620ms ease-out, transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.home-motion__panel {
+  transition: border-color 220ms ease-out, box-shadow 220ms ease-out, transform 220ms ease-out;
+}
+
+.home-motion__image-panel {
+  box-shadow: 0 24px 65px rgba(8, 145, 178, 0.12);
+}
+
+.home-motion__ambient-ring {
+  box-shadow: 0 0 42px rgba(103, 232, 249, 0.13), inset 0 0 24px rgba(103, 232, 249, 0.04);
+  opacity: .34;
+}
+
+@keyframes homeMotionGlowBreath {
+  0%, 100% { opacity: .34; transform: scale(.97); }
+  50% { opacity: .58; transform: scale(1.03); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-motion__panel:hover {
+    transform: translateY(-2px);
+    border-color: rgba(103, 232, 249, 0.45);
+    box-shadow: 0 28px 70px rgba(8, 145, 178, 0.22);
+  }
+
+  .home-motion__image-panel:hover img {
+    filter: brightness(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal,
+  .scroll-reveal--pending,
+  .scroll-reveal--revealed,
+  .home-motion__panel,
+  .home-motion__ambient-ring {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Premium layers stay behind the copy and never introduce a fake data feed. */
+.premium-hero {
+  background: #020817;
+}
+.premium-hero__title {
+  text-wrap: balance;
+}
+.premium-hero__grid {
+  z-index: 0;
+  opacity: .23;
+  background-image: linear-gradient(rgba(103,232,249,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(103,232,249,.12) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to right, transparent, #000);
+  transform: perspective(800px) rotateX(32deg) scale(1.2);
+  transform-origin: bottom center;
+}
+.premium-hero__beam {
+  z-index: 0;
+  opacity: .32;
+  background: linear-gradient(110deg, transparent 46%, rgba(103,232,249,.14) 48%, rgba(103,232,249,.25) 49%, transparent 52%);
+  animation: none;
+}
+.premium-hero__artwork {
+  position: relative;
+  transform-origin: center;
+  animation: none;
+}
+/* Removing the animation offscreen lets the next section entry start naturally.
+   Only visible sections animate; no clock, polling, or repeating JS work. */
+.premium-hero .home-motion__ambient-ring { animation: none; }
+.premium-hero[data-motion-running="true"] .premium-hero__beam {
+  animation: premiumLightSweep 2.4s ease-in-out infinite;
+}
+.premium-hero[data-motion-running="true"] .premium-hero__artwork {
+  animation: premiumArtworkFloat 2.4s ease-in-out infinite;
+}
+.premium-hero[data-motion-running="true"] .home-motion__ambient-ring {
+  animation: homeMotionGlowBreath 2.4s ease-in-out infinite;
+}
+.premium-view-button {
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.premium-view-button[aria-pressed="true"] {
+  color: #a5f3fc;
+  border-color: #67e8f9;
+  background: rgba(34,211,238,.1);
+  box-shadow: 0 0 24px rgba(34,211,238,.08);
+}
+.premium-workspace-frame {
+  box-shadow: 0 28px 80px rgba(8,145,178,.12);
+}
+.premium-switch-in {
+  animation: premiumContentEnter 280ms cubic-bezier(.22,1,.36,1) 1;
+  overflow-wrap: anywhere;
+}
+@keyframes premiumLightSweep {
+  0%, 100% { opacity: .15; transform: translate3d(-5%,0,0); }
+  50% { opacity: .42; transform: translate3d(5%,0,0); }
+}
+@keyframes premiumArtworkFloat {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(0,-9px,0); }
+}
+@keyframes premiumContentEnter {
+  from { opacity: .55; transform: translate3d(0,8px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+
+/* Reduced motion reveals all content without entrance transitions. */
+.home-motion[data-visual-paused="true"] .scroll-reveal,
+.home-motion[data-visual-paused="true"] .home-motion__panel,
+.home-motion[data-visual-paused="true"] .premium-switch-in,
+.home-motion[data-visual-paused="true"] .program-selector-card {
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+@media (max-width: 639px) {
+  .premium-hero__grid { background-size: 48px 48px; }
+  .premium-hero__beam {
+    background: radial-gradient(ellipse at 60% 22%, rgba(34,211,238,.3), transparent 55%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .premium-hero__beam, .premium-hero__artwork, .premium-switch-in {
+    animation: none !important;
+    transform: none !important;
+  }
+  .premium-view-button { transition: none !important; }
+}
+
+/* Existing globe artwork becomes a centred section scene, never a data feed. */
+.home-help-globe {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 3.5rem 0;
+  background: #050c1b;
+}
+.home-help-globe__scene {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.home-help-globe__light {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 28%, rgba(8,145,178,.15), transparent 62%);
+}
+.home-help-globe__orbit {
+  position: absolute;
+  top: -5.25rem;
+  left: 50%;
+  width: min(112vw, 42rem);
+  margin-left: max(-56vw, -21rem);
+  animation: none;
+  transform-origin: center;
+}
+.home-help-globe__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: .8;
+  mix-blend-mode: screen;
+  mask-image: radial-gradient(ellipse closest-side, #000 56%, transparent 98%);
+}
+.home-help-globe__copy {
+  position: relative;
+  padding-top: clamp(18rem, 38vw, 28rem);
+  text-wrap: balance;
+}
+.home-help-globe[data-motion-running="true"] .home-help-globe__orbit {
+  animation: homeHelpGlobeFloat 2.4s ease-in-out infinite;
+}
+@keyframes homeHelpGlobeFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.2deg); }
+  50% { transform: translate3d(0, -12px, 0) rotate(1.2deg); }
+}
+@media (max-width: 639px) {
+  .home-help-globe { padding-bottom: 2.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-help-globe__orbit { animation: none !important; transform: none !important; }
+}

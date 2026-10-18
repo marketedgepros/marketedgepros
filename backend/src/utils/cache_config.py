@@ -1,5 +1,5 @@
 """
-Redis Caching configuration for PropTradePro
+Redis Caching configuration for MarketEdgePros
 Add this to app.py after app creation
 """
 
@@ -12,7 +12,7 @@ def init_cache(app):
         'CACHE_TYPE': 'RedisCache',
         'CACHE_REDIS_URL': app.config.get('REDIS_URL', 'redis://localhost:6379/2'),
         'CACHE_DEFAULT_TIMEOUT': 300,  # 5 minutes default
-        'CACHE_KEY_PREFIX': 'proptradepro_',
+        'CACHE_KEY_PREFIX': 'marketedgepros_',
     }
     
     app.config.from_mapping(cache_config)

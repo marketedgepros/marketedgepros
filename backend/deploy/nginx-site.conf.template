@@ -1,0 +1,122 @@
+# Render @RELEASE_PATH@ to the immutable release root, for example:
+# /var/www/marketedgepros/releases/<git-sha>
+# Existing DNS/IP ownership is preserved: marketedgepros.com and www.marketedgepros.com
+# only. This template neither issues TLS certificates nor changes firewall settings.
+
+upstream marketedgepros_api {
+    server 127.0.0.1:5001;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name marketedgepros.com www.marketedgepros.com;
+    return 301 https://marketedgepros.com$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name marketedgepros.com www.marketedgepros.com;
+
+    # Reuse the already provisioned certificate; do not request or issue a new one.
+    ssl_certificate /etc/letsencrypt/live/marketedgepros.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/marketedgepros.com/privkey.pem;
+
+    # @RELEASE_PATH@ must be replaced with /var/www/marketedgepros/releases/<git-sha>.
+    root @RELEASE_PATH@/frontend/dist;
+    index index.html;
+    server_tokens off;
+    proxy_connect_timeout 5s;
+    proxy_send_timeout 35s;
+    proxy_read_timeout 35s;
+
+    # Never expose dotfiles, source backups, private material, or auth-data from a release.
+    location ~* (^|/)(?:\.|[^/]*(?:backup|private|auth[-_]data)[^/]*)(?:/|$) {
+        return 404;
+    }
+
+    # The backend is reachable only through the canonical API namespace. The URI is
+    # intentionally preserved, so /api/v1/health is handled by the backend as-is.
+    location = /api {
+        return 404;
+    }
+
+    location ^~ /api/ {
+        proxy_pass http://marketedgepros_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }
+
+    location = /health {
+        proxy_pass http://marketedgepros_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Keep operational subchecks out of the SPA fallback as well.
+    location ^~ /health/ {
+        proxy_pass http://marketedgepros_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Generated at bundle time and contains only the audited Git SHA.
+    location = /release.json {
+        add_header Cache-Control "no-store" always;
+        try_files /release.json =404;
+    }
+
+    location = /manus-routes.json {
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    location = /manifest.json {
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    # Only Vite-hashed assets may be immutable. The rule also recognizes precompressed
+    # .br and .gz build artifacts; nonmatching /assets paths remain unavailable below.
+    location ~ "^/assets/[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+(\.(br|gz))?$" {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    location /assets/ {
+        return 404;
+    }
+
+    # Fixed, non-hashed image URLs must be revalidated rather than made immutable.
+    location ~* \.(?:avif|gif|ico|jpe?g|png|svg|webp)$ {
+        add_header Cache-Control "no-cache" always;
+        try_files $uri =404;
+    }
+
+    # A requested filename with an extension is an asset request, never an SPA page.
+    location ~* "\.[A-Za-z0-9]{1,16}$" {
+        try_files $uri =404;
+    }
+
+    # Browser page routes (including legacy-looking /auth or /users routes) are SPA
+    # routes only; they are not backend proxy aliases.
+    location / {
+        add_header Cache-Control "no-store" always;
+        try_files $uri $uri/ /index.html;
+    }
+}

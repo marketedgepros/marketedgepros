@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
                 <Shield className="w-10 h-10 text-white" />
               </div>
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-8">
+            <h1 className="mep-heading text-5xl md:text-7xl font-bold mb-8">
               Privacy{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                 Policy
@@ -78,7 +78,7 @@ export default function PrivacyPolicy() {
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mb-6">
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                    <h2 className="mep-heading text-2xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                       {section.title}
                     </h2>
                     <p className="text-gray-300 text-lg leading-relaxed">
@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
 
             {/* Data We Collect */}
             <div className="max-w-4xl mx-auto mb-16">
-              <h2 className="text-4xl font-bold mb-8 text-center">
+              <h2 className="mep-heading text-4xl font-bold mb-8 text-center">
                 Data We{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">
                   Collect

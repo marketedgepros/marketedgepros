@@ -1,0 +1,217 @@
+{
+  "routes": [
+    {
+      "path": "/"
+    },
+    {
+      "path": "/home"
+    },
+    {
+      "path": "/programs"
+    },
+    {
+      "path": "/programs/:programId/checkout"
+    },
+    {
+      "path": "/programs/:id"
+    },
+    {
+      "path": "/about"
+    },
+    {
+      "path": "/how-it-works"
+    },
+    {
+      "path": "/faq"
+    },
+    {
+      "path": "/contact"
+    },
+    {
+      "path": "/free-course"
+    },
+    {
+      "path": "/lightning-challenge"
+    },
+    {
+      "path": "/support"
+    },
+    {
+      "path": "/support/create-ticket"
+    },
+    {
+      "path": "/support/my-tickets"
+    },
+    {
+      "path": "/support/ticket/:ticketNumber"
+    },
+    {
+      "path": "/support/:slug"
+    },
+    {
+      "path": "/blog"
+    },
+    {
+      "path": "/blog/:slug"
+    },
+    {
+      "path": "/affiliate"
+    },
+    {
+      "path": "/affiliate/payout"
+    },
+    {
+      "path": "/terms-of-service"
+    },
+    {
+      "path": "/terms"
+    },
+    {
+      "path": "/privacy-policy"
+    },
+    {
+      "path": "/privacy"
+    },
+    {
+      "path": "/risk-disclosure"
+    },
+    {
+      "path": "/trading-rules"
+    },
+    {
+      "path": "/refund-policy"
+    },
+    {
+      "path": "/cookie-policy"
+    },
+    {
+      "path": "/careers"
+    },
+    {
+      "path": "/login"
+    },
+    {
+      "path": "/register"
+    },
+    {
+      "path": "/verify-email"
+    },
+    {
+      "path": "/forgot-password"
+    },
+    {
+      "path": "/reset-password"
+    },
+    {
+      "path": "/dashboard"
+    },
+    {
+      "path": "/scaling"
+    },
+    {
+      "path": "/kyc"
+    },
+    {
+      "path": "/profile"
+    },
+    {
+      "path": "/challenges"
+    },
+    {
+      "path": "/challenges/:id"
+    },
+    {
+      "path": "/documents"
+    },
+    {
+      "path": "/wallet"
+    },
+    {
+      "path": "/settings"
+    },
+    {
+      "path": "/notifications"
+    },
+    {
+      "path": "/settings/notifications"
+    },
+    {
+      "path": "/admin"
+    },
+    {
+      "path": "/admin/dashboard"
+    },
+    {
+      "path": "/admin/analytics"
+    },
+    {
+      "path": "/admin/users"
+    },
+    {
+      "path": "/admin/programs"
+    },
+    {
+      "path": "/admin/payments"
+    },
+    {
+      "path": "/admin/challenges"
+    },
+    {
+      "path": "/admin/kyc-approval"
+    },
+    {
+      "path": "/admin/payment-approvals"
+    },
+    {
+      "path": "/admin/withdrawals"
+    },
+    {
+      "path": "/admin/crm"
+    },
+    {
+      "path": "/admin/crm/:id"
+    },
+    {
+      "path": "/admin/settings"
+    },
+    {
+      "path": "/agent"
+    },
+    {
+      "path": "/agent/traders"
+    },
+    {
+      "path": "/agent/commissions"
+    },
+    {
+      "path": "/agent/reports"
+    },
+    {
+      "path": "/affiliate/dashboard"
+    },
+    {
+      "path": "/affiliate/traders"
+    },
+    {
+      "path": "/affiliate/commissions"
+    },
+    {
+      "path": "/affiliate/reports"
+    },
+    {
+      "path": "/user/dashboard"
+    },
+    {
+      "path": "/trader"
+    },
+    {
+      "path": "/trader/history"
+    },
+    {
+      "path": "/trader/withdrawals"
+    },
+    {
+      "path": "/trader/documents"
+    }
+  ]
+}

@@ -1,14 +1,17 @@
 """
 User routes for profile and account management
 """
-from flask import Blueprint, request, jsonify, g
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+
+from flask import Blueprint, request, jsonify, g, current_app
+from sqlalchemy import case, desc, func
+from sqlalchemy.orm import joinedload
+
 from src.database import db
 from src.models.user import User
-from src.models.trading_program import Challenge
-from src.models.payment import Payment
+from src.models.trading_program import Challenge, TradingProgram
 from src.utils.decorators import token_required
-from datetime import datetime
-from sqlalchemy import func, desc
 
 users_bp = Blueprint('users', __name__)
 
@@ -16,76 +19,147 @@ users_bp = Blueprint('users', __name__)
 @users_bp.route('/dashboard', methods=['GET'])
 @token_required
 def get_user_dashboard():
-    """Get user dashboard statistics - works for all user types"""
-    try:
-        user = g.current_user
-        
-        # Get challenges count
-        total_challenges = Challenge.query.filter_by(user_id=user.id).count()
-        active_challenges = Challenge.query.filter_by(user_id=user.id, status='active').count()
-        passed_challenges = Challenge.query.filter_by(user_id=user.id, status='passed').count()
-        failed_challenges = Challenge.query.filter_by(user_id=user.id, status='failed').count()
-        funded_challenges = Challenge.query.filter_by(user_id=user.id, status='funded').count()
-        
-        # Get total profit from all challenges
-        challenges = Challenge.query.filter_by(user_id=user.id).all()
-        total_profit = 0
-        for challenge in challenges:
-            if challenge.current_balance and challenge.initial_balance:
-                profit = float(challenge.current_balance) - float(challenge.initial_balance)
-                if profit > 0:
-                    total_profit += profit
-        
-        # Get payments
-        total_spent = db.session.query(func.sum(Payment.amount)).filter(
-            Payment.user_id == user.id,
-            Payment.status == 'completed',
-            Payment.purpose == 'challenge_purchase'
-        ).scalar() or 0
-        
-        # Get recent challenges
-        recent_challenges = Challenge.query.filter_by(
-            user_id=user.id
-        ).order_by(desc(Challenge.created_at)).limit(5).all()
-        
-        # Calculate success rate
-        completed_challenges = passed_challenges + failed_challenges
-        success_rate = (passed_challenges / completed_challenges * 100) if completed_challenges > 0 else 0
-        
+    """Return a bounded view of the caller's locally recorded legacy rows."""
+    user = g.current_user
+    tenant_id = user.tenant_id
+    # Do not infer a brand from a challenge or its program.  Refuse before any
+    # dashboard-resource SQL when the authenticated principal lacks a tenant.
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
         return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    owner_context = {'user_id': user.id, 'tenant_id': tenant_id}
+    try:
+        def decimal_string(value):
+            """Preserve finite legacy Numeric values without float conversion."""
+            if value is None or isinstance(value, bool):
+                return None
+            try:
+                decimal_value = value if isinstance(value, Decimal) else Decimal(str(value))
+            except (InvalidOperation, TypeError, ValueError):
+                return None
+            return format(decimal_value, 'f') if decimal_value.is_finite() else None
+
+        # ``Challenge`` has no tenant_id.  Both read queries explicitly join its
+        # program and constrain the program tenant as well as the authenticated
+        # owner, rather than trusting a challenge row's implied tenancy.
+        with db.session.no_autoflush:
+            status_totals = (
+                db.session.query(
+                    func.count(Challenge.id).label('total'),
+                    func.sum(case((Challenge.status == 'pending', 1), else_=0)).label('pending'),
+                    func.sum(case((Challenge.status == 'active', 1), else_=0)).label('active'),
+                    func.sum(case((Challenge.status == 'passed', 1), else_=0)).label('passed'),
+                    func.sum(case((Challenge.status == 'failed', 1), else_=0)).label('failed'),
+                    func.sum(case((Challenge.status == 'funded', 1), else_=0)).label('funded'),
+                )
+                .select_from(Challenge)
+                .join(TradingProgram, Challenge.program_id == TradingProgram.id)
+                .filter(
+                    Challenge.user_id == user.id,
+                    TradingProgram.tenant_id == tenant_id,
+                )
+                .one()
+            )
+            status_counts = {
+                name: int(getattr(status_totals, name) or 0)
+                for name in ('total', 'pending', 'active', 'passed', 'failed', 'funded')
+            }
+            recorded_outcomes = status_counts['passed'] + status_counts['failed']
+            success_rate = (
+                round((status_counts['passed'] / recorded_outcomes) * 100, 2)
+                if recorded_outcomes else None
+            )
+            recent_challenges = (
+                Challenge.query.execution_options(autoflush=False)
+                .join(TradingProgram, Challenge.program_id == TradingProgram.id)
+                .options(joinedload(Challenge.program))
+                .filter(
+                    Challenge.user_id == user.id,
+                    TradingProgram.tenant_id == tenant_id,
+                )
+                .order_by(desc(Challenge.created_at), desc(Challenge.id))
+                .limit(5)
+                .all()
+            )
+
+        recent_rows = []
+        for challenge in recent_challenges:
+            initial_balance = decimal_string(challenge.initial_balance)
+            current_balance = decimal_string(challenge.current_balance)
+            profit = None
+            if initial_balance is not None and current_balance is not None:
+                # This is arithmetic over recorded legacy balances only, never
+                # a provider-verified trading result.
+                profit = decimal_string(Decimal(current_balance) - Decimal(initial_balance))
+            recent_rows.append({
+                'id': challenge.id,
+                'user_id': user.id,
+                'program_name': challenge.program.name if challenge.program else None,
+                'status': challenge.status,
+                'status_data_status': 'recorded_not_verified',
+                'phase': challenge.current_phase,
+                'total_phases': challenge.total_phases,
+                'initial_balance': initial_balance,
+                'current_balance': current_balance,
+                'balance_data_quality': 'legacy_unverified',
+                'profit': profit,
+                'profit_data_status': (
+                    'recorded_not_verified'
+                    if profit is not None else 'unavailable_missing_recorded_balance'
+                ),
+                # Challenge records have no source currency column.
+                'currency': None,
+                # There is no approved dashboard target/provenance contract.
+                'progress': None,
+                'progress_data_status': 'unavailable_no_approved_rule_source',
+                'created_at': challenge.created_at.isoformat() if challenge.created_at else None,
+            })
+
+        return jsonify({
+            'owner_context': owner_context,
             'user': {
                 'id': user.id,
-                'email': user.email,
+                'tenant_id': tenant_id,
                 'first_name': user.first_name,
-                'last_name': user.last_name,
                 'role': user.role,
-                'kyc_status': user.kyc_status,
-                'is_verified': user.is_verified
             },
             'statistics': {
-                'total_challenges': total_challenges,
-                'active_challenges': active_challenges,
-                'passed_challenges': passed_challenges,
-                'failed_challenges': failed_challenges,
-                'funded_challenges': funded_challenges,
-                'success_rate': round(success_rate, 2),
-                'total_profit': round(total_profit, 2),
-                'total_spent': float(total_spent)
+                'status_counts': status_counts,
+                'status_counts_data_status': 'recorded_legacy_statuses',
+                'success_rate': success_rate,
+                'success_rate_data_status': (
+                    'recorded_legacy_statuses'
+                    if success_rate is not None else 'unavailable_no_recorded_outcomes'
+                ),
+                # Payment and trading rows have no verified provenance contract.
+                'total_profit': None,
+                'total_profit_data_status': 'unavailable_no_verified_provenance',
+                'total_spent': None,
+                'total_spent_data_status': 'unavailable_no_verified_provenance',
+                'data_quality': 'legacy_unverified',
             },
-            'recent_challenges': [{
-                'id': challenge.id,
-                'program_name': challenge.program.name if challenge.program else 'Unknown',
-                'status': challenge.status,
-                'phase': challenge.phase,
-                'current_balance': float(challenge.current_balance) if challenge.current_balance else 0,
-                'initial_balance': float(challenge.initial_balance) if challenge.initial_balance else 0,
-                'profit': float(challenge.current_balance or 0) - float(challenge.initial_balance or 0),
-                'created_at': challenge.created_at.isoformat() if challenge.created_at else None
-            } for challenge in recent_challenges]
+            'recent_challenges': recent_rows,
+            'data_quality': {
+                'challenge_statuses': 'legacy_unverified',
+                'trading_balances': 'legacy_unverified',
+                'financial_totals': 'unavailable_no_verified_provenance',
+                'provider_verification': 'not_available',
+            },
         }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('User dashboard read failed')
+        return jsonify({
+            'error': 'Dashboard is temporarily unavailable',
+            'code': 'USER_DASHBOARD_UNAVAILABLE',
+        }), 503
 
 
 @users_bp.route('/profile', methods=['GET'])
@@ -135,6 +209,8 @@ def update_profile():
 @token_required
 def get_users_hierarchy():
     """Get users in hierarchical tree structure based on parent_id"""
+    if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False):
+        return jsonify({'error': 'Expanded hierarchy is disabled in launch mode', 'code': 'EXPANDED_HIERARCHY_DISABLED'}), 409
     try:
         # Get all users
         users = User.query.all()

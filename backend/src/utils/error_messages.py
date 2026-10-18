@@ -31,8 +31,8 @@ ERROR_MESSAGES = {
         'code': 'ERR_005'
     },
     'WEAK_PASSWORD': {
-        'en': 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character',
-        'he': 'הסיסמה חייבת להכיל לפחות 8 תווים, אות גדולה, אות קטנה, מספר ותו מיוחד',
+        'en': 'Password must be at least 8 characters and include uppercase, lowercase and number. A special character is recommended.',
+        'he': 'הסיסמה חייבת להכיל לפחות 8 תווים, אות גדולה, אות קטנה ומספר. תו מיוחד מומלץ אך אינו חובה.',
         'code': 'ERR_006'
     },
     'INVALID_PHONE_FORMAT': {

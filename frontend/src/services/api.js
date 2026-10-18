@@ -1,6 +1,76 @@
 import axios from 'axios';
 
 const API_BASE_URL = '/api/v1';
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const INVALID_REFRESH_RESPONSE = 'Refresh response was invalid.';
+
+export const isJsonObject = (value) => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+export const isUnsafeMethod = (method) => UNSAFE_METHODS.has((method || 'GET').toUpperCase());
+
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+
+export const isSameOriginRequest = (url, baseURL = API_BASE_URL, origin) => {
+  const currentOrigin = origin || (typeof window !== 'undefined' ? window.location.origin : null);
+  if (!currentOrigin) {
+    // In non-browser environments, only relative URLs are safe to decorate.
+    return !/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(String(url || ''))
+      && !/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(String(baseURL || ''));
+  }
+
+  try {
+    const resolvedBase = new URL(baseURL || API_BASE_URL, currentOrigin);
+    const resolvedUrl = new URL(url || '', resolvedBase);
+    return resolvedUrl.origin === currentOrigin;
+  } catch (error) {
+    return false;
+  }
+};
+
+export const shouldAttachCsrfToken = (config, csrfToken, origin) => (
+  isNonEmptyString(csrfToken)
+  && isUnsafeMethod(config?.method)
+  && isSameOriginRequest(config?.url, config?.baseURL || API_BASE_URL, origin)
+);
+
+export const isCompleteRefreshResponse = (data) => (
+  isJsonObject(data)
+  && isNonEmptyString(data.access_token)
+  && isNonEmptyString(data.refresh_token)
+  && isNonEmptyString(data.csrf_token)
+);
+
+const readStorage = (key) => (
+  typeof localStorage === 'undefined' ? null : localStorage.getItem(key)
+);
+
+const clearLegacyAuthStorage = () => {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('csrf_token');
+  localStorage.removeItem('user');
+};
+
+const saveRotatedTokens = (data) => {
+  if (!isCompleteRefreshResponse(data)) {
+    throw new Error(INVALID_REFRESH_RESPONSE);
+  }
+
+  localStorage.setItem('access_token', data.access_token);
+  localStorage.setItem('refresh_token', data.refresh_token);
+  localStorage.setItem('csrf_token', data.csrf_token);
+};
+
+const isLoginOrRefreshRequest = (config) => {
+  const url = String(config?.url || '').split('?')[0];
+  return url.includes('/auth/login')
+    || url.includes('/auth/refresh')
+    || url.includes('/auth/register')
+    || url.includes('/auth/password/');
+};
 
 // Create axios instance
 const api = axios.create({
@@ -8,74 +78,96 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Send cookies with requests
+  withCredentials: true,
 });
 
-// Request interceptor to add auth token
+// Keep bearer-token compatibility while cookie sessions are being introduced. CSRF is
+// sent only to same-origin unsafe requests, never to a caller-supplied foreign URL.
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
+    const isSameOrigin = isSameOriginRequest(config.url, config.baseURL || API_BASE_URL);
+    const token = readStorage('access_token');
+    const csrfToken = readStorage('csrf_token');
+    config.headers = config.headers || {};
+
+    if (!config._skipAuthorization && isSameOrigin && isNonEmptyString(token)) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (shouldAttachCsrfToken(config, csrfToken)) {
+      config.headers['X-CSRF-Token'] = csrfToken;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle errors
+let refreshPromise = null;
+
+const refreshSession = async () => {
+  const refreshToken = readStorage('refresh_token');
+  const response = await api.post(
+    '/auth/refresh',
+    isNonEmptyString(refreshToken) ? { refresh_token: refreshToken } : {},
+    {
+      // The endpoint accepts either its HttpOnly cookie or this legacy body token.
+      _skipAuthRefresh: true,
+      _skipAuthorization: true,
+    }
+  );
+  saveRotatedTokens(response?.data);
+  return response.data;
+};
+
+const requestRefresh = () => {
+  if (!refreshPromise) {
+    refreshPromise = refreshSession().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+};
+
+export const sessionLoginRedirect = (location) => {
+  const path = typeof location?.pathname === 'string' ? location.pathname : '/';
+  const search = typeof location?.search === 'string' ? location.search : '';
+  if (!path.startsWith('/') || path.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(path + search)) return '/login';
+  return `/login?redirect=${encodeURIComponent(path + search)}`;
+};
+
+const redirectToLogin = () => {
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.assign(sessionLoginRedirect(window.location));
+  }
+};
+
+// Response interceptor retries a request once after a single shared refresh. Refresh can
+// rely on an HttpOnly cookie even when the legacy refresh_token key is absent.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    // If 401 and we have a refresh token, try to refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      if (refreshToken) {
-        try {
-          // Call refresh endpoint with refresh_token in body
-          const response = await axios.post(
-            `${API_BASE_URL}/auth/refresh`,
-            { refresh_token: refreshToken },  // Send refresh_token in body
-            { withCredentials: true }  // Also send cookies
-          );
-          
-          // Get access_token from response body
-          const { access_token } = response.data;
-          
-          if (access_token) {
-            // Save new access token
-            localStorage.setItem('access_token', access_token);
-            
-            // Update original request with new token
-            originalRequest.headers.Authorization = `Bearer ${access_token}`;
-            
-            // Retry original request
-            return api(originalRequest);
-          } else {
-            throw new Error('No access token in refresh response');
-          }
-        } catch (refreshError) {
-          // Refresh failed, logout user
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
-        }
-      } else {
-        // No refresh token, redirect to login
-        window.location.href = '/login';
-      }
+    const canRefresh = error.response?.status === 401
+      && originalRequest
+      && !originalRequest._retry
+      && !originalRequest._skipAuthRefresh
+      && !isLoginOrRefreshRequest(originalRequest)
+      && isSameOriginRequest(originalRequest.url, originalRequest.baseURL || API_BASE_URL);
+
+    if (!canRefresh) {
+      return Promise.reject(error);
     }
-    
-    return Promise.reject(error);
+
+    originalRequest._retry = true;
+    try {
+      const refreshed = await requestRefresh();
+      originalRequest.headers = originalRequest.headers || {};
+      originalRequest.headers.Authorization = `Bearer ${refreshed.access_token}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      clearLegacyAuthStorage();
+      redirectToLogin();
+      return Promise.reject(refreshError);
+    }
   }
 );
 
@@ -147,17 +239,17 @@ export default api;
 
 // Profile API
 export const profileAPI = {
-  get: () => api.get('/profile'),
-  update: (data) => api.put('/profile', data),
-  changePassword: (data) => api.put('/profile/password', data),
-  uploadAvatar: (file) => {
+  get: (config = {}) => api.get('/profile', config),
+  update: (data, config = {}) => api.put('/profile', data, config),
+  changePassword: (data, config = {}) => api.put('/profile/password', data, { ...config, _skipAuthRefresh: true }),
+  uploadAvatar: (file, config = {}) => {
     const formData = new FormData();
     formData.append('avatar', file);
     return api.post('/profile/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      ...config, headers: { ...config.headers, 'Content-Type': undefined },
     });
   },
-  deleteAvatar: () => api.delete('/profile/avatar'),
+  deleteAvatar: (config = {}) => api.delete('/profile/avatar', config),
   getStats: () => api.get('/profile/stats'),
 };
 
@@ -224,7 +316,7 @@ export const challengesAPI = {
 // Traders API
 export const tradersAPI = {
   getDashboard: () => api.get('/traders/dashboard'),
-  getTradingHistory: (params) => api.get('/traders/trading-history', { params }),
+  getTradingHistory: (params, config = {}) => api.get('/traders/history', { ...config, params }),
   getWithdrawals: () => api.get('/traders/withdrawals'),
   requestWithdrawal: (data) => api.post('/traders/withdrawals', data),
   getDocuments: () => api.get('/traders/documents'),
@@ -318,4 +410,3 @@ export const handleApiError = (error) => {
     };
   }
 };
-

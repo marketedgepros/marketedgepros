@@ -1,298 +1,106 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from "../../services/api";
-import Layout from '../../components/layout/Layout';
-import { DollarSign, CreditCard, Clock, CheckCircle, XCircle, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowLeft, ArrowRight, CircleAlert, ClipboardCheck, DollarSign,
+  Fingerprint, LifeBuoy, LockKeyhole, ReceiptText, ShieldCheck,
+} from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://marketedgepros.com/api/v1';
+const accountLink = 'inline-flex items-center gap-2 rounded-lg text-sm font-semibold text-cyan-300 transition-colors hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-950 motion-reduce:transition-none';
+const cardLink = 'group rounded-xl border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-4 focus-visible:ring-offset-slate-950 motion-reduce:transition-none';
+
+// Conceptual examples only; no live payout state machine or approved customer policy.
+const requirements = [
+  { title: 'Referral records', icon: Fingerprint, text: 'A future service may need to associate a referral with the relevant account and order. No referral or identity review is performed on this page.' },
+  { title: 'Payment records', icon: ReceiptText, text: 'A future service may need verified payment information and approved commission terms. A referral record alone does not establish an amount payable.' },
+  { title: 'Review status', icon: ShieldCheck, text: 'Any future eligibility checks would depend on business terms approved for the program. No eligibility decision is made here.' },
+  { title: 'Transfer handling', icon: ClipboardCheck, text: 'A future payout service would need an approved transfer process and reliable outcome handling. No payout is requested or sent here.' },
+];
 
 export default function AffiliatePayout() {
-  const navigate = useNavigate();
-  const [balance, setBalance] = useState({
-    pending: 0,
-    approved: 0,
-    paid: 0,
-    available: 0
-  });
-  const [payouts, setPayouts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [requesting, setRequesting] = useState(false);
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const [payoutMethod, setPayoutMethod] = useState('paypal');
-  const [payoutDetails, setPayoutDetails] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    fetchPayoutData();
-  }, []);
-
-  const fetchPayoutData = async () => {
-    
-    if (!token) {
-      navigate('/login?redirect=/affiliate/payout');
-      return;
-    }
-
-    try {
-      const [balanceRes, payoutsRes] = await Promise.all([
-        api.get(`${API_URL}/affiliate/balance`),
-        api.get(`${API_URL}/affiliate/payouts`)
-      ]);
-      
-      setBalance(balanceRes.data.balance);
-      setPayouts(payoutsRes.data.payouts);
-    } catch (err) {
-      if (err.response?.status === 404) {
-        navigate('/affiliate');
-      }
-      console.error('Failed to fetch payout data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestPayout = async (e) => {
-    e.preventDefault();
-    
-    setRequesting(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await api.post(
-        `${API_URL}/affiliate/payouts/request`,
-        {
-          method: payoutMethod,
-          details: payoutDetails
-        }
-      );
-      
-      setSuccess('Payout request submitted successfully!');
-      setShowRequestForm(false);
-      setPayoutDetails('');
-      fetchPayoutData();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to request payout');
-    } finally {
-      setRequesting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-slate-900">
-          <div className="text-xl text-white">Loading payout information...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  const minPayout = 50;
-  const canRequestPayout = balance.available >= minPayout;
-
   return (
-    <Layout>
-      <div className="min-h-screen bg-slate-900 py-12">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Payout Management</h1>
-            <p className="text-gray-400">Request payouts and view your payment history</p>
+    <div className="mep-screen min-h-screen text-white">
+      <section className="border-b border-cyan-400/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-slate-950 to-slate-950">
+        <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+          <Link to="/affiliate/dashboard" className={accountLink}>
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+            Back to affiliate dashboard
+          </Link>
+          <div className="mt-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Affiliate account</p>
+              <h1 className="mep-heading mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Payout status</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+                Payout execution is unavailable. This page explains the current limitation and outlines possible future checks.
+              </p>
+            </div>
+            <span className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/5 px-3 py-2 text-xs font-semibold text-amber-200">
+              <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5" />
+              Execution unavailable
+            </span>
           </div>
-
-          {/* Balance Overview */}
-          <div className="grid md:grid-cols-4 gap-6 mb-8">
-            <div className="p-6 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 backdrop-blur-sm border border-yellow-500/20 rounded-xl">
-              <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center mb-4">
-                <Clock className="w-6 h-6 text-yellow-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">${balance.pending.toFixed(2)}</div>
-              <div className="text-sm text-gray-400">Pending</div>
-            </div>
-
-            <div className="p-6 bg-gradient-to-br from-green-500/10 to-green-600/5 backdrop-blur-sm border border-green-500/20 rounded-xl">
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
-                <CheckCircle className="w-6 h-6 text-green-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">${balance.approved.toFixed(2)}</div>
-              <div className="text-sm text-gray-400">Approved</div>
-            </div>
-
-            <div className="p-6 bg-gradient-to-br from-blue-500/10 to-blue-600/5 backdrop-blur-sm border border-blue-500/20 rounded-xl">
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4">
-                <DollarSign className="w-6 h-6 text-blue-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">${balance.paid.toFixed(2)}</div>
-              <div className="text-sm text-gray-400">Paid</div>
-            </div>
-
-            <div className="p-6 bg-gradient-to-br from-purple-500/10 to-purple-600/5 backdrop-blur-sm border border-purple-500/20 rounded-xl">
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
-                <CreditCard className="w-6 h-6 text-purple-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">${balance.available.toFixed(2)}</div>
-              <div className="text-sm text-gray-400">Available</div>
-            </div>
-          </div>
-
-          {/* Request Payout Section */}
-          <div className="p-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Request Payout</h2>
-                <p className="text-gray-400">Minimum payout amount: ${minPayout}</p>
-              </div>
-              {!showRequestForm && (
-                <button
-                  onClick={() => setShowRequestForm(true)}
-                  disabled={!canRequestPayout}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white font-semibold hover:from-blue-600 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Send className="w-5 h-5" />
-                  Request Payout
-                </button>
-              )}
-            </div>
-
-            {!canRequestPayout && !showRequestForm && (
-              <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400">
-                You need at least ${minPayout} in available balance to request a payout. 
-                Current available: ${balance.available.toFixed(2)}
-              </div>
-            )}
-
-            {error && (
-              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400">
-                {error}
-              </div>
-            )}
-            
-            {success && (
-              <div className="mb-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400">
-                {success}
-              </div>
-            )}
-
-            {showRequestForm && (
-              <form onSubmit={handleRequestPayout} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Payout Method
-                  </label>
-                  <select
-                    value={payoutMethod}
-                    onChange={(e) => setPayoutMethod(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="paypal">PayPal</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="crypto">Cryptocurrency</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    {payoutMethod === 'paypal' && 'PayPal Email'}
-                    {payoutMethod === 'bank_transfer' && 'Bank Account Details'}
-                    {payoutMethod === 'crypto' && 'Crypto Wallet Address'}
-                  </label>
-                  <textarea
-                    value={payoutDetails}
-                    onChange={(e) => setPayoutDetails(e.target.value)}
-                    placeholder={
-                      payoutMethod === 'paypal' ? 'your@email.com' :
-                      payoutMethod === 'bank_transfer' ? 'Bank name, Account number, Routing number' :
-                      'Wallet address'
-                    }
-                    rows={3}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-sm">
-                  <strong>Amount to be paid:</strong> ${balance.available.toFixed(2)}
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={requesting}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white font-semibold hover:from-blue-600 hover:to-purple-700 transition disabled:opacity-50"
-                  >
-                    {requesting ? 'Submitting...' : 'Submit Request'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowRequestForm(false);
-                      setError('');
-                      setSuccess('');
-                    }}
-                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-gray-300 hover:bg-white/10 transition"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-
-          {/* Payout History */}
-          <div className="p-6 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl">
-            <h2 className="text-2xl font-bold text-white mb-6">Payout History</h2>
-            {payouts && payouts.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="text-left py-3 px-4 text-gray-400 font-semibold">Date</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-semibold">Method</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-semibold">Status</th>
-                      <th className="text-right py-3 px-4 text-gray-400 font-semibold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payouts.map((payout) => (
-                      <tr key={payout.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-3 px-4 text-gray-300">
-                          {new Date(payout.requested_at).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-4 text-gray-300 capitalize">
-                          {payout.method.replace('_', ' ')}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            payout.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                            payout.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
-                            payout.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-red-500/20 text-red-400'
-                          }`}>
-                            {payout.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right text-white font-semibold">
-                          ${payout.amount.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-400">
-                <CreditCard className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No payout history yet</p>
-              </div>
-            )}
-          </div>
-
         </div>
-      </div>
-    </Layout>
+      </section>
+
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section aria-labelledby="payout-availability" className="rounded-2xl border border-amber-300/25 bg-amber-400/10 p-5 sm:p-6">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="shrink-0 rounded-xl bg-amber-300/15 p-2.5 text-amber-200 sm:p-3">
+              <CircleAlert aria-hidden="true" className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0">
+              <h2 id="payout-availability" className="mep-heading text-lg font-semibold text-amber-100 sm:text-xl">Payout execution is unavailable</h2>
+              <p className="mt-2 text-sm leading-6 text-amber-50/80">
+                This page does not submit payouts, collect payout methods, or verify withdrawal eligibility. It does not show a verified withdrawable balance or payout history.
+              </p>
+              <p className="mt-3 text-sm leading-6 text-amber-50/80">
+                Technical preconditions for a possible future payout service are not approved business or legal policy. No payout request can be made here.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="payout-requirements" className="mep-panel overflow-hidden rounded-2xl border">
+          <div className="border-b border-white/10 p-5 sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Conceptual outline</p>
+            <h2 id="payout-requirements" className="mep-heading mt-2 text-xl font-semibold">Possible checks before a future payout service</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+              These examples describe technical topics a future service might need to address. They are not approved program terms, binding eligibility requirements, account status, or a promise of payment.
+            </p>
+          </div>
+          <ol className="grid gap-px bg-white/5 sm:grid-cols-2" aria-label="Conceptual checks for a possible future payout service">
+            {requirements.map(({ title, icon: Icon, text }, index) => (
+              <li key={title} className="bg-slate-900 p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <Icon aria-hidden="true" className="h-5 w-5 text-cyan-300" />
+                  <span aria-hidden="true" className="font-mono text-sm tabular-nums text-slate-500">0{index + 1}</span>
+                </div>
+                <h3 className="mt-4 font-semibold text-slate-100">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{text}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section aria-labelledby="commission-records" className="mep-panel rounded-2xl border p-5 sm:p-6">
+          <h2 id="commission-records" className="mep-heading text-xl font-semibold">Affiliate account links</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Open the commissions page to review the information available there. A displayed commission record is not confirmation that an amount is approved, payable, or withdrawable.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Link to="/affiliate/commissions" className={`${cardLink} border-cyan-300/20 bg-cyan-300/5 hover:border-cyan-300/45 hover:bg-cyan-300/10`}>
+              <DollarSign aria-hidden="true" className="h-5 w-5 text-cyan-300" />
+              <h3 className="mt-3 font-semibold">Commissions</h3>
+              <p className="mt-1 text-sm text-slate-400">Open the commissions page.</p>
+              <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">Open commissions <ArrowRight aria-hidden="true" className="h-4 w-4" /></span>
+            </Link>
+            <Link to="/support/create-ticket" className={`${cardLink} border-white/10 bg-slate-950/45 hover:border-cyan-300/35`}>
+              <LifeBuoy aria-hidden="true" className="h-5 w-5 text-cyan-300" />
+              <h3 className="mt-3 font-semibold">Contact support</h3>
+              <p className="mt-1 text-sm text-slate-400">Ask about your affiliate account or the payout status shown here.</p>
+              <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">Create a ticket <ArrowRight aria-hidden="true" className="h-4 w-4" /></span>
+            </Link>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
-

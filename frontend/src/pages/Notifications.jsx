@@ -1,242 +1,177 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, CheckCircle, Settings, Loader } from 'lucide-react';
+import { Bell, CheckCircle2, Circle, Loader, RefreshCw, Settings, Trash2 } from 'lucide-react';
+import useAuthStore from '../store/authStore';
 import useNotificationStore from '../stores/notificationStore';
+import { notificationDestination } from '../services/notificationViewService';
 import { formatDistanceToNow } from '../utils/dateUtils';
-import UserLayout from '../components/layout/UserLayout';
+import useTabNavigation from '../hooks/useTabNavigation';
 
-const getNotificationIcon = (type) => {
-  const icons = {
-    withdrawal: '💰',
-    commission: '💵',
-    kyc: '🆔',
-    system: '📢',
-    payment: '💳',
-    challenge: '🎯',
-  };
-  return icons[type] || '📬';
+const getPriorityColor = (priority) => ({
+  low: 'border-slate-500/70 bg-slate-700/70 text-slate-100',
+  normal: 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100',
+  high: 'border-amber-400/50 bg-amber-400/10 text-amber-100',
+  urgent: 'border-red-400/50 bg-red-500/10 text-red-100',
+}[priority] || 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100');
+
+const filterForTab = (tab) => {
+  if (tab === 'unread') return { is_read: false };
+  if (tab === 'all') return {};
+  return { type: tab };
 };
 
-const getPriorityColor = (priority) => {
-  const colors = {
-    low: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
-    normal: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    high: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    urgent: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  };
-  return colors[priority] || colors.normal;
-};
+const tabs = [
+  { label: 'All', value: 'all' },
+  { label: 'Unread', value: 'unread' },
+  { label: 'Withdrawals', value: 'withdrawal' },
+  { label: 'Commissions', value: 'commission' },
+  { label: 'KYC', value: 'kyc' },
+  { label: 'Payments', value: 'payment' },
+  { label: 'Challenges', value: 'challenge' },
+  { label: 'System', value: 'system' },
+];
+const tabIds = tabs.map((tab) => tab.value);
+
+const actorIdentity = (state) => JSON.stringify([
+  state.isAuthenticated,
+  state.user?.id ?? null,
+  state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null,
+  state.user?.role ?? null,
+]);
 
 export default function Notifications() {
+  const context = useAuthStore(actorIdentity);
+  return <NotificationsView key={context} />;
+}
+
+function NotificationsView() {
   const navigate = useNavigate();
+  const role = useAuthStore((state) => state.user?.role);
+  const identity = useAuthStore(actorIdentity);
   const [activeTab, setActiveTab] = useState('all');
-  
-  const {
-    notifications,
-    loading,
-    currentPage,
-    totalPages,
-    fetchNotifications,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-  } = useNotificationStore();
-  
+  const notifications = useNotificationStore((state) => state.notifications);
+  const loading = useNotificationStore((state) => state.loading);
+  const error = useNotificationStore((state) => state.error);
+  const actionErrors = useNotificationStore((state) => state.actionErrors);
+  const pendingAction = useNotificationStore((state) => state.pendingAction);
+  const currentPage = useNotificationStore((state) => state.currentPage);
+  const totalPages = useNotificationStore((state) => state.totalPages);
+  const total = useNotificationStore((state) => state.total);
+  const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
+  const markAsRead = useNotificationStore((state) => state.markAsRead);
+  const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
+  const deleteNotification = useNotificationStore((state) => state.deleteNotification);
+  const filters = useMemo(() => filterForTab(activeTab), [activeTab]);
+  const getTabProps = useTabNavigation({ ids: tabIds, activeId: activeTab, onChange: setActiveTab });
+  const anyActionPending = pendingAction !== null;
+  const actionError = Object.values(actionErrors).find(Boolean);
+
   useEffect(() => {
-    const filters = {};
-    if (activeTab === 'unread') {
-      filters.is_read = 'false';
-    } else if (activeTab !== 'all') {
-      filters.type = activeTab;
-    }
-    
     fetchNotifications(1, filters);
-  }, [activeTab, fetchNotifications]);
-  
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-  };
-  
-  const handlePageChange = (page) => {
-    const filters = {};
-    if (activeTab === 'unread') {
-      filters.is_read = 'false';
-    } else if (activeTab !== 'all') {
-      filters.type = activeTab;
-    }
-    
+  }, [fetchNotifications, filters]);
+
+  const changePage = (page) => {
+    if (page < 1 || page > totalPages || page > 1000) return;
     fetchNotifications(page, filters);
   };
-  
-  const handleNotificationClick = async (notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
-    
-    if (notification.type === 'withdrawal') {
-      navigate('/trader/withdrawals');
-    } else if (notification.type === 'commission') {
-      navigate('/affiliate/commissions');
-    } else if (notification.type === 'kyc') {
-      navigate('/kyc');
-    }
+
+  const handleNotificationOpen = async (notification) => {
+    const originalIdentity = identity;
+    if (!notification.is_read && !(await markAsRead(notification.id))) return;
+    const current = useAuthStore.getState();
+    if (actorIdentity(current) !== originalIdentity) return;
+    navigate(notificationDestination(notification.type, role));
   };
-  
-  const handleDelete = async (e, notificationId) => {
-    e.stopPropagation();
-    await deleteNotification(notificationId);
-  };
-  
-  const handleMarkAllAsRead = async () => {
-    await markAllAsRead();
-  };
-  
-  const tabs = [
-    { label: 'All', value: 'all' },
-    { label: 'Unread', value: 'unread' },
-    { label: 'Withdrawals', value: 'withdrawal' },
-    { label: 'Commissions', value: 'commission' },
-    { label: 'KYC', value: 'kyc' },
-    { label: 'Payments', value: 'payment' },
-    { label: 'Challenges', value: 'challenge' },
-    { label: 'System', value: 'system' },
-  ];
-  
+
   return (
-    <UserLayout>
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-white">Notifications</h1>
-          <div className="flex gap-3">
-            <button
-              onClick={handleMarkAllAsRead}
-              disabled={notifications.length === 0}
-              className="flex items-center gap-2 px-4 py-2 border border-white/20 text-white rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <CheckCircle className="w-4 h-4" />
-              Mark All Read
-            </button>
-            <button
-              onClick={() => navigate('/settings/notifications')}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg hover:from-purple-700 hover:to-purple-900 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              Settings
-            </button>
-          </div>
+    <div className="mx-auto max-w-6xl p-4 sm:p-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="mep-heading text-3xl font-bold text-white">Notifications</h1>
+          <p className="mt-1 text-sm text-slate-300">Your recorded in-app notification history.</p>
         </div>
-        
-        <div className="mb-6 bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-1">
-          <div className="flex gap-1 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => handleTabChange(tab.value)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.value
-                    ? 'bg-gradient-to-r from-purple-600 to-purple-800 text-white'
-                    : 'text-gray-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg">
-          {loading ? (
-            <div className="flex justify-center p-12">
-              <Loader className="w-8 h-8 text-purple-500 animate-spin" />
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-gray-400">No notifications found</p>
-            </div>
-          ) : (
-            <>
-              <div className="divide-y divide-white/5">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`flex items-start gap-4 p-4 cursor-pointer transition-colors ${
-                      notification.is_read 
-                        ? 'hover:bg-white/5' 
-                        : 'bg-white/10 hover:bg-white/15'
-                    }`}
-                  >
-                    <div className="text-3xl flex-shrink-0 mt-1">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`text-base ${notification.is_read ? 'text-gray-300' : 'text-white font-semibold'}`}>
-                          {notification.title}
-                        </h3>
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${getPriorityColor(notification.priority)}`}>
-                          {notification.priority}
-                        </span>
-                        {!notification.is_read && (
-                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-400 mb-1">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={(e) => handleDelete(e, notification.id)}
-                      className="flex-shrink-0 p-2 text-gray-400 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              
-              {totalPages > 1 && (
-                <div className="flex justify-center gap-2 p-4 border-t border-white/10">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="px-4 py-2 border border-white/20 text-white rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <div className="flex items-center gap-2">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        className={`w-10 h-10 rounded-lg transition-colors ${
-                          currentPage === page
-                            ? 'bg-gradient-to-r from-purple-600 to-purple-800 text-white'
-                            : 'border border-white/20 text-gray-300 hover:bg-white/10'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="px-4 py-2 border border-white/20 text-white rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={() => fetchNotifications(1, filters)} disabled={loading || anyActionPending}
+            className="flex items-center gap-2 rounded-lg border border-cyan-300/35 px-4 py-2 text-cyan-100 transition-colors hover:bg-cyan-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh
+          </button>
+          <button type="button" onClick={() => markAllAsRead()} disabled={notifications.length === 0 || loading || anyActionPending}
+            className="flex items-center gap-2 rounded-lg border border-cyan-300/35 px-4 py-2 text-cyan-100 transition-colors hover:bg-cyan-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Mark all read
+          </button>
+          <button type="button" onClick={() => navigate('/settings/notifications')}
+            className="mep-primary flex items-center gap-2 px-4 py-2 font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-100">
+            <Settings className="h-4 w-4" aria-hidden="true" /> Settings
+          </button>
         </div>
       </div>
-    </UserLayout>
+
+      <div className="mep-panel mb-6 rounded-lg border p-1">
+        <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Notification filters">
+          {tabs.map((tab) => (
+            <button type="button" key={tab.value} id={`notifications-tab-${tab.value}`}
+              aria-controls={`notifications-tabpanel-${tab.value}`} {...getTabProps(tab.value)}
+              className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 ${
+                activeTab === tab.value ? 'bg-cyan-400/20 text-cyan-100' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              }`}>{tab.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {actionError && <div role="alert" className="mb-4 rounded-lg border border-red-400/50 bg-red-500/10 p-4 text-red-100">{actionError}</div>}
+
+      <div className="mep-panel rounded-lg border" role="tabpanel" id={`notifications-tabpanel-${activeTab}`}
+        aria-labelledby={`notifications-tab-${activeTab}`} aria-live="polite">
+        {error && (
+          <div role="alert" className="m-4 rounded-lg border border-red-400/50 bg-red-500/10 p-4 text-red-100">
+            <p className="break-words">{error}</p>
+            <button type="button" onClick={() => fetchNotifications(1, filters)}
+              className="mt-2 text-sm font-medium text-cyan-100 underline hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">Try again</button>
+          </div>
+        )}
+        {loading ? <div className="flex justify-center p-12"><Loader className="h-8 w-8 animate-spin text-cyan-300" aria-label="Loading notifications" /></div>
+          : error ? null : notifications.length === 0 ? <div className="p-12 text-center text-slate-300">No notifications found.</div>
+            : <>
+              <div className="divide-y divide-white/10">
+                {notifications.map((notification) => {
+                  const marking = pendingAction?.name === 'mark-read' && pendingAction.id === notification.id;
+                  const deleting = pendingAction?.name === 'delete' && pendingAction.id === notification.id;
+                  return (
+                    <article key={notification.id} className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-start ${notification.is_read ? 'hover:bg-white/5' : 'bg-cyan-300/5'}`}>
+                      <button type="button" onClick={() => handleNotificationOpen(notification)} disabled={anyActionPending}
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed">
+                        <Bell className="mt-1 h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">
+                          <span className="mb-1 flex flex-wrap items-center gap-2">
+                            <span className={`break-words text-base ${notification.is_read ? 'text-slate-200' : 'font-semibold text-white'}`}>{notification.title}</span>
+                            <span className={`rounded border px-2 py-0.5 text-xs font-medium ${getPriorityColor(notification.priority)}`}>{notification.priority}</span>
+                            {!notification.is_read && <Circle className="h-2.5 w-2.5 fill-cyan-300 text-cyan-300" aria-label="Unread" />}
+                          </span>
+                          <span className="block break-words text-sm text-slate-300">{notification.message}</span>
+                          {notification.created_at && <time dateTime={notification.created_at} className="mt-1 block text-xs text-slate-400">{formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}</time>}
+                        </span>
+                      </button>
+                      <div className="flex shrink-0 gap-2 self-end sm:self-start">
+                        {!notification.is_read && <button type="button" onClick={() => markAsRead(notification.id)} disabled={anyActionPending}
+                          className="rounded px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">{marking ? 'Marking…' : 'Mark read'}</button>}
+                        <button type="button" aria-label={`Delete ${notification.title}`} onClick={() => deleteNotification(notification.id)} disabled={anyActionPending}
+                          className="rounded p-2 text-slate-300 hover:bg-red-500/10 hover:text-red-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300 disabled:cursor-not-allowed disabled:opacity-50">
+                          {deleting ? <Loader className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Trash2 className="h-5 w-5" aria-hidden="true" />}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {totalPages > 1 && <div className="flex flex-wrap items-center justify-center gap-3 border-t border-white/10 p-4">
+                <button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage <= 1 || loading || anyActionPending}
+                  className="rounded-lg border border-cyan-300/35 px-4 py-2 text-cyan-100 hover:bg-cyan-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+                <span className="text-center text-sm text-slate-200">Page {currentPage} of {Math.min(totalPages, 1000)} {total > 0 ? `(${total} total)` : ''}</span>
+                <button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage >= totalPages || currentPage >= 1000 || loading || anyActionPending}
+                  className="rounded-lg border border-cyan-300/35 px-4 py-2 text-cyan-100 hover:bg-cyan-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+              </div>}
+            </>}
+      </div>
+    </div>
   );
 }

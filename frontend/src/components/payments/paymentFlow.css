@@ -1,0 +1,90 @@
+.mep-purchase-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  list-style: none;
+}
+.mep-purchase-stages li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.9rem 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 0.95rem;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  background: rgba(15, 23, 42, 0.6);
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+.mep-purchase-stages li[aria-current="step"] {
+  border-color: rgba(34, 211, 238, 0.42);
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(15, 23, 42, 0.82));
+  color: #cffafe;
+}
+.mep-purchase-stages li[data-complete="true"] { color: #a5f3fc; }
+.mep-purchase-stage-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.7rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.mep-payment-panel { min-width: 0; border-color: rgba(34, 211, 238, 0.22); }
+.mep-payment-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: #67e8f9;
+  border: 1px solid rgba(34, 211, 238, 0.26);
+  border-radius: 0.9rem;
+  background: radial-gradient(circle at 25% 20%, rgba(34, 211, 238, 0.18), rgba(15, 23, 42, 0.8));
+}
+.mep-payment-state { border-color: rgba(148, 163, 184, 0.25); background: rgba(2, 6, 23, 0.35); }
+.mep-payment-state[data-state="paid"] { border-color: rgba(52, 211, 153, 0.35); background: rgba(16, 185, 129, 0.06); }
+.mep-payment-state[data-state="manual_review"],
+.mep-payment-state[data-state="creation_uncertain"],
+.mep-payment-state[data-state="expired"],
+.mep-payment-state[data-state="failed"] { border-color: rgba(251, 191, 36, 0.32); }
+.mep-payment-amount { border-color: rgba(34, 211, 238, 0.26); background: linear-gradient(140deg, rgba(8, 145, 178, 0.12), rgba(15, 23, 42, 0.6)); }
+.mep-payment-amount p { overflow-wrap: anywhere; }
+.mep-payment-copy { display: flex; align-items: flex-start; gap: 0.75rem; }
+.mep-payment-value {
+  min-width: 0;
+  flex: 1;
+  padding: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 0.8rem;
+  background: rgba(2, 6, 23, 0.48);
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
+}
+.mep-payment-copy button { flex-shrink: 0; }
+.mep-payment-panel button:disabled { opacity: 0.48; cursor: not-allowed; transform: none; }
+.mep-payment-panel :is(input, select, button, a):focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+.mep-payment-panel select { color: #f1f5f9; background: #0b1425; }
+.mep-purchase-records { min-width: 0; }
+.mep-purchase-records dl dd { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  .mep-purchase-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .mep-purchase-stages li { padding: 0.75rem 0.65rem; }
+  .mep-payment-copy { flex-direction: column; }
+  .mep-payment-copy .mep-payment-value { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mep-purchase-stages li, .mep-payment-panel *, .mep-purchase-records * { animation: none !important; transition: none !important; }
+}

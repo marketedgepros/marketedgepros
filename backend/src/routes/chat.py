@@ -1,8 +1,8 @@
 """
 Chat routes for OpenAI GPT-5 integration
 """
-from flask import Blueprint, request, jsonify, g
-from src.services.openai_service import get_openai_service
+from flask import Blueprint, request, jsonify
+from src.services.openai_service import OpenAIService, get_openai_service
 from src.utils.decorators import token_required
 from src.models import Challenge
 import logging
@@ -14,7 +14,7 @@ chat_bp = Blueprint('chat', __name__)
 
 @chat_bp.route('/message', methods=['POST'])
 @token_required
-def send_message():
+def send_message(current_user):
     """
     Send a message to GPT-5 and get response
     
@@ -41,12 +41,12 @@ def send_message():
         
         # Prepare user context
         user_context = {
-            'role': g.current_user.role,
-            'user_id': g.current_user.id
+            'role': current_user.role,
+            'user_id': current_user.id
         }
         
         # Add challenges info if available
-        challenges = Challenge.query.filter_by(user_id=g.current_user.id).all()
+        challenges = Challenge.query.filter_by(user_id=current_user.id).all()
         user_context['challenges'] = [c.to_dict() for c in challenges]
         
         # Get response from GPT-5
@@ -67,7 +67,7 @@ def send_message():
 
 @chat_bp.route('/program-recommendation', methods=['POST'])
 @token_required
-def get_program_recommendation():
+def get_program_recommendation(current_user):
     """
     Get program recommendation based on user profile
     
@@ -79,7 +79,7 @@ def get_program_recommendation():
         "trading_style": "day trading|swing trading|scalping"
     }
     """
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     
     try:
         openai_service = get_openai_service()
@@ -108,7 +108,7 @@ def get_program_recommendation():
 
 @chat_bp.route('/performance-analysis', methods=['POST'])
 @token_required
-def analyze_performance():
+def analyze_performance(current_user):
     """
     Analyze trading performance
     
@@ -117,25 +117,42 @@ def analyze_performance():
         "challenge_id": 123  // Optional, if not provided will analyze all user's trades
     }
     """
-    data = request.get_json()
-    challenge_id = data.get('challenge_id')
+    data = request.get_json(silent=True) or {}
+    requested_challenge = data.get('challenge_id')
+
+    def not_found():
+        # Do not distinguish a foreign challenge from a nonexistent one.
+        return jsonify({'error': 'Resource not found'}), 404
+
+    if requested_challenge is not None:
+        if (
+            isinstance(requested_challenge, bool)
+            or not isinstance(requested_challenge, int)
+            or requested_challenge <= 0
+        ):
+            return not_found()
+        requested_challenge_ids = [requested_challenge]
+    else:
+        requested_challenge_ids = None
     
     try:
         from src.models import Trade
-        
-        # Get trades
-        if challenge_id:
-            trades = Trade.query.filter_by(
-                challenge_id=challenge_id
-            ).all()
-        else:
-            # Get all user's challenges
-            challenges = Challenge.query.filter_by(user_id=g.current_user.id).all()
-            challenge_ids = [c.id for c in challenges]
-            trades = Trade.query.filter(Trade.challenge_id.in_(challenge_ids)).all()
+
+        # Establish owner -> challenge -> program -> tenant before reading
+        # trades. Client-provided user, email, and tenant data are ignored.
+        challenges = OpenAIService.get_authorized_challenges(
+            current_user, requested_challenge_ids
+        )
+        if not challenges:
+            return not_found()
+        challenge_ids = [challenge.id for challenge in challenges]
+
+        # The service repeats the authorization lookup immediately before the
+        # provider call, preventing a route-bypass from reaching OpenAI.
+        trades = Trade.query.filter(Trade.challenge_id.in_(challenge_ids)).all()
         
         if not trades:
-            return jsonify({'error': 'No trades found'}), 404
+            return not_found()
         
         # Calculate performance metrics
         total_trades = len(trades)
@@ -173,9 +190,15 @@ def analyze_performance():
         
         # Get AI analysis
         openai_service = get_openai_service()
-        response = openai_service.analyze_trading_performance(performance_data)
+        response = openai_service.analyze_trading_performance(
+            performance_data,
+            current_user=current_user,
+            challenge_ids=challenge_ids
+        )
         
         if not response['success']:
+            if response.get('not_found'):
+                return not_found()
             return jsonify({'error': response.get('error', 'Failed to analyze performance')}), 500
         
         return jsonify({
@@ -224,4 +247,3 @@ def answer_faq():
     except Exception as e:
         logger.error(f"FAQ answer error: {str(e)}")
         return jsonify({'error': 'Failed to generate answer'}), 500
-

@@ -1,389 +1,489 @@
-import { useState } from 'react';
-import Swal from 'sweetalert2';
-import { Plus, Edit2, Trash2, Eye, TrendingUp, Zap, Trophy, X } from 'lucide-react';
-// AdminLayout removed - wrapped in App.jsx
-// // AdminLayout removed - wrapped in App.jsx
-// import AdminLayout from '../../components/admin/AdminLayout';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Edit2, Eye, LoaderCircle, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import useAuthStore from '../../store/authStore.js';
+import useDialogFocus from '../../hooks/useDialogFocus.js';
+import {
+  AdminProgramsContractError,
+  adminProgramsPrincipalFromAuth,
+  deleteAdminProgram,
+  isAdminProgramsRequestCanceled,
+  loadAdminPrograms,
+  saveAdminProgram,
+} from '../../services/adminClosureProgramsService.js';
 
-const programs = [
-  {
-    id: 1,
-    name: 'Two Phase $100K',
-    type: 'two_phase',
-    accountSize: 100000,
-    profitSplit: 80,
-    phase1Target: 8,
-    phase2Target: 5,
-    maxDailyLoss: 5,
-    maxTotalLoss: 10,
-    price: 299,
-    enrolledTraders: 234,
-    status: 'active',
-  },
-  {
-    id: 2,
-    name: 'One Phase $50K',
-    type: 'one_phase',
-    accountSize: 50000,
-    profitSplit: 75,
-    phase1Target: 10,
-    maxDailyLoss: 5,
-    maxTotalLoss: 10,
-    price: 199,
-    enrolledTraders: 189,
-    status: 'active',
-  },
-  {
-    id: 3,
-    name: 'Instant Funding $200K',
-    type: 'instant',
-    accountSize: 200000,
-    profitSplit: 90,
-    maxDailyLoss: 3,
-    maxTotalLoss: 6,
-    price: 499,
-    enrolledTraders: 67,
-    status: 'active',
-  },
-];
+const emptyDraft = () => ({
+  name: '',
+  type: '',
+  description: '',
+  accountSize: '',
+  profitTarget: '',
+  maxDailyLoss: '',
+  maxTotalLoss: '',
+  price: '',
+  profitSplit: '',
+  profitSplitPercentage: '',
+  minimumPayoutAmount: '',
+  payoutMode: '',
+  rules: '{}',
+  isActive: true,
+});
 
-const programTypeConfig = {
-  two_phase: {
-    label: 'Two Phase',
-    gradient: 'from-cyan-400 to-pink-300',
-    bgColor: 'bg-gradient-to-br from-cyan-400 to-pink-300',
-    color: 'text-indigo-600',
-    icon: TrendingUp,
-  },
-  one_phase: {
-    label: 'One Phase',
-    gradient: 'from-blue-400 to-cyan-400',
-    bgColor: 'bg-gradient-to-br from-blue-400 to-cyan-400',
-    color: 'text-blue-600',
-    icon: Zap,
-  },
-  instant: {
-    label: 'Instant Funding',
-    gradient: 'from-pink-400 to-yellow-300',
-    bgColor: 'bg-gradient-to-br from-pink-400 to-yellow-300',
-    color: 'text-pink-600',
-    icon: Trophy,
-  },
+export const programDraft = (program) => ({
+  name: program.name,
+  type: program.type,
+  description: program.description ?? '',
+  accountSize: program.accountSize,
+  profitTarget: program.profitTarget ?? '',
+  maxDailyLoss: program.maxDailyLoss ?? '',
+  maxTotalLoss: program.maxTotalLoss ?? '',
+  price: program.price,
+  profitSplit: program.profitSplit ?? '',
+  profitSplitPercentage: program.profitSplitPercentage ?? '',
+  minimumPayoutAmount: program.minimumPayoutAmount ?? '',
+  payoutMode: program.payoutMode ?? '',
+  rules: JSON.stringify(program.rules, null, 2),
+  isActive: program.isActive,
+});
+
+/** Never apply a completed read/write after its principal generation has changed. */
+export const isCurrentProgramsOperation = (generation, currentGeneration, signal) => (
+  generation === currentGeneration && !signal?.aborted
+);
+
+const errorMessage = (error, fallback) => {
+  if (error instanceof AdminProgramsContractError) return error.message;
+  const message = error?.response?.data?.error || error?.response?.data?.message || error?.message;
+  return typeof message === 'string' && message ? message : fallback;
 };
 
-export default function ProgramsManagement() {
-  const [openDialog, setOpenDialog] = useState(false);
-  const [selectedProgram, setSelectedProgram] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'two_phase',
-    accountSize: 100000,
-    profitSplit: 80,
-    price: 299,
-  });
+const displayOptional = (value) => (value === null ? 'Not recorded' : value);
 
-  const handleOpenDialog = (program = null) => {
-    if (program) {
-      setSelectedProgram(program);
-      setFormData(program);
-    } else {
-      setSelectedProgram(null);
-      setFormData({
-        name: '',
-        type: 'two_phase',
-        accountSize: 100000,
-        profitSplit: 80,
-        price: 299,
-      });
-    }
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedProgram(null);
-  };
-
-  const handleSave = () => {
-    // TODO: Implement save functionality
-    handleCloseDialog();
-  };
-
-  const handleViewProgram = (program) => {
-    // Open dialog in view-only mode
-    setSelectedProgram(program);
-    setFormData(program);
-    setOpenDialog(true);
-  };
-
-  const handleDelete = (program) => {
-    Swal.fire({
-      title: "Delete Program?",
-      text: `Are you sure you want to delete ${program.name}? This action cannot be undone.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Yes, delete it!",
-      cancelButtonText: "Cancel"
-    }).then((result) => {
-      if (result.isConfirmed) {
-        // TODO: Implement delete functionality
-        Swal.fire("Deleted!", "Program has been deleted.", "success");
-      }
-    });
-  };
-
-  return (
-    
-    
-      <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Programs Management</h1>
-          <p className="mt-2 text-gray-300">Create and manage trading programs</p>
-        </div>
-        <button
-          onClick={() => handleOpenDialog()}
-          className="bg-gradient-to-r from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-green-400 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl"
-        >
-          <Plus className="w-5 h-5" />
-          Add Program
+function ProgramReadState({ state, error, onRetry }) {
+  if (state === 'loading') {
+    return (
+      <div className="mep-panel rounded-xl border p-8 text-center" role="status" aria-live="polite" aria-busy="true">
+        <LoaderCircle className="mx-auto h-7 w-7 animate-spin text-cyan-300" aria-hidden="true" />
+        <p className="mt-3 text-sm text-slate-200">Loading the persisted program catalog…</p>
+      </div>
+    );
+  }
+  if (state === 'error') {
+    return (
+      <div className="rounded-xl border border-rose-400/50 bg-rose-950/30 p-6 text-rose-100" role="alert">
+        <h2 className="mep-heading font-semibold">Program catalog unavailable</h2>
+        <p className="mt-1 break-words text-sm text-rose-100/90">{error}</p>
+        <button type="button" onClick={onRetry} className="mt-4 rounded-md border border-rose-300/60 px-3 py-2 text-sm font-medium hover:bg-rose-900/40 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+          Retry catalog request
         </button>
       </div>
+    );
+  }
+  return null;
+}
 
-      {/* Programs Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {programs.map((program) => {
-          const config = programTypeConfig[program.type];
-          const Icon = config.icon;
+function ProgramFields({ draft, onChange, readOnly, requireStorageFields }) {
+  const textField = (name, label, { required = false, hint = null, mono = false } = {}) => (
+    <div key={name}>
+      <label className="mb-1 block text-sm font-medium text-slate-100" htmlFor={`program-${name}`}>
+        {label}{required ? <span className="text-cyan-300"> (required)</span> : null}
+      </label>
+      <input
+        id={`program-${name}`}
+        name={name}
+        type="text"
+        value={draft[name]}
+        onChange={onChange}
+        readOnly={readOnly}
+        required={required}
+        aria-describedby={hint ? `program-${name}-hint` : undefined}
+        className={`w-full rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/40 ${mono ? 'font-mono' : ''} ${readOnly ? 'cursor-default text-slate-300' : ''}`}
+      />
+      {hint ? <p id={`program-${name}-hint`} className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+    </div>
+  );
 
-          return (
-            <div
-              key={program.id}
-              className="bg-slate-800/50 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 flex flex-col"
-            >
-              {/* Card Header */}
-              <div className={`${config.bgColor} p-6 rounded-t-lg flex items-center gap-4`}>
-                <div className="w-14 h-14 bg-slate-800/50/20 rounded-lg flex items-center justify-center">
-                  <Icon className="w-8 h-8 text-white" />
-                </div>
-                <div className="flex-1">
-                  <span className="inline-block px-3 py-1 bg-slate-800/50/30 text-white text-xs font-semibold rounded-full mb-2">
-                    {config.label}
-                  </span>
-                  <h3 className="text-xl font-bold text-white">{program.name}</h3>
-                </div>
-              </div>
-
-              {/* Card Content */}
-              <div className="p-6 flex-1">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-400">Account Size</p>
-                    <p className="text-xl font-semibold text-white">
-                      ${(program.accountSize / 1000).toFixed(0)}K
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Profit Split</p>
-                    <p className="text-xl font-semibold text-green-600">
-                      {program.profitSplit}%
-                    </p>
-                  </div>
-                  {program.phase1Target && (
-                    <div>
-                      <p className="text-sm text-gray-400">Phase 1 Target</p>
-                      <p className="text-lg font-semibold text-white">
-                        {program.phase1Target}%
-                      </p>
-                    </div>
-                  )}
-                  {program.phase2Target && (
-                    <div>
-                      <p className="text-sm text-gray-400">Phase 2 Target</p>
-                      <p className="text-lg font-semibold text-white">
-                        {program.phase2Target}%
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-gray-400">Max Daily Loss</p>
-                    <p className="text-lg font-semibold text-red-600">
-                      {program.maxDailyLoss}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Max Total Loss</p>
-                    <p className="text-lg font-semibold text-red-600">
-                      {program.maxTotalLoss}%
-                    </p>
-                  </div>
-                </div>
-
-                {/* Price and Enrolled Box */}
-                <div className="mt-6 p-4 bg-slate-900 rounded-lg flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-400">Price</p>
-                    <p className={`text-2xl font-bold ${config.color}`}>
-                      ${program.price}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-400">Enrolled</p>
-                    <p className="text-xl font-semibold text-white">
-                      {program.enrolledTraders}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card Actions */}
-              <div className="px-6 pb-6 flex gap-2">
-                <button 
-                  onClick={() => handleViewProgram(program)}
-                  className="flex-1 px-4 py-2 text-gray-200 hover:bg-slate-700/50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                >
-                  <Eye className="w-4 h-4" />
-                  View
-                </button>
-                <button
-                  onClick={() => handleOpenDialog(program)}
-                  className="flex-1 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(program)}
-                  className="flex-1 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
-              </div>
-            </div>
-          );
-        })}
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {textField('name', 'Program name', { required: true })}
+      {textField('type', 'Stored type', { required: true, hint: 'An ASCII label stored by the catalog; no phase type is assumed.' })}
+      <div className="md:col-span-2">
+        <label className="mb-1 block text-sm font-medium text-slate-100" htmlFor="program-description">Description</label>
+        <textarea
+          id="program-description"
+          name="description"
+          value={draft.description}
+          onChange={onChange}
+          readOnly={readOnly}
+          rows="3"
+          className="w-full rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/40"
+        />
       </div>
-
-      {/* Add/Edit Program Dialog */}
-      {openDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800/50 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Dialog Header */}
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-2xl font-bold text-white">
-                {selectedProgram ? 'Edit Program' : 'Add New Program'}
-              </h2>
-              <button
-                onClick={handleCloseDialog}
-                className="text-gray-400 hover:text-gray-300 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Dialog Content */}
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Program Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Two Phase $100K"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Type
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full px-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="two_phase">Two Phase</option>
-                  <option value="one_phase">One Phase</option>
-                  <option value="instant">Instant Funding</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Account Size
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-400">$</span>
-                    <input
-                      type="number"
-                      value={formData.accountSize}
-                      onChange={(e) => setFormData({ ...formData, accountSize: parseInt(e.target.value) })}
-                      className="w-full pl-8 pr-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-200 mb-2">
-                    Profit Split
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={formData.profitSplit}
-                      onChange={(e) => setFormData({ ...formData, profitSplit: parseInt(e.target.value) })}
-                      className="w-full pr-8 pl-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <span className="absolute right-3 top-2.5 text-gray-400">%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Price
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-gray-400">$</span>
-                  <input
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
-                    className="w-full pl-8 pr-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Dialog Actions */}
-            <div className="flex justify-end gap-3 p-6 border-t">
-              <button
-                onClick={handleCloseDialog}
-                className="px-6 py-2 text-gray-200 hover:bg-slate-700/50 rounded-lg transition-colors duration-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-6 py-2 bg-gradient-to-r from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-green-400 text-white rounded-lg font-medium transition-all duration-200 shadow-lg"
-              >
-                {selectedProgram ? 'Save Changes' : 'Create Program'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {textField('accountSize', 'Account size', { required: true, mono: true, hint: 'Exact positive decimal, for example 10000.00.' })}
+      {textField('price', 'Price', { required: true, mono: true, hint: 'Exact positive decimal. Currency policy is not edited here.' })}
+      {textField('profitTarget', 'Profit target', { required: requireStorageFields, mono: true, hint: 'Exact decimal from 0.00 to 100.00; required by the current storage schema on create.' })}
+      {textField('maxDailyLoss', 'Maximum daily loss', { required: requireStorageFields, mono: true, hint: 'Exact decimal from 0.00 to 100.00; required by the current storage schema on create.' })}
+      {textField('maxTotalLoss', 'Maximum total loss', { required: requireStorageFields, mono: true, hint: 'Exact decimal from 0.00 to 100.00; required by the current storage schema on create.' })}
+      {textField('profitSplit', 'Profit split', { required: requireStorageFields, mono: true, hint: 'Exact decimal from 0.00 to 100.00; required by the current storage schema on create.' })}
+      {textField('profitSplitPercentage', 'Profit split percentage alias', { mono: true, hint: 'Optional persisted compatibility field, 0.00 to 100.00.' })}
+      {textField('minimumPayoutAmount', 'Minimum payout amount', { mono: true, hint: 'Optional exact non-negative decimal.' })}
+      {textField('payoutMode', 'Payout mode', { hint: 'Optional persisted ASCII label; no mode is inferred.' })}
+      <div className="md:col-span-2">
+        <label className="mb-1 block text-sm font-medium text-slate-100" htmlFor="program-rules">Rules JSON object</label>
+        <textarea
+          id="program-rules"
+          name="rules"
+          value={draft.rules}
+          onChange={onChange}
+          readOnly={readOnly}
+          spellCheck="false"
+          rows="8"
+          aria-describedby="program-rules-hint"
+          className="min-h-36 w-full rounded-md border border-slate-600 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/40"
+        />
+        <p id="program-rules-hint" className="mt-1 text-xs text-slate-400">Must remain a JSON object. Existing rule vocabulary is preserved rather than interpreted.</p>
       </div>
-    
-    
+      <label className="flex items-center gap-3 rounded-md border border-slate-700 bg-slate-950/60 px-3 py-3 text-sm text-slate-100 md:col-span-2">
+        <input
+          type="checkbox"
+          name="isActive"
+          checked={draft.isActive}
+          onChange={onChange}
+          disabled={readOnly}
+          className="h-4 w-4 rounded border-slate-500 text-cyan-500 focus:ring-cyan-300"
+        />
+        Catalog active
+      </label>
+    </div>
   );
 }
 
+function ProgramEditor({ editor, pending, error, onClose, onSave, onChange }) {
+  const dialogRef = useDialogFocus({ open: Boolean(editor), onClose });
+  if (!editor) return null;
+  const isView = editor.mode === 'view';
+  const title = isView ? 'Program record' : editor.program ? 'Edit persisted program' : 'Create persisted program';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4" role="presentation">
+      <section ref={dialogRef} className="mep-panel max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
+        <header className="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+          <div>
+            <h2 id="program-editor-title" className="mep-heading text-xl font-semibold text-white">{title}</h2>
+            <p className="mt-1 text-sm text-slate-400">Changes are submitted only after all stored fields validate.</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={pending} className="rounded-md p-2 text-slate-300 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300" aria-label="Close program dialog">
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </header>
+        <form onSubmit={onSave} className="p-5">
+          <ProgramFields draft={editor.draft} onChange={onChange} readOnly={isView || pending} requireStorageFields={false} />
+          {error ? <p className="mt-4 rounded-md border border-rose-400/50 bg-rose-950/30 p-3 text-sm text-rose-100" role="alert">{error}</p> : null}
+          <footer className="mt-6 flex flex-wrap justify-end gap-3 border-t border-slate-700 pt-4">
+            <button type="button" onClick={onClose} disabled={pending} data-autofocus className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+              {isView ? 'Close' : 'Cancel'}
+            </button>
+            {!isView ? (
+              <button type="submit" disabled={pending} className="mep-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-200">
+                {pending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                {editor.program ? 'Save persisted changes' : 'Create program'}
+              </button>
+            ) : null}
+          </footer>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function DeleteProgramDialog({ program, pending, error, onClose, onConfirm }) {
+  const dialogRef = useDialogFocus({ open: Boolean(program), onClose });
+  if (!program) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4" role="presentation">
+      <section ref={dialogRef} className="mep-panel w-full max-w-lg rounded-xl border border-rose-300/30 p-6 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="delete-program-title" aria-describedby="delete-program-description">
+        <h2 id="delete-program-title" className="mep-heading text-xl font-semibold text-white">Delete program record?</h2>
+        <p id="delete-program-description" className="mt-2 break-words text-sm text-slate-300">
+          Delete <strong>{program.name}</strong> only if the server confirms it. The server can reject deletion when an active challenge exists.
+        </p>
+        {error ? <p className="mt-4 rounded-md border border-rose-400/50 bg-rose-950/30 p-3 text-sm text-rose-100" role="alert">{error}</p> : null}
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} disabled={pending} data-autofocus className="rounded-md border border-slate-600 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-300">Cancel</button>
+          <button type="button" onClick={onConfirm} disabled={pending} className="inline-flex items-center gap-2 rounded-md bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-200">
+            {pending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+            Confirm server deletion
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function ProgramsManagement() {
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isAuthLoading = useAuthStore((state) => state.isLoading);
+  const principal = useMemo(() => adminProgramsPrincipalFromAuth(user, isAuthenticated), [user, isAuthenticated]);
+  const expectedOwner = principal?.owner ?? null;
+  const principalKey = principal?.key ?? 'no-principal';
+  const [readState, setReadState] = useState('loading');
+  const [readError, setReadError] = useState(null);
+  const [programs, setPrograms] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, perPage: 20, total: 0, pages: 0 });
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [editor, setEditor] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [mutationPending, setMutationPending] = useState(false);
+  const [mutationError, setMutationError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const generationRef = useRef(0);
+  const writeControllerRef = useRef(null);
+
+  const retry = useCallback(() => setRefreshKey((value) => value + 1), []);
+  const refetchCurrentRange = useCallback(() => {
+    setPrograms([]);
+    setReadState('loading');
+    setReadError(null);
+    setRefreshKey((value) => value + 1);
+  }, []);
+  const refetchAfterDelete = useCallback(() => {
+    setPrograms([]);
+    setReadState('loading');
+    setReadError(null);
+    setPagination((current) => {
+      const total = Math.max(0, current.total - 1);
+      const pages = total === 0 ? 0 : Math.ceil(total / current.perPage);
+      return { ...current, total, pages, page: Math.min(current.page, Math.max(1, pages)) };
+    });
+    setRefreshKey((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    setNotice(null);
+  }, [principalKey, isAuthLoading]);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    const generation = generationRef.current;
+    writeControllerRef.current?.abort();
+    writeControllerRef.current = null;
+    setPrograms([]);
+    setEditor(null);
+    setDeleteTarget(null);
+    setMutationPending(false);
+    setMutationError(null);
+
+    if (isAuthLoading) {
+      setReadState('loading');
+      setReadError(null);
+      return undefined;
+    }
+    if (!expectedOwner) {
+      setReadState('error');
+      setReadError('A verified supermaster or master session with a tenant is required to load program records.');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setReadState('loading');
+    setReadError(null);
+    loadAdminPrograms(undefined, {
+      signal: controller.signal,
+      expectedOwner,
+      page: pagination.page,
+      perPage: pagination.perPage,
+    }).then((view) => {
+      if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) return;
+      setPrograms(view.programs);
+      setPagination(view.pagination);
+      setReadState('ready');
+    }).catch((error) => {
+      if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal) || isAdminProgramsRequestCanceled(error)) return;
+      setPrograms([]);
+      setReadState('error');
+      setReadError(errorMessage(error, 'The program catalog request failed.'));
+    });
+    return () => controller.abort();
+  }, [expectedOwner, isAuthLoading, pagination.page, pagination.perPage, principalKey, refreshKey]);
+
+  const openEditor = (mode, program = null) => {
+    if (!expectedOwner || mutationPending) return;
+    setNotice(null);
+    setMutationError(null);
+    setEditor({ mode, program, draft: program ? programDraft(program) : emptyDraft() });
+  };
+
+  const onDraftChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setEditor((current) => current ? {
+      ...current,
+      draft: { ...current.draft, [name]: type === 'checkbox' ? checked : value },
+    } : current);
+  };
+
+  const closeDialog = () => {
+    if (!mutationPending) {
+      setEditor(null);
+      setDeleteTarget(null);
+      setMutationError(null);
+    }
+  };
+
+  const save = async (event) => {
+    event.preventDefault();
+    if (!expectedOwner || !editor || editor.mode === 'view' || mutationPending) return;
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    writeControllerRef.current?.abort();
+    writeControllerRef.current = controller;
+    setMutationPending(true);
+    setMutationError(null);
+    setNotice(null);
+    try {
+      const saved = await saveAdminProgram(undefined, {
+        programId: editor.program?.id ?? null,
+        draft: editor.draft,
+        signal: controller.signal,
+        expectedOwner,
+      });
+      if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) return;
+      if (editor.program) {
+        setPrograms((rows) => rows.map((row) => row.id === saved.program.id ? saved.program : row));
+      } else {
+        refetchCurrentRange();
+      }
+      setEditor(null);
+      setNotice(editor.program ? 'Saved the server-confirmed program record.' : 'Created the server-confirmed program record.');
+    } catch (error) {
+      if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal) || isAdminProgramsRequestCanceled(error)) return;
+      setMutationError(errorMessage(error, 'Program changes were not saved.'));
+    } finally {
+      if (isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) setMutationPending(false);
+      if (writeControllerRef.current === controller) writeControllerRef.current = null;
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!expectedOwner || !deleteTarget || mutationPending) return;
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    writeControllerRef.current?.abort();
+    writeControllerRef.current = controller;
+    setMutationPending(true);
+    setMutationError(null);
+    setNotice(null);
+    try {
+      const deleted = await deleteAdminProgram(undefined, {
+        programId: deleteTarget.id,
+        signal: controller.signal,
+        expectedOwner,
+      });
+      if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) return;
+      refetchAfterDelete();
+      setDeleteTarget(null);
+      setNotice('Deleted the server-confirmed program record.');
+    } catch (error) {
+      if (!isCurrentProgramsOperation(generation, generationRef.current, controller.signal) || isAdminProgramsRequestCanceled(error)) return;
+      setMutationError(errorMessage(error, 'Program deletion was not confirmed.'));
+    } finally {
+      if (isCurrentProgramsOperation(generation, generationRef.current, controller.signal)) setMutationPending(false);
+      if (writeControllerRef.current === controller) writeControllerRef.current = null;
+    }
+  };
+
+  const changePage = (nextPage) => {
+    if (nextPage >= 1 && (pagination.pages === 0 || nextPage <= pagination.pages) && nextPage !== pagination.page) {
+      setPagination((current) => ({ ...current, page: nextPage }));
+    }
+  };
+
+  return (
+    <div className="space-y-6 text-slate-100">
+      <header className="flex flex-col gap-4 border-b border-cyan-300/15 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Administration / Catalog</p>
+          <h1 className="mep-heading mt-2 text-3xl font-bold text-white">Programs management</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Review and edit persisted program schema fields. Prices and constraints are exact stored decimals; this screen does not execute payments, provider actions, or quote settlement.</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={retry} disabled={readState === 'loading' || mutationPending} className="inline-flex items-center gap-2 rounded-md border border-cyan-300/50 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Refresh records
+          </button>
+          <button type="button" onClick={() => openEditor('create')} disabled={!expectedOwner || mutationPending} className="mep-primary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-cyan-200">
+            <Plus className="h-4 w-4" aria-hidden="true" /> Create program
+          </button>
+        </div>
+      </header>
+
+      {notice ? <p className="rounded-md border border-emerald-300/40 bg-emerald-950/25 p-3 text-sm text-emerald-100" role="status">{notice}</p> : null}
+      <ProgramReadState state={readState} error={readError} onRetry={retry} />
+
+      {readState === 'ready' && programs.length === 0 ? (
+        <section className="mep-panel rounded-xl border p-8 text-center" aria-labelledby="empty-programs-title">
+          <h2 id="empty-programs-title" className="mep-heading text-lg font-semibold text-white">No persisted program records</h2>
+          <p className="mt-2 text-sm text-slate-300">The scoped catalog returned no records. Create a program only when its stored terms are available.</p>
+        </section>
+      ) : null}
+
+      {readState === 'ready' && programs.length > 0 ? (
+        <section className="mep-panel overflow-hidden rounded-xl border" aria-labelledby="program-list-title">
+          <div className="flex flex-col gap-2 border-b border-slate-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 id="program-list-title" className="mep-heading font-semibold text-white">Persisted program catalog</h2>
+              <p className="text-sm text-slate-400">{pagination.total} scoped record{pagination.total === 1 ? '' : 's'} · ordered by stored ID</p>
+            </div>
+            <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-100">Exact decimal fields</span>
+          </div>
+          <div className="overflow-x-auto" tabIndex="0" aria-label="Program catalog table">
+            <table className="min-w-[1100px] w-full text-left text-sm">
+              <thead className="bg-slate-950/70 text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th scope="col" className="px-4 py-3">ID</th>
+                  <th scope="col" className="px-4 py-3">Program</th>
+                  <th scope="col" className="px-4 py-3">Type</th>
+                  <th scope="col" className="px-4 py-3">Account size</th>
+                  <th scope="col" className="px-4 py-3">Price</th>
+                  <th scope="col" className="px-4 py-3">Constraints</th>
+                  <th scope="col" className="px-4 py-3">Catalog state</th>
+                  <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {programs.map((program) => (
+                  <tr key={program.id} className="align-top hover:bg-slate-800/45">
+                    <td className="px-4 py-4 font-mono text-cyan-200">{program.id}</td>
+                    <td className="max-w-xs px-4 py-4"><p className="break-words font-medium text-white">{program.name}</p><p className="mt-1 break-words text-xs text-slate-400">Tenant {program.tenantId}</p></td>
+                    <td className="max-w-48 px-4 py-4 font-mono text-slate-200 break-words">{program.type}</td>
+                    <td className="px-4 py-4 font-mono text-slate-100">{program.accountSize}</td>
+                    <td className="px-4 py-4 font-mono font-semibold text-cyan-200">{program.price}</td>
+                    <td className="max-w-xs px-4 py-4 text-xs leading-5 text-slate-300">
+                      <span className="block">Target: {displayOptional(program.profitTarget)}</span>
+                      <span className="block">Daily loss: {displayOptional(program.maxDailyLoss)}</span>
+                      <span className="block">Total loss: {displayOptional(program.maxTotalLoss)}</span>
+                    </td>
+                    <td className="px-4 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${program.isActive ? 'bg-emerald-400/15 text-emerald-200' : 'bg-slate-700 text-slate-200'}`}>{program.isActive ? 'Active' : 'Inactive'}</span></td>
+                    <td className="px-4 py-4">
+                      <div className="flex justify-end gap-1">
+                        <button type="button" onClick={() => openEditor('view', program)} disabled={mutationPending} className="rounded-md p-2 text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-300" aria-label={`View ${program.name}`}><Eye className="h-4 w-4" aria-hidden="true" /></button>
+                        <button type="button" onClick={() => openEditor('edit', program)} disabled={mutationPending} className="rounded-md p-2 text-cyan-200 hover:bg-cyan-300/10 focus:outline-none focus:ring-2 focus:ring-cyan-300" aria-label={`Edit ${program.name}`}><Edit2 className="h-4 w-4" aria-hidden="true" /></button>
+                        <button type="button" onClick={() => { setNotice(null); setMutationError(null); setDeleteTarget(program); }} disabled={mutationPending} className="rounded-md p-2 text-rose-200 hover:bg-rose-400/10 focus:outline-none focus:ring-2 focus:ring-rose-200" aria-label={`Delete ${program.name}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <footer className="flex items-center justify-between border-t border-slate-700 px-5 py-3 text-sm text-slate-300">
+            <span>Page {pagination.page} of {pagination.pages || 1}</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => changePage(pagination.page - 1)} disabled={pagination.page <= 1 || mutationPending} className="rounded-md border border-slate-600 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-cyan-300">Previous</button>
+              <button type="button" onClick={() => changePage(pagination.page + 1)} disabled={pagination.pages === 0 || pagination.page >= pagination.pages || mutationPending} className="rounded-md border border-slate-600 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-cyan-300">Next</button>
+            </div>
+          </footer>
+        </section>
+      ) : null}
+
+      <ProgramEditor editor={editor} pending={mutationPending} error={mutationError} onClose={closeDialog} onSave={save} onChange={onDraftChange} />
+      <DeleteProgramDialog program={deleteTarget} pending={mutationPending} error={mutationError} onClose={closeDialog} onConfirm={confirmDelete} />
+    </div>
+  );
+}

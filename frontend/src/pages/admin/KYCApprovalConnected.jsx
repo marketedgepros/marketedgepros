@@ -1,287 +1,485 @@
-import { useState, useEffect } from 'react';
-import Swal from 'sweetalert2';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Download,
+  FileCheck2,
+  FileText,
+  LoaderCircle,
+  ShieldCheck,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
-import { FileCheck, CheckCircle, XCircle, Clock } from 'lucide-react';
-import api from "../../services/api";
-// AdminLayout removed - wrapped in App.jsx
-// // AdminLayout removed - wrapped in App.jsx
-// import AdminLayout from '../../components/admin/AdminLayout';
+import useAuthStore from '../../store/authStore';
+import useAdminClosureKyc from '../../hooks/useAdminClosureKyc.js';
+import useDialogFocus from '../../hooks/useDialogFocus.js';
+import {
+  adminClosureKycAcknowledgement,
+  createAdminClosureKycService,
+  isAdminClosureKycRequestCanceled,
+} from '../../services/adminClosureKycService.js';
 
+const kycAdminService = createAdminClosureKycService();
 
-function KYCApproval() {
-  const toast = useToast();
-  const [pendingKYC, setPendingKYC] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [allUsers, setAllUsers] = useState([]);
+const DOCUMENT_LABELS = {
+  id_proof: 'ID proof',
+  address_proof: 'Address proof',
+  selfie: 'Selfie with ID',
+  bank_statement: 'Bank statement',
+};
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+const statusStyle = {
+  pending: 'border-amber-400/40 bg-amber-400/10 text-amber-100',
+  approved: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-100',
+  rejected: 'border-rose-400/40 bg-rose-400/10 text-rose-100',
+  not_uploaded: 'border-slate-600 bg-slate-800 text-slate-200',
+};
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch pending KYC
-      const kycResponse = await api.get(`/admin/kyc/pending`);
-      
-      setPendingKYC(kycResponse.data.pending_kyc);
+const isKnownStatus = (value) => Object.prototype.hasOwnProperty.call(statusStyle, value);
+const formatStatus = (value) => (isKnownStatus(value) ? value.replaceAll('_', ' ') : 'Unavailable');
+const formatDate = (value) => {
+  if (!value) return 'Not recorded';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Recorded date unavailable' : parsed.toLocaleString();
+};
+const errorMessage = (error, fallback) => {
+  const message = error?.response?.data?.error;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
 
-      // Fetch all users to get stats
-      const usersResponse = await api.get(`/admin/users?per_page=1000`);
-      
-      setAllUsers(usersResponse.data.users);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load KYC data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApprove = async (userId) => {
-    try {
-      await api.post(`/admin/kyc/${userId}/approve`, {});
-      
-      // Refresh data
-      fetchData();
-      toast.success('KYC approved successfully');
-    } catch (err) {
-      toast.error('Failed to approve KYC');
-    }
-  };
-
-  const handleReject = async (userId) => {
-    try {
-      const reasonResult = await Swal.fire({
-      title: "Rejection Reason",
-      input: "textarea",
-      inputLabel: "Please enter rejection reason:",
-      inputPlaceholder: "Enter reason...",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Reject",
-      cancelButtonText: "Cancel",
-      inputValidator: (value) => {
-        if (!value) {
-          return "You need to provide a reason!";
-        }
-      }
-    });
-    
-    if (!reasonResult.isConfirmed) return;
-    const reason = reasonResult.value;
-      if (!reason) return;
-
-      await api.post(`/admin/kyc/${userId}/reject`, { reason });
-      
-      // Refresh data
-      fetchData();
-      toast.success('KYC rejected successfully');
-    } catch (err) {
-      toast.error('Failed to reject KYC');
-    }
-  };
-
-  // Calculate stats
-  const stats = {
-    pending: allUsers.filter(u => u.kyc_status === 'pending').length,
-    approved: allUsers.filter(u => u.kyc_status === 'approved').length,
-    rejected: allUsers.filter(u => u.kyc_status === 'rejected').length,
-    total: allUsers.filter(u => u.kyc_status !== 'not_submitted').length,
-  };
-
-  const verificationRate = stats.total > 0 
-    ? Math.round((stats.approved / stats.total) * 100) 
-    : 0;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
-
+export function KycStatusPill({ value }) {
   return (
-    
-    
-      <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white dark:text-white">
-          KYC Approval
-        </h1>
-        <p className="mt-2 text-sm text-gray-300 dark:text-gray-400">
-          Review and approve user identity verification
-        </p>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">Pending KYC</p>
-              <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
-                {stats.pending}
-              </p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Requires review</p>
-            </div>
-            <Clock className="w-12 h-12 text-yellow-600 dark:text-yellow-400" />
-          </div>
-        </div>
-
-        <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-green-600 dark:text-green-400">Approved</p>
-              <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                {stats.approved}
-              </p>
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">Verified users</p>
-            </div>
-            <CheckCircle className="w-12 h-12 text-green-600 dark:text-green-400" />
-          </div>
-        </div>
-
-        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-red-600 dark:text-red-400">Rejected</p>
-              <p className="text-2xl font-bold text-red-900 dark:text-red-100">
-                {stats.rejected}
-              </p>
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Failed verification</p>
-            </div>
-            <XCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
-          </div>
-        </div>
-
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-600 dark:text-blue-400">Verification Rate</p>
-              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {verificationRate}%
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Success rate</p>
-            </div>
-            <FileCheck className="w-12 h-12 text-blue-600 dark:text-blue-400" />
-          </div>
-        </div>
-      </div>
-
-      {/* Pending KYC Table */}
-      <div className="bg-slate-800/50 dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/10 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-white dark:text-white">
-            Pending KYC Submissions
-          </h2>
-        </div>
-
-        {pendingKYC.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 dark:text-gray-400">
-            <FileCheck className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No pending KYC submissions</p>
-            <p className="text-sm mt-2">All KYC requests have been processed</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-900 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-300 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-300 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-300 uppercase tracking-wider">
-                    Submitted Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-300 uppercase tracking-wider">
-                    Documents
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-slate-800/50 dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {pendingKYC.map((kyc) => (
-                  <tr key={kyc.id} className="hover:bg-slate-900 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white dark:text-white">
-                        {kyc.first_name} {kyc.last_name}
-                      </div>
-                      <div className="text-sm text-gray-400 dark:text-gray-400">
-                        ID: #{kyc.id}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 dark:text-gray-400">
-                      {kyc.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 dark:text-gray-400">
-                      {kyc.kyc_submitted_at ? new Date(kyc.kyc_submitted_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex gap-2">
-                        {kyc.kyc_id_url && (
-                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">ID</span>
-                        )}
-                        {kyc.kyc_address_url && (
-                          <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Address</span>
-                        )}
-                        {kyc.kyc_selfie_url && (
-                          <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">Selfie</span>
-                        )}
-                        {kyc.kyc_bank_url && (
-                          <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Bank</span>
-                        )}
-                        {!kyc.kyc_id_url && !kyc.kyc_address_url && !kyc.kyc_selfie_url && !kyc.kyc_bank_url && (
-                          <span className="px-2 py-1 text-xs bg-slate-700/50 text-gray-100 rounded">No documents</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleApprove(kyc.id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          Approve
-                        </button>
-                        <button 
-                          onClick={() => handleReject(kyc.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                        >
-                          Reject
-                        </button>
-                        <button className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-                          View
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      </div>
-    
-    
+    <span className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${statusStyle[value] || 'border-slate-600 bg-slate-800 text-slate-200'}`}>
+      {formatStatus(value)}
+    </span>
   );
 }
 
-export default KYCApproval;
+export function KycReviewNotice() {
+  return (
+    <section className="rounded-2xl border border-cyan-900/60 bg-cyan-950/30 p-4 text-sm text-slate-200" aria-label="Recorded document review scope">
+      <div className="flex gap-3">
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
+        <p>
+          This workspace records a manual review of submitted documents only. It does not verify a provider identity and does not change wallet, payout, trading, or MT5 eligibility.
+        </p>
+      </div>
+    </section>
+  );
+}
 
+export function KycSubmissionList({
+  list,
+  selectedUserId,
+  onSelect,
+  onPreviousPage,
+  onNextPage,
+  canPreviousPage,
+  canNextPage,
+  disabled,
+}) {
+  if (list.loading) {
+    return (
+      <section className="mep-panel rounded-2xl border p-8" aria-busy="true" aria-label="Loading pending KYC submissions">
+        <div className="flex items-center gap-3 text-slate-200" role="status">
+          <LoaderCircle className="h-5 w-5 animate-spin text-cyan-300" aria-hidden="true" />
+          Loading recorded pending submissions…
+        </div>
+      </section>
+    );
+  }
+  if (list.error) {
+    return (
+      <section className="rounded-2xl border border-rose-900 bg-rose-950/40 p-5 text-rose-100" role="alert">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <div>
+            <h2 className="mep-heading font-semibold">Pending submissions unavailable</h2>
+            <p className="mt-1 text-sm">{errorMessage(list.error, 'The recorded KYC submissions could not be loaded. Try a manual refresh.')}</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  if (!list.value?.submissions.length) {
+    return (
+      <section className="mep-panel rounded-2xl border p-8 text-center text-slate-300">
+        <FileCheck2 className="mx-auto h-12 w-12 text-cyan-300/70" aria-hidden="true" />
+        <h2 className="mep-heading mt-3 text-lg font-semibold text-white">No pending KYC submissions</h2>
+        <p className="mt-2 text-sm">No pending submissions are available to display.</p>
+      </section>
+    );
+  }
+  return (
+    <section className="mep-panel overflow-hidden rounded-2xl border shadow-sm" aria-labelledby="kyc-submissions-heading">
+      <div className="border-b border-slate-700 px-5 py-4 sm:px-6">
+        <h2 id="kyc-submissions-heading" className="mep-heading text-lg font-semibold text-white">Pending recorded submissions</h2>
+        <p className="mt-1 text-sm text-slate-300">{list.value.pagination.total} pending record{list.value.pagination.total === 1 ? '' : 's'} in this scoped result.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-[720px] w-full text-left">
+          <thead className="bg-slate-950/80 text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+              <th scope="col" className="px-5 py-3 font-semibold">Subject</th>
+              <th scope="col" className="px-5 py-3 font-semibold">Submitted</th>
+              <th scope="col" className="px-5 py-3 font-semibold">Document records</th>
+              <th scope="col" className="px-5 py-3 font-semibold">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700">
+            {list.value.submissions.map((submission) => (
+              <tr key={submission.userId} className={selectedUserId === submission.userId ? 'bg-cyan-950/30' : 'hover:bg-slate-800/70'}>
+                <td className="px-5 py-4 align-top">
+                  <p className="font-semibold text-white">User #{submission.userId}</p>
+                  <p className="mt-1 text-xs text-slate-400">Recorded status: {formatStatus(submission.kycStatus)}</p>
+                </td>
+                <td className="px-5 py-4 align-top text-sm text-slate-300">{formatDate(submission.submittedAt)}</td>
+                <td className="px-5 py-4 align-top">
+                  <div className="flex max-w-md flex-wrap gap-1.5">
+                    {Object.entries(submission.documents).map(([type, status]) => (
+                      <span key={type} className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200">
+                        {DOCUMENT_LABELS[type]}: <span className="capitalize text-slate-100">{formatStatus(status)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-5 py-4 align-top">
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onSelect(submission.userId)}
+                    className="rounded-lg border border-cyan-500/70 bg-cyan-950/40 px-3 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {selectedUserId === submission.userId ? 'Viewing record' : 'Review documents'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {list.value.pagination.pages > 1 && (
+        <nav className="flex flex-col gap-3 border-t border-slate-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6" aria-label="Pending KYC submission pages">
+          <p className="text-sm text-slate-300" aria-live="polite">Page {list.value.pagination.page} of {list.value.pagination.pages}</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={disabled || !canPreviousPage}
+              onClick={onPreviousPage}
+              className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous page
+            </button>
+            <button
+              type="button"
+              disabled={disabled || !canNextPage}
+              onClick={onNextPage}
+              className="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next page
+            </button>
+          </div>
+        </nav>
+      )}
+    </section>
+  );
+}
+
+export function KycSubmissionDetail({ detail, onDownload, onReview, disabled }) {
+  if (detail.loading) {
+    return (
+      <section className="mep-panel rounded-2xl border p-6" aria-busy="true">
+        <div className="flex items-center gap-3 text-slate-200" role="status">
+          <LoaderCircle className="h-5 w-5 animate-spin text-cyan-300" aria-hidden="true" />
+          Loading selected document record…
+        </div>
+      </section>
+    );
+  }
+  if (detail.error) {
+    return (
+      <section className="rounded-2xl border border-rose-900 bg-rose-950/40 p-5 text-rose-100" role="alert">
+        <h2 className="mep-heading font-semibold">Selected submission unavailable</h2>
+        <p className="mt-1 text-sm">{errorMessage(detail.error, 'The selected document record could not be loaded. Return to the pending list and select it again.')}</p>
+      </section>
+    );
+  }
+  if (!detail.value) {
+    return (
+      <section className="mep-panel rounded-2xl border border-dashed p-6 text-sm text-slate-300" role="status">
+        Select a pending submission to view its recorded documents. No document data is retained until a scoped detail response is returned.
+      </section>
+    );
+  }
+  const { user, documents, kycStatus, submittedAt } = detail.value;
+  return (
+    <section className="mep-panel rounded-2xl border shadow-sm" aria-labelledby="kyc-detail-heading">
+      <div className="border-b border-slate-700 px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Selected recorded submission</p>
+            <h2 id="kyc-detail-heading" className="mep-heading mt-1 break-words text-xl font-semibold text-white">{user.displayName} <span className="text-slate-400">· User #{user.id}</span></h2>
+            <p className="mt-1 text-sm text-slate-300">Submitted: {formatDate(submittedAt)}</p>
+          </div>
+          <KycStatusPill value={kycStatus} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-2">
+        {documents.map((document) => {
+          const canReview = document.status === 'pending' && Boolean(document.uploadedAt && document.downloadPath);
+          return (
+            <article key={document.type} className="mep-panel flex min-w-0 flex-col rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
+                    <h3 className="break-words font-semibold text-white">{document.name}</h3>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">Recorded upload: {formatDate(document.uploadedAt)}</p>
+                </div>
+                <KycStatusPill value={document.status} />
+              </div>
+              {document.notes && <p className="mt-3 break-words rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200"><strong>Recorded note:</strong> {document.notes}</p>}
+              {!isKnownStatus(document.status) && <p className="mt-3 rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200">This record has an unavailable status and cannot be acted on.</p>}
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                {document.downloadPath && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onDownload(document)}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-cyan-600 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" /> Download privately
+                  </button>
+                )}
+                {canReview && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onReview(document, 'approved')}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Record approval
+                  </button>
+                )}
+                {canReview && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onReview(document, 'rejected')}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4" aria-hidden="true" /> Record rejection
+                  </button>
+                )}
+              </div>
+              {document.status === 'pending' && !canReview && <p className="mt-3 text-sm text-amber-200">This pending record cannot be reviewed until a current private document and upload timestamp are returned.</p>}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function KycDocumentReviewDialog({ review, onClose, onChange, onSubmit, isSaving }) {
+  const closeDialog = () => {
+    if (!isSaving) onClose();
+  };
+  const dialogRef = useDialogFocus({ open: Boolean(review), onClose: closeDialog });
+  if (!review) return null;
+  const acknowledgement = adminClosureKycAcknowledgement(review.userId, review.document.type);
+  const needsReason = review.status === 'rejected';
+  const canSave = acknowledgement !== null
+    && review.acknowledgement === acknowledgement
+    && (!needsReason || review.notes.trim().length > 0)
+    && !isSaving;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/80 p-4 sm:items-center sm:justify-center" role="presentation">
+      <section ref={dialogRef} className="mep-panel max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border p-5 shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="kyc-review-dialog-title">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Manual recorded review</p>
+            <h2 id="kyc-review-dialog-title" className="mep-heading mt-1 text-xl font-semibold text-white">{review.status === 'approved' ? 'Record document approval' : 'Record document rejection'}</h2>
+          </div>
+          <button type="button" disabled={isSaving} onClick={closeDialog} className="rounded-md p-1 text-slate-300 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50" aria-label="Close recorded document review dialog">
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mt-5 rounded-xl border border-cyan-900/60 bg-cyan-950/30 p-4 text-sm text-slate-100">
+          <p><strong>Original subject:</strong> User #{review.userId}</p>
+          <p className="mt-1"><strong>Original document:</strong> {review.document.name}</p>
+          <p className="mt-1"><strong>Recorded upload:</strong> {formatDate(review.document.uploadedAt)}</p>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-slate-300">This saves a document-review record only. It is not provider identity proof and it does not change account eligibility.</p>
+        <label htmlFor="kyc-review-note" className="mt-5 block text-sm font-semibold text-slate-100">{needsReason ? 'Recorded rejection reason' : 'Recorded review note (optional)'}</label>
+        <textarea
+          id="kyc-review-note"
+          value={review.notes}
+          onChange={(event) => onChange({ notes: event.target.value })}
+          maxLength={500}
+          required={needsReason}
+          disabled={isSaving}
+          data-autofocus="true"
+          className="mt-2 min-h-24 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 disabled:opacity-50"
+          placeholder={needsReason ? 'Explain why this document record was rejected' : 'Optional recorded note'}
+        />
+        <label htmlFor="kyc-review-acknowledgement" className="mt-5 block text-sm font-semibold text-slate-100">Type the acknowledgement to confirm this original user and document</label>
+        <p id="kyc-review-acknowledgement-help" className="mt-1 break-all rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs text-cyan-200">{acknowledgement}</p>
+        <input
+          id="kyc-review-acknowledgement"
+          value={review.acknowledgement}
+          onChange={(event) => onChange({ acknowledgement: event.target.value })}
+          aria-describedby="kyc-review-acknowledgement-help"
+          autoComplete="off"
+          spellCheck="false"
+          disabled={isSaving}
+          className="mt-2 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 font-mono text-sm text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 disabled:opacity-50"
+          placeholder="Type the exact acknowledgement"
+        />
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" disabled={isSaving} onClick={closeDialog} className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 disabled:opacity-50">Cancel</button>
+          <button type="button" disabled={!canSave} onClick={onSubmit} className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50 ${review.status === 'approved' ? 'bg-emerald-700 hover:bg-emerald-600 focus-visible:ring-emerald-300' : 'bg-rose-700 hover:bg-rose-600 focus-visible:ring-rose-300'}`}>
+            {isSaving ? 'Saving recorded review…' : review.status === 'approved' ? 'Save recorded approval' : 'Save recorded rejection'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function KYCApprovalContent({ user, isAuthenticated, service = kycAdminService }) {
+  const toast = useToast();
+  const read = useAdminClosureKyc({ user, isAuthenticated, service });
+  const [review, setReview] = useState(null);
+  const [activeAction, setActiveAction] = useState(null);
+  const [outcome, setOutcome] = useState(null);
+  const mountedRef = useRef(false);
+  const actionControllerRef = useRef(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      actionControllerRef.current?.abort();
+      actionControllerRef.current = null;
+    };
+  }, []);
+
+  const openReview = (document, status) => {
+    const detail = read.detail.value;
+    if (activeAction || !read.principal || !detail || document.status !== 'pending' || !document.uploadedAt || !document.downloadPath) return;
+    setOutcome(null);
+    setReview({ userId: detail.user.id, document, status, notes: '', acknowledgement: '' });
+  };
+
+  const downloadDocument = async (document) => {
+    const detail = read.detail.value;
+    if (activeAction || !read.principal || !detail || document.downloadPath === null) return;
+    const controller = new AbortController();
+    actionControllerRef.current = controller;
+    setActiveAction({ kind: 'download', type: document.type });
+    try {
+      await service.downloadDocument({
+        expectedOwner: read.principal.owner,
+        userId: detail.user.id,
+        document,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (mountedRef.current && !isAdminClosureKycRequestCanceled(error)) {
+        toast.error(errorMessage(error, 'The private document download could not be prepared.'));
+      }
+    } finally {
+      if (actionControllerRef.current === controller) actionControllerRef.current = null;
+      if (mountedRef.current && !controller.signal.aborted) setActiveAction(null);
+    }
+  };
+
+  const saveReview = async () => {
+    const detail = read.detail.value;
+    if (!review || activeAction || !read.principal || !detail || detail.user.id !== review.userId) return;
+    const controller = new AbortController();
+    actionControllerRef.current = controller;
+    setActiveAction({ kind: 'review', type: review.document.type });
+    try {
+      const result = await service.reviewDocument({
+        expectedOwner: read.principal.owner,
+        userId: review.userId,
+        documentType: review.document.type,
+        status: review.status,
+        notes: review.notes,
+        acknowledgement: review.acknowledgement,
+        expectedUploadedAt: review.document.uploadedAt,
+        documentName: review.document.name,
+        signal: controller.signal,
+      });
+      if (mountedRef.current && !controller.signal.aborted) {
+        setReview(null);
+        setOutcome({
+          userId: result.userId,
+          document: result.document.name,
+          status: result.document.status,
+        });
+        toast.success(`Recorded ${result.document.status} review saved for User #${result.userId}.`);
+        read.refresh();
+      }
+    } catch (error) {
+      if (mountedRef.current && !isAdminClosureKycRequestCanceled(error)) {
+        toast.error(errorMessage(error, 'The recorded document review could not be saved.'));
+      }
+    } finally {
+      if (actionControllerRef.current === controller) actionControllerRef.current = null;
+      if (mountedRef.current && !controller.signal.aborted) setActiveAction(null);
+    }
+  };
+
+  const disabled = Boolean(activeAction);
+  return (
+    <main className="space-y-6 text-slate-100">
+      <header className="border-b border-cyan-900/50 pb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Administration · recorded review</p>
+        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="mep-heading text-3xl font-bold tracking-tight text-white">KYC document review</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Review pending document records within your tenant and hierarchy scope. Private files are downloaded through the authenticated document route.</p>
+          </div>
+          <button type="button" disabled={disabled || read.list.loading} onClick={read.refresh} className="inline-flex w-fit items-center gap-2 rounded-lg border border-cyan-500 px-4 py-2.5 text-sm font-semibold text-cyan-200 hover:bg-cyan-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-50">
+            <LoaderCircle className={`h-4 w-4 ${read.list.loading ? 'animate-spin' : ''}`} aria-hidden="true" /> Refresh records
+          </button>
+        </div>
+      </header>
+      <KycReviewNotice />
+      {outcome && <section className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 p-4 text-sm text-emerald-100" role="status">Confirmed saved response: User #{outcome.userId}, {outcome.document}, recorded as {formatStatus(outcome.status)}.</section>}
+      <KycSubmissionList
+        list={read.list}
+        selectedUserId={read.selectedUserId}
+        onSelect={read.selectSubmission}
+        onPreviousPage={read.previousPage}
+        onNextPage={read.nextPage}
+        canPreviousPage={read.canPreviousPage}
+        canNextPage={read.canNextPage}
+        disabled={disabled}
+      />
+      <KycSubmissionDetail detail={read.detail} onDownload={downloadDocument} onReview={openReview} disabled={disabled} />
+      <KycDocumentReviewDialog
+        review={review}
+        isSaving={activeAction?.kind === 'review'}
+        onClose={() => { if (!activeAction) setReview(null); }}
+        onChange={(change) => setReview((current) => (current ? { ...current, ...change } : current))}
+        onSubmit={() => { void saveReview(); }}
+      />
+    </main>
+  );
+}
+
+export default function KYCApproval() {
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const identityKey = useMemo(
+    () => `${isAuthenticated === true ? 'yes' : 'no'}:${user?.id ?? 'missing'}:${user?.tenant_id ?? user?.tenantId ?? user?.tenant?.id ?? 'missing'}:${user?.role ?? 'missing'}`,
+    [isAuthenticated, user?.id, user?.role, user?.tenant?.id, user?.tenant_id, user?.tenantId],
+  );
+  return <KYCApprovalContent key={identityKey} user={user} isAuthenticated={isAuthenticated} />;
+}

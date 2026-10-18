@@ -18,7 +18,8 @@ export default function ChatWidget() {
   const inputRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    messagesEndRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
   };
 
   useEffect(() => {
@@ -83,7 +84,9 @@ export default function ChatWidget() {
 
   const handleQuickQuestion = (question) => {
     setInputMessage(question);
-    setTimeout(() => sendMessage(), 100);
+    // Fill the draft; send only after an explicit user action. A delayed callback
+    // captured the previous draft and could submit the wrong question.
+    inputRef.current?.focus();
   };
 
   if (!isOpen) {
@@ -99,18 +102,18 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl z-50 transition-all duration-300 ${
-      isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'
+    <section aria-label="Account assistant" className={`fixed bottom-6 right-6 max-w-[calc(100vw-3rem)] max-h-[calc(100dvh-3rem)] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 flex flex-col transition-colors duration-200 ${
+      isMinimized ? 'w-80' : 'w-96 h-[600px]'
     }`}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-2xl p-4 flex items-center justify-between">
+      <div className="bg-slate-800 rounded-t-2xl p-4 flex shrink-0 items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
             <MessageCircle className="w-5 h-5 text-blue-600" />
           </div>
           <div>
             <h3 className="text-white font-semibold">AI Assistant</h3>
-            <p className="text-blue-100 text-xs">Powered by GPT-5</p>
+            <p className="text-slate-300 text-xs">Not a source of approved program terms</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -134,7 +137,7 @@ export default function ChatWidget() {
       {!isMinimized && (
         <>
           {/* Messages */}
-          <div className="h-[440px] overflow-y-auto p-4 space-y-4">
+          <div role="log" aria-label="Conversation" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -143,13 +146,13 @@ export default function ChatWidget() {
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-2 ${
                     message.role === 'user'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                      ? 'bg-cyan-800 text-white'
                       : message.isError
                       ? 'bg-red-50 text-red-800 border border-red-200'
-                      : 'bg-gray-100 text-gray-800'
+                      : 'bg-slate-800 text-slate-100'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                   <p className={`text-xs mt-1 ${
                     message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                   }`}>
@@ -160,7 +163,7 @@ export default function ChatWidget() {
             ))}
 
             {isLoading && (
-              <div className="flex justify-start">
+              <div role="status" aria-label="Waiting for assistant response" className="flex justify-start">
                 <div className="bg-gray-100 rounded-2xl px-4 py-2">
                   <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
                 </div>
@@ -186,22 +189,23 @@ export default function ChatWidget() {
           </div>
 
           {/* Input */}
-          <div className="p-4 border-t border-gray-200">
+          <div className="shrink-0 p-4 border-t border-slate-700">
             <div className="flex gap-2">
               <input
                 ref={inputRef}
                 type="text"
+                aria-label="Message to account assistant"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="min-w-0 flex-1 px-4 py-2 border border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-400"
                 disabled={isLoading}
               />
               <button
                 onClick={sendMessage}
                 disabled={!inputMessage.trim() || isLoading}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mep-primary shrink-0 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Send message"
               >
                 {isLoading ? (
@@ -217,7 +221,6 @@ export default function ChatWidget() {
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
-

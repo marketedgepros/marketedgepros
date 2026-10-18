@@ -7,7 +7,11 @@ import logging
 from src.database import db
 from src.models import PaymentApprovalRequest, Challenge, Payment, User
 from src.services.email_service import EmailService
-from src.services.commission_service import CommissionService
+from src.services.affiliate_financial_boundary import refuse_unverified_affiliate_mutation
+
+
+class PaymentApprovalSettlementNotConfigured(RuntimeError):
+    """Legacy approval operations have no verified settlement command."""
 
 
 class PaymentApprovalService:
@@ -32,197 +36,43 @@ class PaymentApprovalService:
     @staticmethod
     def create_approval_request(challenge_id, payment_id, requested_by_id, requested_for_id, 
                                amount, payment_type):
+        """Refuse legacy cash/free settlement before any validation or effect.
+
+        This approval workflow cannot establish affiliate settlement authority.
+        It remains unavailable until a verified settlement/identity/ledger path
+        is introduced. Read-only queries and rejection handling are unchanged.
         """
-        Create a new payment approval request
-        
-        Args:
-            challenge_id: ID of the challenge
-            payment_id: ID of the payment (optional)
-            requested_by_id: ID of the user requesting approval (Master/Admin)
-            requested_for_id: ID of the trader/user
-            amount: Payment amount
-            payment_type: 'cash' or 'free'
-        
-        Returns:
-            PaymentApprovalRequest object
-        """
-        # Validate payment type
-        if payment_type not in ['cash', 'free']:
-            raise ValueError("Payment type must be 'cash' or 'free'")
-        
-        # Validate requester permissions
-        requester = User.query.get(requested_by_id)
-        if not requester:
-            raise ValueError("Requester not found")
-        
-        if payment_type == 'free' and not PaymentApprovalService.can_create_free_account(requester):
-            raise ValueError("Only Super Admin can create free accounts")
-        
-        if payment_type == 'cash' and not PaymentApprovalService.can_use_cash_payment(requester):
-            raise ValueError("Only Super Admin and Masters can use cash payment")
-        
-        # Create approval request
-        approval_request = PaymentApprovalRequest(
-            challenge_id=challenge_id,
-            payment_id=payment_id,
-            requested_by=requested_by_id,
-            requested_for=requested_for_id,
-            amount=amount,
-            payment_type=payment_type,
-            status='pending'
-        )
-        
-        db.session.add(approval_request)
-        
-        # Update challenge status to pending approval
-        if challenge_id:
-            challenge = Challenge.query.get(challenge_id)
-            if challenge:
-                challenge.approval_status = 'pending'
-                challenge.payment_type = payment_type
-        
-        # Update payment status to pending approval
-        if payment_id:
-            payment = Payment.query.get(payment_id)
-            if payment:
-                payment.approval_status = 'pending'
-                payment.payment_type = payment_type
-        
-        db.session.commit()
-        
-        # Send notification email to Super Admins
-        PaymentApprovalService._notify_super_admins(approval_request)
-        
-        return approval_request
+        refuse_unverified_affiliate_mutation()
     
     @staticmethod
     def approve_request(approval_request_id, admin_id, admin_notes=None):
+        """Refuse legacy approval before any lookup, activation, or payment write.
+
+        In particular, challenge activation and payment completion must never be
+        performed when the related commission/settlement cannot be verified.
         """
-        Approve a payment approval request
-        
-        Args:
-            approval_request_id: ID of the approval request
-            admin_id: ID of the Super Admin approving
-            admin_notes: Optional notes from admin
-        
-        Returns:
-            Updated PaymentApprovalRequest object
-        """
-        # Validate admin permissions
-        admin = User.query.get(admin_id)
-        if not admin or admin.role != 'supermaster':
-            raise ValueError("Only Super Admin can approve payment requests")
-        
-        # Get approval request
-        approval_request = PaymentApprovalRequest.query.get(approval_request_id)
-        if not approval_request:
-            raise ValueError("Approval request not found")
-        
-        if approval_request.status != 'pending':
-            raise ValueError("Approval request is not pending")
-        
-        # Update approval request
-        approval_request.status = 'approved'
-        approval_request.reviewed_by = admin_id
-        approval_request.reviewed_at = datetime.utcnow()
-        approval_request.admin_notes = admin_notes
-        
-        # Update challenge
-        if approval_request.challenge_id:
-            challenge = Challenge.query.get(approval_request.challenge_id)
-            if challenge:
-                challenge.approval_status = 'approved'
-                challenge.approved_by = admin_id
-                challenge.approved_at = datetime.utcnow()
-                challenge.payment_status = 'paid'
-                challenge.status = 'active'  # Activate the challenge
-                
-                # Calculate and create commission if applicable
-                try:
-                    CommissionService.calculate_and_create_commission(
-                        challenge_id=challenge.id,
-                        sale_amount=approval_request.amount
-                    )
-                except Exception as commission_error:
-                    logging.error(f"Failed to create commission: {commission_error}")
-        
-        # Update payment
-        if approval_request.payment_id:
-            payment = Payment.query.get(approval_request.payment_id)
-            if payment:
-                payment.approval_status = 'approved'
-                payment.approved_by = admin_id
-                payment.approved_at = datetime.utcnow()
-                payment.status = 'completed'
-                payment.completed_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        # Send notification emails
-        PaymentApprovalService._notify_approval(approval_request, approved=True)
-        
-        return approval_request
+        refuse_unverified_affiliate_mutation()
     
     @staticmethod
     def reject_request(approval_request_id, admin_id, rejection_reason, admin_notes=None):
+        """Refuse legacy rejection before any lookup, write, or notification.
+
+        The historical path changes a challenge/payment and sends email without a
+        verified settlement command.  It must therefore remain unavailable even
+        when this service is invoked outside its HTTP route.
         """
-        Reject a payment approval request
-        
-        Args:
-            approval_request_id: ID of the approval request
-            admin_id: ID of the Super Admin rejecting
-            rejection_reason: Reason for rejection
-            admin_notes: Optional notes from admin
-        
-        Returns:
-            Updated PaymentApprovalRequest object
-        """
-        # Validate admin permissions
-        admin = User.query.get(admin_id)
-        if not admin or admin.role != 'supermaster':
-            raise ValueError("Only Super Admin can reject payment requests")
-        
-        # Get approval request
-        approval_request = PaymentApprovalRequest.query.get(approval_request_id)
-        if not approval_request:
-            raise ValueError("Approval request not found")
-        
-        if approval_request.status != 'pending':
-            raise ValueError("Approval request is not pending")
-        
-        # Update approval request
-        approval_request.status = 'rejected'
-        approval_request.reviewed_by = admin_id
-        approval_request.reviewed_at = datetime.utcnow()
-        approval_request.rejection_reason = rejection_reason
-        approval_request.admin_notes = admin_notes
-        
-        # Update challenge
-        if approval_request.challenge_id:
-            challenge = Challenge.query.get(approval_request.challenge_id)
-            if challenge:
-                challenge.approval_status = 'rejected'
-                challenge.approved_by = admin_id
-                challenge.approved_at = datetime.utcnow()
-                challenge.rejection_reason = rejection_reason
-                challenge.status = 'failed'  # Mark as failed
-        
-        # Update payment
-        if approval_request.payment_id:
-            payment = Payment.query.get(approval_request.payment_id)
-            if payment:
-                payment.approval_status = 'rejected'
-                payment.approved_by = admin_id
-                payment.approved_at = datetime.utcnow()
-                payment.rejection_reason = rejection_reason
-                payment.status = 'failed'
-        
-        db.session.commit()
-        
-        # Send notification emails
-        PaymentApprovalService._notify_approval(approval_request, approved=False)
-        
-        return approval_request
+        raise PaymentApprovalSettlementNotConfigured(
+            'Order settlement is not configured'
+        )
+
+    @staticmethod
+    def reject_unavailable_response():
+        """HTTP boundary after JWT/role/CSRF decorators and before body parsing."""
+        from flask import jsonify
+        return jsonify({
+            'error': 'Order settlement is not configured',
+            'code': 'ORDER_SETTLEMENT_NOT_CONFIGURED',
+        }), 503
     
     @staticmethod
     def get_pending_requests():
@@ -303,4 +153,3 @@ class PaymentApprovalService:
         except Exception as e:
             # Log error but don't fail the approval/rejection
             logging.error(f"Error sending approval/rejection notification: {str(e)}", exc_info=True)
-

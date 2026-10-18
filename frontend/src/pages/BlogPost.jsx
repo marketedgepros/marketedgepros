@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, ArrowLeft, Share2, Facebook, Twitter, Linkedin, Tag, User } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -14,40 +14,82 @@ export default function BlogPost() {
   const [post, setPost] = useState(null);
   const [relatedPosts, setRelatedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [contentSlug, setContentSlug] = useState(null);
   const [error, setError] = useState('');
   const [readingProgress, setReadingProgress] = useState(0);
-
-  useEffect(() => {
-    fetchPost();
-    window.scrollTo(0, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  const [shareError, setShareError] = useState('');
+  const postRequestRef = useRef({ controller: null, version: 0 });
 
   useEffect(() => {
     const handleScroll = () => {
       const windowHeight = window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const progress = (scrollTop / (documentHeight - windowHeight)) * 100;
-      setReadingProgress(Math.min(progress, 100));
+      const scrollableHeight = documentHeight - windowHeight;
+      const progress = scrollableHeight > 0
+        ? (scrollTop / scrollableHeight) * 100
+        : 0;
+      setReadingProgress(Math.min(Math.max(progress, 0), 100));
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const fetchPost = async () => {
+  const fetchRelatedPosts = async (category, currentPostId, controller, version) => {
+    const isCurrentRequest = () => (
+      postRequestRef.current.version === version
+      && postRequestRef.current.controller === controller
+    );
+
     try {
-      setLoading(true);
-      const response = await api.get(`/blog/posts/${slug}`);
-      setPost(response.data);
-      
-      if (response.data.category) {
-        fetchRelatedPosts(response.data.category, response.data.id);
-      }
-      
-      setError('');
+      const response = await api.get('/blog/posts', {
+        params: { category, per_page: 3 },
+        signal: controller.signal,
+      });
+      if (!isCurrentRequest()) return;
+
+      const related = Array.isArray(response.data?.posts)
+        ? response.data.posts.filter((item) => item.id !== currentPostId).slice(0, 3)
+        : [];
+      setRelatedPosts(related);
     } catch (err) {
+      if (controller.signal.aborted || !isCurrentRequest()) return;
+      console.error('Error fetching related posts:', err);
+      setRelatedPosts([]);
+    }
+  };
+
+  const fetchPost = async (requestedSlug = slug) => {
+    const previousRequest = postRequestRef.current;
+    previousRequest.controller?.abort();
+
+    const controller = new AbortController();
+    const version = previousRequest.version + 1;
+    postRequestRef.current = { controller, version };
+    const isCurrentRequest = () => (
+      postRequestRef.current.version === version
+      && postRequestRef.current.controller === controller
+    );
+
+    try {
+      setContentSlug(requestedSlug);
+      setLoading(true);
+      setError('');
+      setPost(null);
+      setRelatedPosts([]);
+      setShareError('');
+      const response = await api.get(`/blog/posts/${requestedSlug}`, { signal: controller.signal });
+      if (!isCurrentRequest()) return;
+
+      const nextPost = response.data;
+      setPost(nextPost);
+
+      if (nextPost?.category) {
+        void fetchRelatedPosts(nextPost.category, nextPost.id, controller, version);
+      }
+    } catch (err) {
+      if (controller.signal.aborted || !isCurrentRequest()) return;
       console.error('Error fetching post:', err);
       if (err.response?.status === 404) {
         setError('Blog post not found');
@@ -55,21 +97,21 @@ export default function BlogPost() {
         setError('Failed to load blog post');
       }
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) setLoading(false);
     }
   };
 
-  const fetchRelatedPosts = async (category, currentPostId) => {
-    try {
-      const response = await api.get('/blog/posts', {
-        params: { category, per_page: 3 }
-      });
-      const related = response.data.posts.filter(p => p.id !== currentPostId).slice(0, 3);
-      setRelatedPosts(related);
-    } catch (err) {
-      console.error('Error fetching related posts:', err);
-    }
-  };
+  useEffect(() => {
+    fetchPost(slug);
+    window.scrollTo(0, 0);
+
+    return () => {
+      const activeRequest = postRequestRef.current;
+      activeRequest.version += 1;
+      activeRequest.controller?.abort();
+      postRequestRef.current = { controller: null, version: activeRequest.version };
+    };
+  }, [slug]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -89,11 +131,25 @@ export default function BlogPost() {
       twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
     };
-    
-    window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+
+    const shareUrl = shareUrls[platform];
+    if (!shareUrl) return;
+
+    try {
+      const popup = window.open(shareUrl, '_blank', 'noopener,noreferrer,width=600,height=400');
+      if (!popup) {
+        setShareError('Your browser blocked the sharing window. Please allow pop-ups and try again.');
+        return;
+      }
+      popup.opener = null;
+      setShareError('');
+    } catch (err) {
+      setShareError('The sharing window could not be opened. Please try again.');
+    }
   };
 
-  if (loading) {
+  // Route changes must hide old content before passive effects start the new read.
+  if (loading || contentSlug !== slug) {
     return (
       <Layout>
         <div className="min-h-screen bg-black flex items-center justify-center">
@@ -111,10 +167,18 @@ export default function BlogPost() {
       <Layout>
         <div className="min-h-screen bg-black flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">{error || 'Post not found'}</h2>
+            <h2 className="mep-heading text-2xl font-bold text-white mb-4">{error || 'Post not found'}</h2>
             <button
+              type="button"
+              onClick={() => fetchPost(slug)}
+              className="mep-primary mr-3 px-6 py-3 font-bold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
               onClick={() => navigate('/blog')}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-xl text-white font-bold hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300"
+              className="mep-primary px-6 py-3 font-bold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-300"
             >
               Back to Blog
             </button>
@@ -165,7 +229,7 @@ export default function BlogPost() {
             )}
 
             {/* Title */}
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            <h1 className="mep-heading text-4xl md:text-5xl font-bold text-white mb-6">
               {post.title}
             </h1>
 
@@ -226,7 +290,7 @@ export default function BlogPost() {
                   {post.tags.map((tag, index) => (
                     <span
                       key={index}
-                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-gray-300 text-sm hover:border-cyan-500/50 transition-colors cursor-pointer"
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-gray-300 text-sm"
                     >
                       #{tag}
                     </span>
@@ -241,30 +305,37 @@ export default function BlogPost() {
                 <span className="text-gray-400 font-semibold">Share:</span>
                 <button
                   onClick={() => shareOnSocial('facebook')}
-                  className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300"
+                  aria-label="Share on Facebook"
+                  type="button"
+                  className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-300"
                 >
                   <Facebook className="w-5 h-5 text-gray-300" />
                 </button>
                 <button
                   onClick={() => shareOnSocial('twitter')}
-                  className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300"
+                  aria-label="Share on X/Twitter"
+                  type="button"
+                  className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-300"
                 >
                   <Twitter className="w-5 h-5 text-gray-300" />
                 </button>
                 <button
                   onClick={() => shareOnSocial('linkedin')}
-                  className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300"
+                  aria-label="Share on LinkedIn"
+                  type="button"
+                  className="p-3 bg-white/5 border border-white/10 rounded-xl hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-300"
                 >
                   <Linkedin className="w-5 h-5 text-gray-300" />
                 </button>
               </div>
+              {shareError && <p className="mt-3 text-sm text-rose-200" role="status" aria-live="polite">{shareError}</p>}
             </div>
           </article>
 
           {/* Related Posts */}
           {relatedPosts.length > 0 && (
             <div>
-              <h2 className="text-3xl font-bold text-white mb-8">
+              <h2 className="mep-heading text-3xl font-bold text-white mb-8">
                 Related <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">Articles</span>
               </h2>
               <div className="grid md:grid-cols-3 gap-6">
@@ -308,4 +379,3 @@ export default function BlogPost() {
     </Layout>
   );
 }
-

@@ -1,257 +1,126 @@
-import { useEffect, useState } from 'react';
-import { Search, Filter, Download, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
-import TraderLayout from '../../components/trader/TraderLayout';
-import api from '../../services/api';
+import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Download, RefreshCw, Search } from 'lucide-react';
+import useAuthStore from '../../store/authStore';
+import useRecordedTradingRead from '../../hooks/useRecordedTradingRead';
+import {
+  buildRecordedHistoryParams, createRecordedTradingViewService, downloadRecordedHistoryPage,
+  recordedIdentityKey, recordedPrincipal,
+} from '../../services/recordedTradingViewService.js';
+import {
+  RecordedBoundary, RecordedMetric, RecordedPagination, RecordedReadState,
+  recordedDisplay, tradingButton, tradingPanel,
+} from '../../components/trading/RecordedTradingUI';
 
-export default function TradingHistory() {
-  const [trades, setTrades] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterPeriod, setFilterPeriod] = useState('all');
+const service = createRecordedTradingViewService();
+const defaults = { symbol: '', type: 'all', period: 'all' };
+const inputClass = 'mt-2 w-full min-w-0 rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2.5 text-sm text-white focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300/25';
 
-  useEffect(() => {
-    loadTrades();
-  }, []);
-
-  const loadTrades = async () => {
+function HistoryContent({ principal }) {
+  const [draft, setDraft] = useState(defaults);
+  const [filters, setFilters] = useState(defaults);
+  const [page, setPage] = useState(1);
+  const [filterError, setFilterError] = useState(null);
+  const [exportError, setExportError] = useState(null);
+  const scopeKey = recordedIdentityKey(principal);
+  const params = buildRecordedHistoryParams({ ...filters, page });
+  const key = JSON.stringify([scopeKey, params]);
+  const load = useCallback((signal) => service.history({ ...params, expectedOwner: principal, signal }), [key]);
+  const { value: view, loading, error, retry } = useRecordedTradingRead(key, load);
+  const dirty = draft.symbol !== filters.symbol || draft.type !== filters.type || draft.period !== filters.period;
+  const apply = (event) => {
+    event.preventDefault();
     try {
-      setIsLoading(true);
-      const response = await api.get('/trader/trades');
-      setTrades(response.data.trades || []);
-    } catch (error) {
-      setTrades([]);
-    } finally {
-      setIsLoading(false);
+      const normalized = buildRecordedHistoryParams(draft);
+      const applied = { symbol: normalized.symbol, type: normalized.type, period: normalized.period };
+      setDraft(applied); setFilters(applied); setPage(1); setFilterError(null); setExportError(null);
+    } catch (requestError) {
+      setFilterError(requestError.message);
     }
   };
-
-  const exportTrades = () => {
-    const headers = ['Symbol', 'Type', 'Lots', 'Open Price', 'Close Price', 'Open Time', 'Close Time', 'Pips', 'Profit', 'Commission', 'Swap'];
-    const rows = filteredTrades.map((trade) => [
-      trade.symbol,
-      trade.type,
-      trade.lots,
-      trade.openPrice,
-      trade.closePrice,
-      new Date(trade.openTime).toLocaleString(),
-      new Date(trade.closeTime).toLocaleString(),
-      trade.pips,
-      trade.profit,
-      trade.commission,
-      trade.swap,
-    ]);
-
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `trading-history-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+  const exportPage = () => {
+    if (!view || loading || error || dirty || !view.trades.length
+      || recordedIdentityKey(recordedPrincipal(useAuthStore.getState().user)) !== scopeKey) return;
+    try { downloadRecordedHistoryPage(view); setExportError(null); }
+    catch { setExportError('The recorded page could not be exported. Please try again.'); }
   };
-
-  const filteredTrades = trades.filter((trade) => {
-    const matchesSearch = trade.symbol.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || trade.type === filterType;
-    
-    let matchesPeriod = true;
-    if (filterPeriod !== 'all') {
-      const tradeDate = new Date(trade.closeTime);
-      const now = new Date();
-      
-      if (filterPeriod === 'today') {
-        matchesPeriod = tradeDate.toDateString() === now.toDateString();
-      } else if (filterPeriod === 'this_week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        matchesPeriod = tradeDate >= weekAgo;
-      } else if (filterPeriod === 'this_month') {
-        matchesPeriod = tradeDate.getMonth() === now.getMonth() && 
-                       tradeDate.getFullYear() === now.getFullYear();
-      }
-    }
-    
-    return matchesSearch && matchesType && matchesPeriod;
-  });
-
-  const stats = {
-    totalTrades: filteredTrades.length,
-    winningTrades: filteredTrades.filter(t => t.profit > 0).length,
-    losingTrades: filteredTrades.filter(t => t.profit < 0).length,
-    totalProfit: filteredTrades.reduce((sum, t) => sum + t.profit, 0),
-    totalPips: filteredTrades.reduce((sum, t) => sum + t.pips, 0),
-  };
-
-  if (isLoading) {
-    return (
-      <TraderLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-            <p className="text-gray-300 mt-4">Loading trading history...</p>
-          </div>
-        </div>
-      </TraderLayout>
-    );
-  }
-
-  return (
-    <TraderLayout>
-      <div className="min-h-screen bg-slate-900">
-        {/* Header */}
-        <div className="bg-slate-800/50 border-b border-white/10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white">Trading History</h1>
-                <p className="text-gray-300 mt-2">View all your past trades</p>
-              </div>
-              <button
-                onClick={exportTrades}
-                className="btn btn-primary flex items-center gap-2"
-              >
-                <Download className="w-5 h-5" />
-                Export
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div className="card text-center">
-              <p className="text-sm text-gray-300 mb-1">Total Trades</p>
-              <p className="text-2xl font-bold text-white">{stats.totalTrades}</p>
-            </div>
-            <div className="card text-center">
-              <p className="text-sm text-gray-300 mb-1">Winning</p>
-              <p className="text-2xl font-bold text-green-600">{stats.winningTrades}</p>
-            </div>
-            <div className="card text-center">
-              <p className="text-sm text-gray-300 mb-1">Losing</p>
-              <p className="text-2xl font-bold text-red-600">{stats.losingTrades}</p>
-            </div>
-            <div className="card text-center">
-              <p className="text-sm text-gray-300 mb-1">Total Profit</p>
-              <p className={`text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {stats.totalProfit >= 0 ? '+' : ''}${stats.totalProfit.toFixed(2)}
-              </p>
-            </div>
-            <div className="card text-center">
-              <p className="text-sm text-gray-300 mb-1">Total Pips</p>
-              <p className={`text-2xl font-bold ${stats.totalPips >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {stats.totalPips >= 0 ? '+' : ''}{stats.totalPips}
-              </p>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="bg-slate-800/50 rounded-lg shadow-sm p-4 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search by symbol..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input pl-10 w-full"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-gray-400" />
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="input flex-1"
-                >
-                  <option value="all">All Types</option>
-                  <option value="buy">Buy</option>
-                  <option value="sell">Sell</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <select
-                  value={filterPeriod}
-                  onChange={(e) => setFilterPeriod(e.target.value)}
-                  className="input flex-1"
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="this_week">This Week</option>
-                  <option value="this_month">This Month</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Trades Table */}
-          <div className="bg-slate-800/50 rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-900 border-b border-white/10">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Symbol</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Lots</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Open Price</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Close Price</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Open Time</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Close Time</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Pips</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Profit</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredTrades.map((trade) => (
-                    <tr key={trade.id} className="hover:bg-slate-900">
-                      <td className="px-4 py-3 text-sm font-medium text-white">{trade.symbol}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {trade.type === 'buy' ? (
-                            <TrendingUp className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 text-red-600" />
-                          )}
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            trade.type === 'buy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {trade.type.toUpperCase()}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-white">{trade.lots}</td>
-                      <td className="px-4 py-3 text-sm text-white">{trade.openPrice}</td>
-                      <td className="px-4 py-3 text-sm text-white">{trade.closePrice}</td>
-                      <td className="px-4 py-3 text-sm text-gray-300">
-                        {new Date(trade.openTime).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">
-                        {new Date(trade.closeTime).toLocaleString()}
-                      </td>
-                      <td className={`px-4 py-3 text-sm font-medium ${trade.pips >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {trade.pips >= 0 ? '+' : ''}{trade.pips}
-                      </td>
-                      <td className={`px-4 py-3 text-sm font-bold ${trade.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {trade.profit >= 0 ? '+' : ''}${trade.profit.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredTrades.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-300">No trades found</p>
-              </div>
-            )}
-          </div>
-        </div>
+  return <div className="mx-auto max-w-7xl min-w-0 space-y-6 p-4 text-slate-100 sm:p-6 lg:p-8">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account records</p>
+        <h1 className="mep-heading mt-2 text-3xl font-semibold tracking-tight text-white">Trading history</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Review stored trade records, filter them on the server and export the current page. Recorded figures are not live trading evidence.</p></div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={tradingButton} onClick={retry} disabled={loading}><RefreshCw className="h-4 w-4" aria-hidden="true" />Refresh records</button>
+        <button type="button" className={tradingButton} onClick={exportPage} disabled={loading || error || dirty || !view?.trades.length}>
+          <Download className="h-4 w-4" aria-hidden="true" />Export current page</button>
       </div>
-    </TraderLayout>
-  );
+    </header>
+    <RecordedBoundary />
+    <form onSubmit={apply} className={tradingPanel} aria-label="Recorded trade filters">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="min-w-0 text-sm text-slate-300">Symbol
+          <input className={inputClass} value={draft.symbol} maxLength={20} placeholder="For example EURUSD" onChange={(event) => setDraft({ ...draft, symbol: event.target.value })} />
+        </label>
+        <label className="text-sm text-slate-300">Recorded side
+          <select className={inputClass} value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}>
+            <option value="all">All recorded sides</option><option value="buy">Buy</option><option value="sell">Sell</option>
+          </select>
+        </label>
+        <label className="text-sm text-slate-300">Close-time window
+          <select className={inputClass} value={draft.period} onChange={(event) => setDraft({ ...draft, period: event.target.value })}>
+            <option value="all">All recorded times</option><option value="today">Today — UTC cutoff</option>
+            <option value="week">Last 7 days</option><option value="month">Last 30 days</option>
+          </select>
+        </label>
+        <div className="flex items-end"><button type="submit" className={`${tradingButton} w-full`}><Search className="h-4 w-4" aria-hidden="true" />Apply filters</button></div>
+      </div>
+      <p className="mt-4 text-xs leading-5 text-slate-400">The time windows use server UTC cutoffs against stored close times; source timezone is not verified. Filters apply when submitted. Export is disabled until changes are applied.</p>
+      {dirty && <p className="mt-2 text-sm text-cyan-200" role="status">Filter changes have not been applied.</p>}
+      {filterError && <p className="mt-3 text-sm text-red-200" role="alert">{filterError}</p>}
+    </form>
+    {exportError && <p className="rounded-xl border border-red-400/30 p-4 text-sm text-red-200" role="alert">{exportError}</p>}
+    <RecordedReadState loading={loading} error={error} retry={retry} empty={view?.trades.length === 0}
+      emptyTitle={view?.pagination.total > 0 ? 'No records on this page' : 'No recorded trades for these filters'} />
+    {view && !loading && !error && <>
+      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <RecordedMetric label="Recorded rows in this filter" value={view.statistics.total_trades} />
+        <RecordedMetric label="Rows with positive stored P/L" value={view.statistics.winning_trades} />
+        <RecordedMetric label="Rows with negative stored P/L" value={view.statistics.losing_trades} />
+        <RecordedMetric label="Stored P/L sum" value={view.statistics.total_profit} hint="Currency not recorded; incomplete P/L remains unavailable." />
+      </dl>
+      {view.trades.length > 0 && <section className="mep-panel min-w-0 overflow-hidden rounded-2xl border" aria-label="Recorded trades">
+        <div className="flex flex-col gap-2 border-b border-white/10 p-5 sm:flex-row sm:justify-between">
+          <h2 className="mep-heading font-semibold text-white">Current recorded page</h2><p className="text-xs text-slate-300">{view.trades.length} rows · currency unspecified · unverified legacy</p>
+        </div>
+        <div className="max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-cyan-300" role="region" aria-label="Scrollable recorded trade table" tabIndex={0}>
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <caption className="sr-only">Stored trade values only. Open or incomplete trades can have unavailable close fields.</caption>
+            <thead className="bg-slate-950/40 text-xs text-slate-300"><tr>
+              {['Symbol / ID', 'Side / status', 'Volume', 'Open / close price', 'Stored P/L', 'Commission / swap', 'Recorded open / close time'].map((label) => <th key={label} scope="col" className="px-4 py-3 font-semibold">{label}</th>)}
+            </tr></thead>
+            <tbody className="divide-y divide-white/10">{view.trades.map((trade) => <tr key={trade.id} className="hover:bg-white/[0.025]">
+              <td className="px-4 py-4"><span className="font-semibold text-white">{trade.symbol}</span><span className="mt-1 block text-xs text-slate-400">Trade {trade.id} · Challenge {trade.challenge_id}</span></td>
+              <td className="px-4 py-4"><span>{recordedDisplay(trade.trade_type)}</span><span className="mt-1 block text-xs text-slate-400">{recordedDisplay(trade.status)}</span></td>
+              <td className="px-4 py-4 font-mono">{recordedDisplay(trade.volume)}</td>
+              <td className="px-4 py-4 font-mono"><span>{recordedDisplay(trade.open_price)}</span><span className="mt-1 block text-slate-400">{recordedDisplay(trade.close_price)}</span></td>
+              <td className="px-4 py-4 font-mono">{recordedDisplay(trade.profit)}</td>
+              <td className="px-4 py-4 font-mono"><span>{recordedDisplay(trade.commission)}</span><span className="mt-1 block text-slate-400">{recordedDisplay(trade.swap)}</span></td>
+              <td className="px-4 py-4 text-xs"><span>{recordedDisplay(trade.open_time)}</span><span className="mt-1 block text-slate-400">{recordedDisplay(trade.close_time)}</span></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </section>}
+      <RecordedPagination pagination={view.pagination} onPage={setPage} disabled={loading || dirty} />
+    </>}
+    <footer className="flex flex-wrap gap-4 text-sm"><Link className="text-cyan-200 underline underline-offset-4 focus-visible:outline focus-visible:outline-cyan-300" to="/challenges">View recorded challenges</Link>
+      <Link className="text-cyan-200 underline underline-offset-4 focus-visible:outline focus-visible:outline-cyan-300" to="/support/my-tickets">My support tickets</Link></footer>
+  </div>;
 }
-
+export default function TradingHistory() {
+  const user = useAuthStore((state) => state.user);
+  const principal = recordedPrincipal(user);
+  if (!principal || principal.role !== 'trader' || principal.tenant_id === null) return <section className={`${tradingPanel} m-4`} role="status">
+    <h1 className="mep-heading text-xl font-semibold text-white">Trading history unavailable</h1><p className="mt-2 text-sm text-slate-300">A signed-in trader account with a recorded brand is required.</p>
+  </section>;
+  return <HistoryContent key={recordedIdentityKey(principal)} principal={principal} />;
+}

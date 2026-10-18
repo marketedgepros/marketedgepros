@@ -7,7 +7,13 @@ from datetime import datetime, timedelta
 import jwt
 from flask import current_app
 from src.constants.roles import Roles, ROLE_HIERARCHY
-from src.utils.hierarchy_scoping import HierarchyScopedMixin
+from src.utils.hierarchy_scoping import (
+    HierarchyScopedMixin,
+    complete_hierarchy_scope,
+    escape_hierarchy_path,
+    legacy_root_scope,
+    tenant_hierarchy_scope,
+)
 
 
 class User(db.Model, TimestampMixin, HierarchyScopedMixin):
@@ -127,12 +133,13 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
         if not Roles.is_admin(self.role) and self.role != Roles.AFFILIATE:
             return None
         
-        # Generate unique 8-character code
-        while True:
+        # Bounded retries; the unique DB index remains the concurrency gate.
+        for _attempt in range(32):
             code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
             if not User.query.filter_by(referral_code=code).first():
                 self.referral_code = code
                 return code
+        raise RuntimeError('Unable to allocate a unique referral code')
     
     def generate_2fa_secret(self):
         """Generate new 2FA secret"""
@@ -193,7 +200,7 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             # Log the exception if necessary
             raise RuntimeError("Failed to generate password reset token") from e
     
-    def generate_access_token(self):
+    def generate_access_token(self, session_id=None):
         """Generate JWT access token with jti and token_version"""
         import uuid
         now = datetime.utcnow()
@@ -210,13 +217,16 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             'token_version': self.token_version or 0  # For mass revocation
         }
         
+        if session_id is not None:
+            payload['sid'] = session_id
+
         return jwt.encode(
             payload,
             current_app.config['JWT_SECRET_KEY'],
             algorithm='HS256'
         )
     
-    def generate_refresh_token(self):
+    def generate_refresh_token(self, session_id=None):
         """Generate JWT refresh token"""
         now = datetime.utcnow()
         expires_delta = current_app.config['JWT_REFRESH_TOKEN_EXPIRES']
@@ -224,9 +234,14 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             'user_id': self.id,
             'exp': now + expires_delta,
             'iat': now,
-            'type': 'refresh'
+            'type': 'refresh',
+            'jti': __import__('uuid').uuid4().hex,
+            'token_version': self.token_version or 0
         }
-        
+
+        if session_id is not None:
+            payload['sid'] = session_id
+
         return jwt.encode(
             payload,
             current_app.config['JWT_SECRET_KEY'],
@@ -240,7 +255,8 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
             payload = jwt.decode(
                 token,
                 current_app.config['JWT_SECRET_KEY'],
-                algorithms=['HS256']
+                algorithms=['HS256'],
+                options={'require': ['user_id', 'type', 'exp', 'iat']}
             )
             
             if payload.get('type') != token_type:
@@ -260,34 +276,92 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
         db.session.commit()
     
     # Hierarchy Methods
+    MAX_ANCESTOR_DEPTH = 128
+
+    @staticmethod
+    def _is_positive_integer(value):
+        return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+    @classmethod
+    def _is_canonical_path_for_id(cls, path, user_id):
+        """Validate the slash-delimited format written for newly created paths."""
+        if not isinstance(path, str) or not path or len(path) > 500:
+            return False
+        segments = path.split('/')
+        return (
+            bool(segments)
+            and all(segment.isdigit() and str(int(segment)) == segment and int(segment) > 0
+                    for segment in segments)
+            and segments[-1] == str(user_id)
+        )
+
+    def _descendants_query(self):
+        """Return the slash-bounded descendant query, or no query for an invalid path."""
+        path = self.tree_path
+        if not isinstance(path, str) or not path.strip() or len(path) > 500:
+            return None
+        escaped_path = escape_hierarchy_path(path)
+        query = User.query.filter(User.tree_path.like(f"{escaped_path}/%", escape="\\"))
+        if legacy_root_scope(self):
+            return query
+        if not tenant_hierarchy_scope(self):
+            return None
+        return query.filter(User.tenant_id == self.tenant_id)
+
     def get_all_descendants(self):
-        """Get all users in the downline (recursive)"""
-        if not self.tree_path:
-            return []
-        return User.query.filter(User.tree_path.startswith(self.tree_path + '/')).all()
+        """Get all users in the downline using a literal, slash-bounded prefix."""
+        query = self._descendants_query()
+        return query.all() if query is not None else []
     
     def get_direct_children(self):
         """Get only direct children (1 level down)"""
         return self.children
     
     def get_ancestors(self):
-        """Get all users in the upline"""
+        """Get the upline while refusing cycles and unbounded malformed chains."""
         ancestors = []
-        current = self.parent
-        while current:
+        self_id = getattr(self, 'id', None)
+        visited = {('id', self_id)} if self_id is not None else {('object', id(self))}
+        current = getattr(self, 'parent', None)
+        max_depth = getattr(self, 'MAX_ANCESTOR_DEPTH', 128)
+
+        while current is not None:
+            current_id = getattr(current, 'id', None)
+            marker = ('id', current_id) if current_id is not None else ('object', id(current))
+            if marker in visited:
+                raise ValueError('Hierarchy ancestry contains a cycle')
+            if len(ancestors) >= max_depth:
+                raise ValueError('Hierarchy ancestry exceeds the maximum depth')
+            visited.add(marker)
             ancestors.append(current)
-            current = current.parent
+            current = getattr(current, 'parent', None)
         return ancestors
     
     def update_tree_path(self):
-        """Update tree_path and level based on parent"""
-        if self.parent:
-            parent_path = self.parent.tree_path or str(self.parent.id)
-            self.tree_path = f"{parent_path}/{self.id}"
-            self.level = self.parent.level + 1
-        else:
+        """Write a canonical slash-delimited path for a valid parent relationship."""
+        if not self._is_positive_integer(self.id):
+            raise ValueError('Cannot build hierarchy path')
+
+        parent = self.parent
+        if parent is None:
+            if self.parent_id is not None:
+                raise ValueError('Cannot build hierarchy path')
             self.tree_path = str(self.id)
             self.level = 0
+            return
+
+        if not self._is_positive_integer(parent.id):
+            raise ValueError('Cannot build hierarchy path')
+        parent_path = parent.tree_path
+        if not self._is_canonical_path_for_id(parent_path, parent.id):
+            raise ValueError('Cannot build hierarchy path')
+        if str(self.id) in parent_path.split('/'):
+            raise ValueError('Cannot build hierarchy path')
+        new_path = f"{parent_path}/{self.id}"
+        if len(new_path) > 500 or not isinstance(parent.level, int) or isinstance(parent.level, bool) or parent.level < 0:
+            raise ValueError('Cannot build hierarchy path')
+        self.tree_path = new_path
+        self.level = parent.level + 1
     
     def can_create_user(self, target_role):
         """Check if this user can create a user with target_role"""
@@ -298,11 +372,15 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
         target = Roles.normalize_role(target_role)
         
         # Use the centralized role hierarchy check
-        return can_user_create_role(current_role, target, self.can_create_same_role)
+        from src.utils.hierarchy_scoping import platform_root_scope
+        if not current_app.config.get('EXPANDED_HIERARCHY_ENABLED', False):
+            return platform_root_scope(self) and target in {Roles.AFFILIATE, Roles.TRADER}
+        return can_user_create_role(current_role, target, platform_root_scope(self))
     
     def get_downline_count(self):
-        """Get total count of users in downline"""
-        return len(self.get_all_descendants())
+        """Get total count of users in downline without materializing every row."""
+        query = self._descendants_query()
+        return query.count() if query is not None else 0
     
     def get_downline_by_level(self, max_level=None):
         """Get downline organized by level"""
@@ -355,17 +433,18 @@ class User(db.Model, TimestampMixin, HierarchyScopedMixin):
         Returns:
             SQLAlchemy filter condition or None (if supermaster)
         """
-        # Only ROOT supermasters (parent_id=None) see all users
-        # Created supermasters are filtered by hierarchy like everyone else
-        if hasattr(current_user, 'role') and current_user.role == 'supermaster':
-            parent_id = getattr(current_user, 'parent_id', None)
-            if parent_id is None:
-                # Root supermaster - sees everything
-                return None
-        
-        # Filter by tree_path - only users in this user's hierarchy
-        # tree_path LIKE 'current_user_path%' means all descendants
-        return cls.tree_path.like(f"{current_user.tree_path}/%") | (cls.tree_path == current_user.tree_path)
+        if not complete_hierarchy_scope(current_user):
+            from sqlalchemy import false
+            return false()
+        if legacy_root_scope(current_user):
+            return None
+        if not tenant_hierarchy_scope(current_user):
+            from sqlalchemy import false
+            return false()
+        path = escape_hierarchy_path(current_user.tree_path)
+        return ((cls.tenant_id == current_user.tenant_id)
+                & ((cls.id == current_user.id)
+                   | cls.tree_path.like(f"{path}/%", escape="\\")))
 
 
 class EmailVerificationToken(db.Model, TimestampMixin):
@@ -474,4 +553,3 @@ class PasswordResetToken(db.Model, TimestampMixin):
         """Mark token as used"""
         self.used = True
         db.session.commit()
-

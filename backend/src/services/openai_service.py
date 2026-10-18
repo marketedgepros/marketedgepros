@@ -124,16 +124,93 @@ would be best and why."""
         
         return self.chat_completion(messages, temperature=0.7, max_tokens=300)
     
-    def analyze_trading_performance(self, performance_data):
+    @staticmethod
+    def get_authorized_challenges(current_user, challenge_ids=None):
+        """Return challenges owned by the authenticated user in their tenant.
+
+        A challenge does not carry tenant metadata itself, so the tenant check
+        must be made through its trading program. This returns ``None`` for
+        malformed, missing, or inaccessible ownership metadata, allowing the
+        route to use one not-found response for absent and forbidden resources.
+        """
+        user_id = getattr(current_user, 'id', None)
+        tenant_id = getattr(current_user, 'tenant_id', None)
+        if user_id is None or tenant_id is None:
+            return None
+
+        if challenge_ids is not None:
+            if not isinstance(challenge_ids, (list, tuple, set)):
+                return None
+            challenge_ids = list(challenge_ids)
+            if any(
+                isinstance(challenge_id, bool)
+                or not isinstance(challenge_id, int)
+                or challenge_id <= 0
+                for challenge_id in challenge_ids
+            ):
+                return None
+            if len(set(challenge_ids)) != len(challenge_ids):
+                return None
+
+        try:
+            from src.database import db
+            from src.models import Challenge, TradingProgram
+
+            query = db.session.query(Challenge).join(
+                TradingProgram,
+                Challenge.program_id == TradingProgram.id
+            ).filter(
+                Challenge.user_id == user_id,
+                TradingProgram.tenant_id == tenant_id
+            )
+            if challenge_ids is not None:
+                if not challenge_ids:
+                    return []
+                query = query.filter(Challenge.id.in_(challenge_ids))
+
+            challenges = query.all()
+            if challenge_ids is not None:
+                found_ids = {challenge.id for challenge in challenges}
+                if found_ids != set(challenge_ids):
+                    return None
+            return challenges
+        except Exception:
+            # Authorization cannot be established without the authoritative
+            # lookup. Do not permit an AI call when that lookup fails.
+            return None
+
+    def analyze_trading_performance(
+        self, performance_data, *, current_user=None, challenge_ids=None
+    ):
         """
         Analyze trading performance and provide insights
         
         Args:
             performance_data (dict): Trading performance metrics
+            current_user: Authenticated database user owning the challenges
+            challenge_ids: Exact challenge IDs used to derive the metrics
             
         Returns:
             dict: Analysis and recommendations
         """
+        # This independent check prevents a future caller from sending
+        # performance data to OpenAI without proving its owner/tenant scope.
+        if challenge_ids is None:
+            return {
+                'success': False,
+                'not_found': True,
+                'error': 'Resource not found'
+            }
+        authorized_challenges = self.get_authorized_challenges(
+            current_user, challenge_ids
+        )
+        if not authorized_challenges:
+            return {
+                'success': False,
+                'not_found': True,
+                'error': 'Resource not found'
+            }
+
         prompt = f"""Analyze the following trading performance and provide insights:
 
 Total Trades: {performance_data.get('total_trades', 0)}
@@ -201,4 +278,3 @@ def get_openai_service():
     if _openai_service is None:
         _openai_service = OpenAIService()
     return _openai_service
-

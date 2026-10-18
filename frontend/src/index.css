@@ -1,33 +1,65 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-primary-600: #0891b2;
+  --color-primary-700: #0e7490;
+  --color-primary-800: #155e75;
+}
+
+:root {
+  --mep-canvas: #020617;
+  --mep-surface: #0b1425;
+  --mep-border: rgba(103, 232, 249, 0.14);
+  --mep-accent: #22d3ee;
+  --mep-surface-shadow: 0 16px 48px rgba(2, 6, 23, 0.24);
+}
+
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-slate-950 text-slate-100 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid #22d3ee;
+    outline-offset: 3px;
+  }
+
+  :where(input, select, textarea, button) {
+    font: inherit;
+  }
+
+  :where(button, a, label, p, h1, h2, h3, h4, h5, h6, td, th) {
+    overflow-wrap: anywhere;
+  }
+
+  :where(table, input[type="number"]) {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
   }
-  
+
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800;
+    @apply bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900;
   }
-  
+
   .btn-secondary {
-    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 active:bg-gray-400;
+    @apply bg-slate-800 text-slate-100 hover:bg-slate-700 active:bg-slate-600;
   }
-  
+
   .btn-outline {
-    @apply border-2 border-blue-600 text-blue-600 hover:bg-blue-50 active:bg-blue-100;
+    @apply border-2 border-cyan-600 text-cyan-300 hover:bg-cyan-950;
   }
-  
+
   .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full px-4 py-2 border border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-400;
   }
-  
-  /* Fix input text visibility - dark background with white text */
+
   input[type="text"],
   input[type="email"],
   input[type="password"],
@@ -36,9 +68,9 @@
   input[type="search"],
   textarea,
   select {
-    @apply bg-gray-700 text-white placeholder-gray-400;
+    @apply bg-slate-800 text-slate-100 placeholder-slate-400;
   }
-  
+
   input[type="text"]:focus,
   input[type="email"]:focus,
   input[type="password"]:focus,
@@ -47,11 +79,165 @@
   input[type="search"]:focus,
   textarea:focus,
   select:focus {
-    @apply bg-gray-600 text-white ring-2 ring-blue-500;
+    @apply ring-2 ring-cyan-400;
   }
-  
+
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+    @apply bg-slate-900 rounded-xl shadow-sm border border-slate-700 p-6;
+  }
+
+  /* Explicit shared surfaces: no blanket color/status overrides or animated feed. */
+  .mep-shell {
+    background-color: var(--mep-canvas);
+    background-image: radial-gradient(ellipse at 90% 0%, rgba(8, 145, 178, 0.07), transparent 48%);
+    color: #f1f5f9;
+  }
+
+  .mep-chrome {
+    background-color: rgba(11, 20, 37, 0.96);
+    border-color: var(--mep-border);
+  }
+
+  .mep-page {
+    min-width: 0;
+    background-color: transparent;
+  }
+
+  .mep-page :where(h1, h2) {
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  .mep-nav-item {
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  }
+
+  .mep-nav-item[aria-current="page"] {
+    color: #cffafe;
+    background: rgba(34, 211, 238, 0.1);
+    border-color: rgba(103, 232, 249, 0.3);
+    box-shadow: inset 3px 0 0 var(--mep-accent);
+  }
+
+  .mep-brand-mark {
+    @apply flex shrink-0 items-center justify-center rounded-lg font-bold;
+    width: 2rem;
+    height: 2rem;
+    background: linear-gradient(135deg, #22d3ee, #0891b2);
+    color: #020617;
+    box-shadow: 0 4px 18px rgba(8, 145, 178, 0.18);
+  }
+
+  .mep-cta {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold;
+    background-color: var(--mep-accent);
+    color: #020617;
+    transition: background-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .mep-cta:hover {
+    background-color: #67e8f9;
+    box-shadow: 0 8px 28px rgba(8, 145, 178, 0.2);
+  }
+
+  .mep-screen {
+    background-color: var(--mep-canvas);
+    background-image: radial-gradient(ellipse at 95% 0%, rgba(8, 145, 178, 0.06), transparent 50%);
+  }
+
+  .mep-heading {
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  .mep-panel {
+    background-color: var(--mep-surface);
+    background-image: linear-gradient(135deg, rgba(103, 232, 249, 0.025), transparent 65%);
+    border-color: var(--mep-border);
+    box-shadow: var(--mep-surface-shadow);
+  }
+
+  .mep-primary {
+    border-radius: 0.75rem;
+    background-color: var(--mep-accent);
+    color: #020617;
+    font-weight: 600;
+    transition: background-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .mep-primary:hover:not(:disabled) {
+    background-color: #67e8f9;
+    box-shadow: 0 6px 24px rgba(8, 145, 178, 0.15);
+  }
+
+  /* One entrance per mounted screen/panel. No route key or data remount is needed. */
+  .mep-page > :not([role="alert"]):not([role="status"]),
+  .mep-page [role="tabpanel"],
+  .mep-tab-panel {
+    animation: mep-interior-arrive 180ms ease-out 1;
+  }
+
+  .mep-page .mep-panel {
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .mep-workspace-hero {
+    background-color: var(--mep-canvas);
+    background-image: radial-gradient(ellipse at 0% 0%, rgba(34, 211, 238, 0.1), transparent 60%),
+      linear-gradient(145deg, rgba(11, 20, 37, 0.8), transparent);
+    border-color: var(--mep-border);
+  }
+
+  .mep-interior-card {
+    min-width: 0;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .mep-interior-card:focus-within {
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.4), var(--mep-surface-shadow);
+  }
+
+  .mep-page [role="tab"] {
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
   }
 }
 
+@keyframes mep-interior-arrive {
+  from { opacity: 0.96; }
+  to { opacity: 1; }
+}
+
+/* Pointer-only response: no translated cards, sticky hover, blur or animated lights on phones. */
+@media (hover: hover) and (pointer: fine) {
+  .mep-interior-card:hover {
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.22), var(--mep-surface-shadow);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mep-page > :not([role="alert"]):not([role="status"]),
+  .mep-page [role="tabpanel"],
+  .mep-tab-panel {
+    animation: none;
+  }
+  .mep-page .mep-panel,
+  .mep-page [role="tab"],
+  .mep-interior-card {
+    transition: none;
+  }
+}
+
+/* Respect the user's motion preference, including Tailwind animation utilities.
+   Keep loading text/status visible; never hide content to mask layout defects. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

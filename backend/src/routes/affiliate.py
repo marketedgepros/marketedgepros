@@ -2,9 +2,12 @@
 Affiliate Program Routes
 Handles affiliate registration, tracking, commissions, and payouts
 """
+from decimal import Decimal, InvalidOperation
+import re
+
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta
-from sqlalchemy import func
+from sqlalchemy import case, desc, func
 import secrets
 import string
 
@@ -15,16 +18,23 @@ from src.models.affiliate import (
 )
 from src.models.user import User
 from src.utils.decorators import token_required, admin_required
+from src.services.affiliate_financial_boundary import affiliate_mutation_unavailable_response
+from src.services.affiliate_records_read import (
+    AffiliateRecordsArgumentError,
+    AffiliateRecordsReadService,
+)
+from src.utils.hierarchy_scoping import platform_root_scope
 
 affiliate_bp = Blueprint('affiliate', __name__)
 
 
 def generate_affiliate_code(length=8):
-    """Generate unique affiliate code"""
-    while True:
+    """Generate a code with bounded work; the DB unique constraint is final."""
+    for _ in range(5):
         code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(length))
         if not AffiliateLink.query.filter_by(code=code).first():
             return code
+    raise RuntimeError('Affiliate code allocation unavailable')
 
 
 # ============================================================================
@@ -46,14 +56,16 @@ def get_affiliate_info():
                 'commission_rate': float(settings.default_commission_rate),
                 'min_payout': float(settings.min_payout_amount),
                 'cookie_duration_days': settings.cookie_duration_days,
-                'terms': settings.terms_and_conditions
+                'terms': settings.terms_and_conditions,
+                'payouts_enabled': False,
+                'settlement_verification': 'not_configured'
             },
             'benefits': [
-                f'{float(settings.default_commission_rate)}% commission on all sales',
+                f'{float(settings.default_commission_rate)}% configured rate; commission eligibility requires verified settlement',
                 f'${float(settings.min_payout_amount)} minimum payout',
                 f'{settings.cookie_duration_days}-day cookie duration',
                 'Real-time tracking dashboard',
-                'Monthly payouts',
+                'Payouts unavailable until settlement and identity verification are configured',
                 'Dedicated affiliate support'
             ]
         }), 200
@@ -111,49 +123,182 @@ def register_affiliate(current_user):
 @affiliate_bp.route('/dashboard', methods=['GET'])
 @token_required
 def get_dashboard(current_user):
-    """Get affiliate dashboard statistics"""
+    """Return bounded, tenant-scoped legacy affiliate records without authority."""
+    tenant_id = current_user.tenant_id
+    # Never infer a tenant from a legacy link, referral, or program record.
+    if isinstance(tenant_id, bool) or not isinstance(tenant_id, int) or tenant_id < 1:
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    owner_context = {'user_id': current_user.id, 'tenant_id': tenant_id}
+
+    def decimal_string(value):
+        """Serialize finite stored Numeric values without float coercion or zero-fill."""
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            result = value if isinstance(value, Decimal) else Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+        return format(result, 'f') if result.is_finite() else None
+
+    def nonnegative_count(value):
+        """Expose only recorded non-negative integer counters; unknown stays null."""
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        return value
+
+    def public_link_url(code):
+        """Keep received codes inside the sole approved public HTTPS URL shape."""
+        if not isinstance(code, str) or not re.fullmatch(r'[A-Z0-9]{1,50}', code):
+            return None
+        return f'https://marketedgepros.com/?ref={code}'
+
     try:
-        # Get all affiliate links for user
-        links = AffiliateLink.query.filter_by(user_id=current_user.id).all()
-        
+        with db.session.no_autoflush:
+            # Keep the dashboard's fixed bounded query plan while applying the
+            # same local PostgreSQL timeout as the two record-list projections.
+            AffiliateRecordsReadService._set_postgresql_statement_timeout()
+            link_totals = (
+                db.session.query(
+                    func.count(AffiliateLink.id).label('total'),
+                    func.sum(AffiliateLink.clicks).label('clicks'),
+                    func.count(AffiliateLink.clicks).label('clicks_count'),
+                    func.sum(case((AffiliateLink.clicks < 0, 1), else_=0)).label('negative_clicks'),
+                    func.sum(AffiliateLink.conversions).label('conversions'),
+                    func.count(AffiliateLink.conversions).label('conversions_count'),
+                    func.sum(case((AffiliateLink.conversions < 0, 1), else_=0)).label('negative_conversions'),
+                    func.sum(AffiliateLink.total_revenue).label('revenue'),
+                    func.count(AffiliateLink.total_revenue).label('revenue_count'),
+                )
+                .filter(AffiliateLink.user_id == current_user.id)
+                .one()
+            )
+            # COUNT(id) is the authoritative pagination total and must never be
+            # replaced with a guessed zero for a malformed storage response.
+            total_links = nonnegative_count(link_totals.total)
+            if total_links is None:
+                raise RuntimeError('affiliate link count was not a non-negative integer')
+            # Preserve the existing endpoint's registration signal without
+            # loading all links into application memory.
+            if total_links == 0:
+                return jsonify({'error': 'Not registered as affiliate'}), 404
+
+            commission_totals = (
+                AffiliateRecordsReadService._coherent_commissions_query(current_user)
+                .with_entities(
+                    func.sum(AffiliateCommission.amount).label('total'),
+                    func.sum(case(
+                        (AffiliateCommission.status == 'pending', AffiliateCommission.amount),
+                        else_=None,
+                    )).label('pending'),
+                    func.sum(case(
+                        (AffiliateCommission.status == 'approved', AffiliateCommission.amount),
+                        else_=None,
+                    )).label('approved'),
+                    func.sum(case(
+                        (AffiliateCommission.status == 'paid', AffiliateCommission.amount),
+                        else_=None,
+                    )).label('paid'),
+                )
+                .one()
+            )
+            links = (
+                AffiliateLink.query.execution_options(autoflush=False)
+                .filter(AffiliateLink.user_id == current_user.id)
+                .order_by(desc(AffiliateLink.created_at), desc(AffiliateLink.id))
+                .limit(50)
+                .all()
+            )
+            recent_referrals = (
+                AffiliateRecordsReadService._coherent_referrals_query(current_user)
+                .execution_options(autoflush=False)
+                .order_by(desc(AffiliateReferral.click_date), desc(AffiliateReferral.id))
+                .limit(10)
+                .all()
+            )
+
+        # A sum is displayable only if each owned link supplied that field. This
+        # prevents a partial legacy aggregate from looking complete. Negative
+        # counters are likewise unavailable, not normalized to zero.
+        total_clicks = (
+            nonnegative_count(link_totals.clicks)
+            if link_totals.clicks_count == total_links and link_totals.negative_clicks == 0
+            else None
+        )
+        total_conversions = (
+            nonnegative_count(link_totals.conversions)
+            if (
+                link_totals.conversions_count == total_links
+                and link_totals.negative_conversions == 0
+            )
+            else None
+        )
+        total_revenue = (
+            decimal_string(link_totals.revenue)
+            if link_totals.revenue_count == total_links
+            else None
+        )
+        conversion_rate = None
+        if total_clicks is not None and total_conversions is not None and total_clicks > 0:
+            conversion_rate = decimal_string(
+                (Decimal(total_conversions) * Decimal('100')) / Decimal(total_clicks)
+            )
+
+        # A concurrent delete after the aggregate remains a closed 404 rather
+        # than a widened or stale ownership response.
         if not links:
             return jsonify({'error': 'Not registered as affiliate'}), 404
-        
-        # Calculate totals
-        total_clicks = sum(link.clicks for link in links)
-        total_conversions = sum(link.conversions for link in links)
-        total_revenue = sum(link.total_revenue for link in links)
-        total_commission = sum(link.total_commission for link in links)
-        
-        # Get commission breakdown
-        commissions = AffiliateCommission.query.filter_by(affiliate_user_id=current_user.id).all()
-        pending_commission = sum(c.amount for c in commissions if c.status == 'pending')
-        approved_commission = sum(c.amount for c in commissions if c.status == 'approved')
-        paid_commission = sum(c.amount for c in commissions if c.status == 'paid')
-        
-        # Get recent referrals
-        recent_referrals = AffiliateReferral.query.filter_by(
-            affiliate_user_id=current_user.id
-        ).order_by(AffiliateReferral.click_date.desc()).limit(10).all()
-        
+
         return jsonify({
+            'owner_context': owner_context,
             'stats': {
                 'total_clicks': total_clicks,
                 'total_conversions': total_conversions,
-                'total_revenue': float(total_revenue),
-                'total_commission': float(total_commission),
-                'conversion_rate': round((total_conversions / total_clicks * 100) if total_clicks > 0 else 0, 2),
-                'pending_commission': float(pending_commission),
-                'approved_commission': float(approved_commission),
-                'paid_commission': float(paid_commission)
+                'total_revenue': total_revenue,
+                'total_commission': decimal_string(commission_totals.total),
+                'conversion_rate': conversion_rate,
+                'pending_commission': decimal_string(commission_totals.pending),
+                'approved_commission': decimal_string(commission_totals.approved),
+                'paid_commission': decimal_string(commission_totals.paid),
+                'currency': None,
+                'available_for_payout': None,
+                'payouts_enabled': False,
+                'commission_verification': 'unverified_legacy',
             },
-            'links': [link.to_dict() for link in links],
-            'recent_referrals': [ref.to_dict() for ref in recent_referrals]
+            'link_pagination': {
+                'total': total_links,
+                'limit': 50,
+                'truncated': total_links > 50,
+            },
+            'links': [{
+                'id': link.id,
+                'name': link.name,
+                'url': public_link_url(link.code),
+                'clicks': nonnegative_count(link.clicks),
+                'conversions': nonnegative_count(link.conversions),
+            } for link in links],
+            'recent_referrals': [{
+                'id': referral.id,
+                'status': referral.status,
+                'click_date': referral.click_date.isoformat() if referral.click_date else None,
+                'commission_amount': decimal_string(referral.commission_amount),
+                'currency': None,
+            } for referral in recent_referrals],
         }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'Get affiliate dashboard error: {str(e)}')
-        return jsonify({'error': 'Failed to get dashboard'}), 500
+
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('Affiliate dashboard read failed')
+        return jsonify({
+            'error': 'Dashboard is temporarily unavailable',
+            'code': 'AFFILIATE_DASHBOARD_UNAVAILABLE',
+        }), 503
 
 
 @affiliate_bp.route('/links', methods=['GET'])
@@ -207,141 +352,76 @@ def create_affiliate_link(current_user):
 @affiliate_bp.route('/referrals', methods=['GET'])
 @token_required
 def get_referrals(current_user):
-    """Get all referrals for current user"""
+    """Return a bounded, coherent legacy referral page without PII."""
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        status = request.args.get('status')
-        
-        query = AffiliateReferral.query.filter_by(affiliate_user_id=current_user.id)
-        
-        if status:
-            query = query.filter_by(status=status)
-        
-        referrals = query.order_by(AffiliateReferral.click_date.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
+        arguments = AffiliateRecordsReadService.parse_referral_arguments(request.args)
+    except AffiliateRecordsArgumentError:
         return jsonify({
-            'referrals': [ref.to_dict() for ref in referrals.items],
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': referrals.total,
-                'pages': referrals.pages
-            }
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'Get referrals error: {str(e)}')
-        return jsonify({'error': 'Failed to get referrals'}), 500
+            'error': 'Invalid affiliate records query',
+            'code': 'AFFILIATE_RECORDS_QUERY_INVALID',
+        }), 400
+
+    # This gate intentionally follows query validation but precedes every
+    # affiliate resource query. Tenant identity is never inferred from a row.
+    if not AffiliateRecordsReadService.has_positive_tenant(current_user):
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    try:
+        return jsonify(AffiliateRecordsReadService.get_referrals(current_user, arguments)), 200
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('Affiliate referrals read failed')
+        return jsonify({
+            'error': 'Affiliate records are temporarily unavailable',
+            'code': 'AFFILIATE_RECORDS_UNAVAILABLE',
+        }), 503
 
 
 @affiliate_bp.route('/commissions', methods=['GET'])
 @token_required
 def get_commissions(current_user):
-    """Get all commissions for current user"""
+    """Return a bounded, coherent legacy commission page without payout authority."""
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        status = request.args.get('status')
-        
-        query = AffiliateCommission.query.filter_by(affiliate_user_id=current_user.id)
-        
-        if status:
-            query = query.filter_by(status=status)
-        
-        commissions = query.order_by(AffiliateCommission.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
+        arguments = AffiliateRecordsReadService.parse_commission_arguments(request.args)
+    except AffiliateRecordsArgumentError:
         return jsonify({
-            'commissions': [comm.to_dict() for comm in commissions.items],
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': commissions.total,
-                'pages': commissions.pages
-            }
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.error(f'Get commissions error: {str(e)}')
-        return jsonify({'error': 'Failed to get commissions'}), 500
+            'error': 'Invalid affiliate records query',
+            'code': 'AFFILIATE_RECORDS_QUERY_INVALID',
+        }), 400
+
+    # Keep the same closed tenant boundary as referrals; authentication itself
+    # remains handled by token_required before this request reaches the handler.
+    if not AffiliateRecordsReadService.has_positive_tenant(current_user):
+        return jsonify({
+            'error': 'User must belong to a tenant',
+            'code': 'TENANT_CONTEXT_REQUIRED',
+        }), 403
+
+    try:
+        return jsonify(AffiliateRecordsReadService.get_commissions(current_user, arguments)), 200
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        current_app.logger.error('Affiliate commissions read failed')
+        return jsonify({
+            'error': 'Affiliate records are temporarily unavailable',
+            'code': 'AFFILIATE_RECORDS_UNAVAILABLE',
+        }), 503
 
 
 @affiliate_bp.route('/payout', methods=['POST'])
 @token_required
 def request_payout(current_user):
-    """Request payout"""
-    try:
-        data = request.get_json()
-        method = data.get('method')
-        payment_details = data.get('payment_details')
-        
-        if not method or not payment_details:
-            return jsonify({'error': 'Method and payment details required'}), 400
-        
-        # Get approved commissions
-        approved_commissions = AffiliateCommission.query.filter_by(
-            affiliate_user_id=current_user.id,
-            status='approved',
-            payout_id=None
-        ).all()
-        
-        if not approved_commissions:
-            return jsonify({'error': 'No approved commissions available'}), 400
-        
-        total_amount = sum(c.amount for c in approved_commissions)
-        
-        # Check minimum payout
-        settings = AffiliateSettings.query.first()
-        if settings and total_amount < settings.min_payout_amount:
-            return jsonify({
-                'error': f'Minimum payout amount is ${float(settings.min_payout_amount)}'
-            }), 400
-        
-        # Check minimum unique customers (10 required)
-        from sqlalchemy import func
-        unique_customers = db.session.query(
-            func.count(func.distinct(AffiliateReferral.referred_user_id))
-        ).filter(
-            AffiliateReferral.affiliate_user_id == current_user.id,
-            AffiliateReferral.status == 'converted'
-        ).scalar() or 0
-        
-        if unique_customers < 10:
-            return jsonify({
-                'error': f'You need {10 - unique_customers} more unique customers to request payout. Current: {unique_customers}/10'
-            }), 400
-        
-        
-        # Create payout request
-        payout = AffiliatePayout(
-            affiliate_user_id=current_user.id,
-            amount=total_amount,
-            method=method,
-            payment_details=payment_details
-        )
-        
-        db.session.add(payout)
-        db.session.flush()
-        
-        # Link commissions to payout
-        for commission in approved_commissions:
-            commission.payout_id = payout.id
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Payout requested successfully',
-            'payout': payout.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'Request payout error: {str(e)}')
-        return jsonify({'error': 'Failed to request payout'}), 500
+    """Legacy approved rows are not authority to reserve or request funds."""
+    return affiliate_mutation_unavailable_response()
 
 
 @affiliate_bp.route('/payouts', methods=['GET'])
@@ -353,7 +433,7 @@ def get_payouts(current_user):
             affiliate_user_id=current_user.id
         ).order_by(AffiliatePayout.requested_at.desc()).all()
         
-        return jsonify({'payouts': [p.to_dict() for p in payouts]}), 200
+        return jsonify({'payouts': [p.to_dict() for p in payouts], 'verification': 'unverified_legacy', 'payouts_enabled': False}), 200
         
     except Exception as e:
         current_app.logger.error(f'Get payouts error: {str(e)}')
@@ -436,62 +516,56 @@ def get_all_payouts(current_user):
 
 
 @affiliate_bp.route('/admin/payout/<int:payout_id>/process', methods=['POST'])
+@token_required
 @admin_required
 def process_payout(current_user, payout_id):
-    """Process payout (admin only)"""
-    try:
-        data = request.get_json()
-        status = data.get('status')  # completed or failed
-        transaction_id = data.get('transaction_id')
-        notes = data.get('notes')
-        
-        payout = AffiliatePayout.query.get(payout_id)
-        
-        if not payout:
-            return jsonify({'error': 'Payout not found'}), 404
-        
-        payout.status = status
-        payout.transaction_id = transaction_id
-        payout.notes = notes
-        payout.processed_at = datetime.utcnow()
-        
-        if status == 'completed':
-            payout.completed_at = datetime.utcnow()
-            # Mark commissions as paid
-            for commission in payout.commissions:
-                commission.status = 'paid'
-                commission.paid_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Payout processed successfully',
-            'payout': payout.to_dict()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f'Process payout error: {str(e)}')
-        return jsonify({'error': 'Failed to process payout'}), 500
+    """Client-supplied status/transaction text cannot prove disbursement."""
+    return affiliate_mutation_unavailable_response()
 
 
 @affiliate_bp.route('/admin/settings', methods=['GET', 'PUT'])
+@token_required
 @admin_required
 def manage_settings(current_user):
     """Get or update affiliate settings (admin only)"""
+    # This legacy table has no tenant key: only the explicitly configured
+    # platform owner may read or edit its global program settings.
+    if not platform_root_scope(current_user):
+        return jsonify({'error': 'Platform owner access required'}), 403
     try:
+        data = None
+        if request.method == 'PUT':
+            if not request.is_json:
+                return jsonify({'error': 'JSON request required'}), 415
+            raw = request.stream.read(4097)
+            if len(raw) > 4096:
+                return jsonify({'error': 'Affiliate settings request too large'}), 413
+            import json
+            def unique_fields(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError('Duplicate field')
+                    result[key] = value
+                return result
+            def reject_constant(value):
+                raise ValueError('Non-finite JSON number')
+            try:
+                data = json.loads(raw, object_pairs_hook=unique_fields, parse_constant=reject_constant)
+            except (ValueError, RecursionError):
+                return jsonify({'error': 'Invalid affiliate settings request'}), 400
+            if not isinstance(data, dict):
+                return jsonify({'error': 'Invalid affiliate settings request'}), 400
+            if 'auto_approve_commissions' in data and data['auto_approve_commissions'] is not False:
+                return jsonify({'error': 'Automatic commission approval requires verified settlement and identity',
+                                'code': 'AFFILIATE_AUTO_APPROVAL_UNAVAILABLE'}), 409
+
         settings = AffiliateSettings.query.first()
-        
         if not settings:
-            settings = AffiliateSettings()
-            db.session.add(settings)
-            db.session.commit()
-        
+            return jsonify({'error': 'Affiliate settings not configured'}), 404
         if request.method == 'GET':
-            return jsonify({'settings': settings.to_dict()}), 200
-        
-        # PUT - Update settings
-        data = request.get_json()
+            return jsonify({'settings': settings.to_dict(), 'payouts_enabled': False,
+                            'settlement_verification': 'not_configured'}), 200
         
         if 'default_commission_rate' in data:
             settings.default_commission_rate = data['default_commission_rate']
@@ -520,4 +594,3 @@ def manage_settings(current_user):
         db.session.rollback()
         current_app.logger.error(f'Manage settings error: {str(e)}')
         return jsonify({'error': 'Failed to manage settings'}), 500
-

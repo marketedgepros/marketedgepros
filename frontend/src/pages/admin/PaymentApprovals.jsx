@@ -1,373 +1,106 @@
-import React, { useState, useEffect } from 'react';
-import { useToast } from '../../contexts/ToastContext';
-import { CheckCircle, XCircle, Eye, DollarSign, Gift } from 'lucide-react';
-import api from "../../services/api";
-// AdminLayout removed - wrapped in App.jsx
-// // AdminLayout removed - wrapped in App.jsx
-// import AdminLayout from '../../components/admin/AdminLayout';
+import { useCallback, useMemo, useState } from "react";
+import useAuthStore from "../../store/authStore.js";
+import { ROLES } from "../../constants/roles.js";
+import {
+  createAdminPaymentRecordViewService,
+} from "../../services/adminPaymentRecordViewService.js";
+import useAdminPaymentRead from "../../hooks/useAdminPaymentRead.js";
+import {
+  AdminPaymentBoundary,
+  AdminPaymentPagination,
+  AdminPaymentReadState,
+  ApprovalAccessRestricted,
+  ApprovalRequestsTable,
+  adminPaymentButton,
+} from "../../components/admin/AdminPaymentRecordUI.jsx";
 
+const approvalService = createAdminPaymentRecordViewService();
 
-const PaymentApprovals = () => {
-  const toast = useToast();
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [allRequests, setAllRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [actionType, setActionType] = useState(null); // 'approve' or 'reject'
-  const [adminNotes, setAdminNotes] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [stats, setStats] = useState(null);
-  const [tabValue, setTabValue] = useState(0);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      const pendingRes = await api.get('/payment-approvals/pending');
-      setPendingRequests(pendingRes.data.data || []);
-
-      const statsRes = await api.get('/payment-approvals/stats');
-      setStats(statsRes.data.data || {});
-
-      setError(null);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load approval requests');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenDialog = (request, action) => {
-    setSelectedRequest(request);
-    setActionType(action);
-    setDialogOpen(true);
-    setAdminNotes('');
-    setRejectionReason('');
-  };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setSelectedRequest(null);
-    setActionType(null);
-    setAdminNotes('');
-    setRejectionReason('');
-  };
-
-  const handleApprove = async () => {
-    if (!selectedRequest) return;
-
-    try {
-      setProcessing(true);
-
-      await api.post(
-        `/payment-approvals/${selectedRequest.id}/approve`,
-        { admin_notes: adminNotes }
-      );
-
-      await fetchData();
-      handleCloseDialog();
-      toast.success('Payment approved successfully!');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to approve request');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedRequest || !rejectionReason.trim()) {
-      toast.warning('Please provide a rejection reason');
-      return;
-    }
-
-    try {
-      setProcessing(true);
-
-      await api.post(
-        `/payment-approvals/${selectedRequest.id}/reject`,
-        {
-          rejection_reason: rejectionReason,
-          admin_notes: adminNotes
-        }
-      );
-
-      await fetchData();
-      handleCloseDialog();
-      toast.info('Payment rejected');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to reject request');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending':
-        return 'warning';
-      case 'approved':
-        return 'success';
-      case 'rejected':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  const getPaymentTypeIcon = (type) => {
-    return type === 'cash' ? <DollarSign className="h-4 w-4" /> : <Gift className="h-4 w-4" />;
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
-  };
-
-  const formatAmount = (amount) => {
-    return `$${parseFloat(amount).toFixed(2)}`;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-neutral-700 dark:border-t-transparent" />
-      </div>
-    );
-  }
-
+export function PaymentApprovalsContent({ read, onPage }) {
+  const requests = read.value?.requests || [];
   return (
-    
-    <div className="p-4 md:p-6">
-      <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-        Payment Approvals
-      </h1>
+    <div className="space-y-5 p-4 sm:p-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Read-only record view</p>
+          <h1 className="mep-heading mt-2 text-2xl font-bold text-white sm:text-3xl">Pending legacy payment requests</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            Pending legacy requests are displayed without a settlement or review action.
+          </p>
+        </div>
+        <button type="button" className={adminPaymentButton} onClick={read.refresh} disabled={read.loading}>
+          Refresh records
+        </button>
+      </header>
 
-      {error && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      <AdminPaymentBoundary />
 
-      {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Pending</p>
-            <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              {stats.pending || 0}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Approved</p>
-            <p className="text-2xl font-semibold text-green-600 dark:text-green-400">
-              {stats.approved || 0}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Rejected</p>
-            <p className="text-2xl font-semibold text-red-600 dark:text-red-400">
-              {stats.rejected || 0}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total</p>
-            <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              {stats.total || 0}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-            Pending Approval Requests
-          </h2>
-        </div>
-        <div className="p-4">
-          {pendingRequests.length === 0 ? (
-            <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-blue-800 dark:border-blue-800/50 dark:bg-blue-900/30 dark:text-blue-300">
-              No pending approval requests
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-neutral-800/50">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">ID</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Requester</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Trader</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Amount</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Type</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Date</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
-                  {pendingRequests.map((request) => (
-                    <tr key={request.id} className="hover:bg-gray-50 dark:hover:bg-neutral-800/60">
-                      <td className="px-4 py-3 align-top text-gray-900 dark:text-gray-100">{request.id}</td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {request.requester?.name || 'N/A'}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {request.requester?.email || ''}
-                        </div>
-                        <div className="mt-1 inline-flex items-center rounded-full border border-gray-300 dark:border-neutral-700 px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300">
-                          {request.requester?.role || 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {request.trader?.name || 'N/A'}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {request.trader?.email || ''}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="font-semibold text-gray-900 dark:text-gray-100">
-                          {formatAmount(request.amount)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                          request.payment_type === 'cash'
-                            ? 'text-blue-700 bg-blue-50 ring-blue-200 dark:text-blue-300 dark:bg-blue-950/40 dark:ring-blue-900/50'
-                            : 'text-purple-700 bg-purple-50 ring-purple-200 dark:text-purple-300 dark:bg-purple-950/40 dark:ring-purple-900/50'
-                        }`}>
-                          {getPaymentTypeIcon(request.payment_type)}
-                          {request.payment_type.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {formatDate(request.created_at)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex gap-2">
-                          <button
-                            className="inline-flex items-center gap-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-green-500/50 disabled:opacity-50"
-                            onClick={() => handleOpenDialog(request, 'approve')}
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            Approve
-                          </button>
-                          <button
-                            className="inline-flex items-center gap-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50"
-                            onClick={() => handleOpenDialog(request, 'reject')}
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Reject
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+      <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] px-4 py-3 text-sm text-cyan-100" role="status">
+        Server filter: pending only. The server retains authority over platform-root scope and record visibility.
       </div>
 
-      {dialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={handleCloseDialog} />
-          <div
-            className="relative w-full max-w-lg mx-4 rounded-lg border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-neutral-800">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {actionType === 'approve' ? 'Approve Payment' : 'Reject Payment'}
-              </h3>
-            </div>
-            <div className="p-4">
-              {selectedRequest && (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-800 dark:text-gray-200">
-                    <strong>Requester:</strong> {selectedRequest.requester?.name}
-                  </p>
-                  <p className="text-sm text-gray-800 dark:text-gray-200">
-                    <strong>Trader:</strong> {selectedRequest.trader?.name}
-                  </p>
-                  <p className="text-sm text-gray-800 dark:text-gray-200">
-                    <strong>Amount:</strong> {formatAmount(selectedRequest.amount)}
-                  </p>
-                  <p className="text-sm text-gray-800 dark:text-gray-200">
-                    <strong>Payment Type:</strong> {selectedRequest.payment_type.toUpperCase()}
-                  </p>
+      <AdminPaymentReadState
+        loading={read.loading}
+        error={read.error}
+        onRetry={read.refresh}
+        empty={!read.loading && !read.error && read.value && requests.length === 0}
+        emptyTitle="No pending legacy requests"
+        emptyMessage="The server returned no pending legacy requests for this page. This does not confirm that there are no settlement obligations."
+      />
 
-                  {actionType === 'reject' && (
-                    <div className="pt-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Rejection Reason *
-                      </label>
-                      <textarea
-                        className="w-full rounded-md border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={3}
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        required
-                      />
-                    </div>
-                  )}
-
-                  <div className="pt-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Admin Notes (Optional)
-                    </label>
-                    <textarea
-                      className="w-full rounded-md border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={3}
-                      value={adminNotes}
-                      onChange={(e) => setAdminNotes(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-neutral-800 flex justify-end gap-2">
-              <button
-                className="inline-flex items-center rounded-md border border-gray-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                onClick={handleCloseDialog}
-                disabled={processing}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={actionType === 'approve' ? handleApprove : handleReject}
-                className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50 ${
-                  actionType === 'approve'
-                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500/50'
-                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500/50'
-                }`}
-                disabled={processing || (actionType === 'reject' && !rejectionReason.trim())}
-              >
-                {processing ? (
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/60 border-t-transparent" />
-                ) : actionType === 'approve' ? (
-                  'Approve'
-                ) : (
-                  'Reject'
-                )}
-              </button>
-            </div>
+      {!read.loading && !read.error && read.value && requests.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 px-1 text-sm text-slate-300" aria-live="polite">
+            <p>Showing {requests.length} pending {requests.length === 1 ? "row" : "rows"} on this page.</p>
+            <p>{read.value.pagination.total} total pending {read.value.pagination.total === 1 ? "request" : "requests"}.</p>
           </div>
-        </div>
+          <ApprovalRequestsTable requests={requests} />
+        </>
+      )}
+      {!read.loading && !read.error && read.value && (
+        <AdminPaymentPagination pagination={read.value.pagination} onPage={onPage} disabled={read.loading} />
       )}
     </div>
-    
   );
-};
+}
 
-export default PaymentApprovals;
+function SupermasterApprovalRead({ isAuthenticated, userId, tenantId, role }) {
+  const [page, setPage] = useState(1);
+  const queryKey = useMemo(() => JSON.stringify(["approval-requests", "pending", page]), [page]);
+  const load = useCallback(
+    (expectedOwner, signal) => approvalService.loadApprovalRequests({
+      expectedOwner,
+      role,
+      signal,
+      page,
+    }),
+    [page, role],
+  );
+  const read = useAdminPaymentRead({
+    isAuthenticated,
+    userId,
+    tenantId,
+    role,
+    queryKey,
+    load,
+  });
+  const onPage = useCallback((nextPage) => setPage(nextPage), []);
+  return <PaymentApprovalsContent read={read} onPage={onPage} />;
+}
+
+export default function PaymentApprovals() {
+  const { user, isAuthenticated } = useAuthStore();
+  const role = user?.role;
+
+  // A master must see the restriction without attempting the supermaster-only endpoint.
+  if (role !== ROLES.SUPERMASTER) return <ApprovalAccessRestricted />;
+
+  return (
+    <SupermasterApprovalRead
+      isAuthenticated={isAuthenticated}
+      userId={user?.id}
+      tenantId={user?.tenant_id}
+      role={role}
+    />
+  );
+}

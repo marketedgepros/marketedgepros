@@ -4,7 +4,11 @@ import useAuthStore from './store/authStore';
 import Notification from './components/Notification';
 import ChatWidget from './components/ChatWidget';
 import { ADMIN_ROLES } from './constants/roles';
+import { postLoginDestination } from './services/navigationService.js';
+import { useLocation } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
+import useNotificationStore from './stores/notificationStore.js';
+import RouteScrollManager from './components/RouteScrollManager.js';
 
 // Auth Pages (Lazy Loaded)
 const Login = lazy(() => import('./pages/Login'));
@@ -34,6 +38,7 @@ const Article = lazy(() => import("./pages/support/Article"));
 const Blog = lazy(() => import('./pages/Blog'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
 const AffiliateLanding = lazy(() => import('./pages/affiliate/AffiliateLanding'));
+const AffiliateDashboard = lazy(() => import('./pages/affiliate/AffiliateDashboard'));
 const AffiliatePayout = lazy(() => import('./pages/affiliate/AffiliatePayout'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -44,7 +49,6 @@ const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const Careers = lazy(() => import("./pages/Careers"));
 
 // Shared Pages (Lazy Loaded)
-const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ScalingProgress = lazy(() => import("./pages/ScalingProgress"));
 const RoleBasedDashboard = lazy(() => import('./components/RoleBasedDashboard'));
 const KYC = lazy(() => import('./pages/KYC'));
@@ -58,6 +62,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboardConnected'
 const AnalyticsDashboard = lazy(() => import('./pages/admin/AnalyticsDashboard'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagementConnected'));
 const ProgramsManagement = lazy(() => import('./pages/admin/ProgramsManagement'));
+const ChallengesManagement = lazy(() => import('./pages/admin/ChallengesManagement'));
 const PaymentsManagement = lazy(() => import('./pages/admin/PaymentsManagementConnected'));
 const KYCApproval = lazy(() => import('./pages/admin/KYCApprovalConnected'));
 const PaymentApprovals = lazy(() => import('./pages/admin/PaymentApprovals'));
@@ -71,9 +76,9 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const NotificationSettings = lazy(() => import('./pages/settings/NotificationSettings'));
 
 // Affiliate Pages (Lazy Loaded)
-const TradersManagement = lazy(() => import('./pages/affiliate/TradersManagement'));
-const Commissions = lazy(() => import('./pages/affiliate/Commissions'));
-const Reports = lazy(() => import('./pages/affiliate/Reports'));
+const TradersManagement = lazy(() => import('./pages/agent/TradersManagement'));
+const Commissions = lazy(() => import('./pages/agent/Commissions'));
+const Reports = lazy(() => import('./pages/agent/Reports'));
 
 // Trader Pages (Lazy Loaded)
 const TraderDashboard = lazy(() => import('./pages/user/UserDashboard'));
@@ -89,20 +94,21 @@ import RoleGuard from './components/guards/RoleGuard';
 // Protected Route Component
 function ProtectedRoute({ children, adminOnly = false, userOnly = false }) {
   const { isAuthenticated, isLoading, user } = useAuthStore();
+  const location = useLocation();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+      <div className="mep-screen min-h-screen flex items-center justify-center p-4">
+        <div className="text-center" role="status">
+          <div aria-hidden="true" className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+          <p className="text-slate-300 mt-4">Loading...</p>
         </div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
   // Check if admin trying to access user-only pages
@@ -118,59 +124,76 @@ function ProtectedRoute({ children, adminOnly = false, userOnly = false }) {
 // Public Route Component (redirect if already logged in)
 function PublicRoute({ children }) {
   const { isAuthenticated, isLoading, user } = useAuthStore();
+  const location = useLocation();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+      <div className="mep-screen min-h-screen flex items-center justify-center p-4">
+        <div className="text-center" role="status">
+          <div aria-hidden="true" className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+          <p className="text-slate-300 mt-4">Loading...</p>
         </div>
       </div>
     );
   }
 
   if (isAuthenticated && user) {
-    // Redirect based on user role
-    if (ADMIN_ROLES.includes(user.role)) {
-      return <Navigate to="/admin" replace />;
-    }
-    
-    if (user.role === 'affiliate') {
-      return <Navigate to="/affiliate" replace />;
-    }
-    
-    if (user.role === 'trader') {
-      return <Navigate to="/trader" replace />;
-    }
-    
-    // Regular users go to home
-    return <Navigate to="/" replace />;
+    return <Navigate to={postLoginDestination(user, location.search)} replace />;
   }
 
   return children;
+}
+
+function AccountChatWidget() {
+  const location = useLocation();
+  // Payout availability must remain unobscured, particularly on narrow screens.
+  // The page has a supported support-ticket link instead of a floating overlay.
+  if (location.pathname === '/affiliate/payout') return null;
+  if (['/affiliate/traders', '/affiliate/commissions', '/affiliate/reports'].includes(location.pathname)) return null;
+  if (['/wallet', '/trader/withdrawals', '/admin/withdrawals'].includes(location.pathname)) return null;
+  if (['/admin/payments', '/admin/payment-approvals'].includes(location.pathname)) return null;
+  if (location.pathname === '/admin' || location.pathname.startsWith('/admin/')) return null;
+  if (location.pathname === '/programs' || /^\/programs\/[^/]+(?:\/checkout)?$/.test(location.pathname)) return null;
+  // On narrow screens, use the normal support navigation instead of covering copy.
+  return <div className="hidden md:block"><ChatWidget /></div>;
 }
 
 function App() {
   const { init } = useAuthStore();
 
   useEffect(() => {
+    // Invalidate notification requests synchronously when the verified principal changes.
+    const identity = (state) => JSON.stringify([
+      state.isAuthenticated, state.user?.id ?? null,
+      state.user?.tenant_id ?? state.user?.tenantId ?? state.user?.tenant?.id ?? null,
+      state.user?.role ?? null,
+    ]);
+    const unsubscribe = useAuthStore.subscribe((state, previous) => {
+      if (identity(state) !== identity(previous)) useNotificationStore.getState().reset();
+    });
     init();
+    return unsubscribe;
   }, [init]);
 
   return (
     <ToastProvider>
       <BrowserRouter>
+        {import.meta.env?.VITE_DEMO_RELEASE === 'true' && (
+          <aside aria-label="Demo release status" className="bg-slate-900 px-4 py-2 text-center text-sm text-cyan-200 border-b border-cyan-400/20">
+            Limited release — live trading and payouts are disabled. Account access and purchase availability are controlled separately by the service.
+          </aside>
+        )}
         <Notification />
-        <ChatWidget />
+        <AccountChatWidget />
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-900">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="mep-screen min-h-screen flex items-center justify-center">
+          <div className="text-center" role="status">
+            <div aria-hidden="true" className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
             <p className="text-gray-300 mt-4">Loading...</p>
           </div>
         </div>
       }>
+        <RouteScrollManager />
         <Routes>
         {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
@@ -186,14 +209,14 @@ function App() {
         <Route path="/lightning-challenge" element={<LightningChallenge />} />
         <Route path="/support" element={<SupportHub />} />
 
-        <Route path="/support/create-ticket" element={<CreateTicket />} />
-        <Route path="/support/my-tickets" element={<MyTickets />} />
-        <Route path="/support/ticket/:ticketNumber" element={<TicketDetail />} />
+        <Route path="/support/create-ticket" element={<ProtectedRoute><CreateTicket /></ProtectedRoute>} />
+        <Route path="/support/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
+        <Route path="/support/ticket/:ticketNumber" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
         <Route path="/support/:slug" element={<Article />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/affiliate" element={<AffiliateLanding />} />
-        <Route path="/affiliate/payout" element={<ProtectedRoute><AffiliatePayout /></ProtectedRoute>} />
+        <Route path="/affiliate/payout" element={<ProtectedRoute><RoleGuard allowedRoles={['affiliate']}><UserLayout><AffiliatePayout /></UserLayout></RoleGuard></ProtectedRoute>} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -230,9 +253,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <UserLayout>
-                <RoleBasedDashboard />
-              </UserLayout>
+              <RoleBasedDashboard />
             </ProtectedRoute>
           }
         />
@@ -409,6 +430,18 @@ function App() {
           }
         />
         <Route
+          path="/admin/challenges"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={ADMIN_ROLES}>
+                <AdminLayout>
+                  <ChallengesManagement />
+                </AdminLayout>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/kyc-approval"
           element={
             <ProtectedRoute>
@@ -481,13 +514,20 @@ function App() {
           }
         />
 
+        {/* Compatibility URLs point only to the protected canonical affiliate pages. */}
+        <Route path="/agent" element={<Navigate to="/affiliate/dashboard" replace />} />
+        <Route path="/agent/traders" element={<Navigate to="/affiliate/traders" replace />} />
+        <Route path="/agent/commissions" element={<Navigate to="/affiliate/commissions" replace />} />
+        <Route path="/agent/reports" element={<Navigate to="/affiliate/reports" replace />} />
+
         {/* Affiliate Routes */}
         <Route
-          path="/affiliate"
+          path="/affiliate/dashboard"
           element={
             <ProtectedRoute>
               <RoleGuard allowedRoles={['affiliate']}>
                 <UserLayout>
+                  <AffiliateDashboard />
                 </UserLayout>
               </RoleGuard>
             </ProtectedRoute>
@@ -529,6 +569,10 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/user/dashboard" element={
+          <ProtectedRoute><RoleGuard allowedRoles={['user']}><UserLayout><TraderDashboard /></UserLayout></RoleGuard></ProtectedRoute>
+        } />
 
         {/* Trader Routes */}
         <Route
@@ -584,15 +628,15 @@ function App() {
         <Route
           path="*"
           element={
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <main className="mep-screen min-h-screen flex items-center justify-center p-4">
               <div className="text-center">
-                <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>
-                <p className="text-xl text-gray-600 mb-8">Page not found</p>
+                <h1 className="mep-heading text-6xl font-bold text-slate-100 mb-4">404</h1>
+                <p className="text-xl text-slate-300 mb-8">Page not found</p>
                 <a href="/" className="btn btn-primary">
                   Go to Home
                 </a>
               </div>
-            </div>
+            </main>
           }
         />
         </Routes>
@@ -603,4 +647,3 @@ function App() {
 }
 
 export default App;
-

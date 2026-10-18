@@ -1,380 +1,90 @@
-import React, { useState, useEffect } from 'react';
-import { useToast } from '../contexts/ToastContext';
-import { TrendingUp, Target, Trophy, Lock, CheckCircle, ArrowUp } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
 import UserLayout from '../components/layout/UserLayout';
 import useAuthStore from '../store/authStore';
-import { ADMIN_ROLES, ROLES } from '../constants/roles';
-import api from "../services/api";
+import useRecordedTradingRead from '../hooks/useRecordedTradingRead';
+import { createRecordedTradingViewService, isScalingAdmin, recordedIdentityKey, recordedPrincipal } from '../services/recordedTradingViewService.js';
+import { RecordedBoundary, RecordedMetric, RecordedPagination, RecordedReadState, recordedDisplay, tradingButton, tradingPanel } from '../components/trading/RecordedTradingUI';
 
-const ScalingProgress = () => {
-  const { user } = useAuthStore();
-  const [loading, setLoading] = useState(true);
-  const [scalingData, setScalingData] = useState(null);
-  const [allUsersScaling, setAllUsersScaling] = useState([]);
-  const [error, setError] = useState(null);
+const service = createRecordedTradingViewService();
 
-  const isAdmin = user && ADMIN_ROLES.includes(user.role);
-  const isAffiliate = user && user.role === ROLES.AFFILIATE;
-  const isTrader = user && user.role === ROLES.TRADER;
-
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      if (isTrader) {
-        // Trader: Get own progress
-        const response = await api.get('/scaling/my-progress');
-        setScalingData(response.data.data);
-      } else if (isAdmin || isAffiliate) {
-        // Admin/Affiliate: Get all users (filtered by backend)
-        const response = await api.get('/scaling/admin/all-users');
-        setAllUsersScaling(response.data.data || []);
-      }
-      
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching scaling data:', err);
-      setError(err.response?.data?.error || 'Failed to load scaling data');
-      setLoading(false);
-    }
-  };
-
-  const handleScaleUp = async () => {
-    try {
-      await api.post('/scaling/scale-up', {});
-      toast.success('Successfully scaled up to next tier!');
-      fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to scale up');
-    }
-  };
-
-  if (loading) {
-    return (
-      <UserLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
-            <p className="text-gray-400 mt-4">Loading scaling data...</p>
-          </div>
-        </div>
-      </UserLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <UserLayout>
-        <div className="p-6">
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400">
-            {error}
-          </div>
-        </div>
-      </UserLayout>
-    );
-  }
-
-  // Trader View
-  if (isTrader) {
-    return <TraderView scalingData={scalingData} onScaleUp={handleScaleUp} />;
-  }
-
-  // Admin/Affiliate View
-  if (isAdmin || isAffiliate) {
-    return <AdminView users={allUsersScaling} isAffiliate={isAffiliate} />;
-  }
-
-  return (
-    <UserLayout>
-      <div className="p-6">
-        <p className="text-gray-400">No scaling data available for your role.</p>
+export function RecordedScalingDetail({ data }) {
+  return <>
+    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <RecordedMetric label="Legacy current tier" value={data.current_tier} />
+      <RecordedMetric label="Stored account size" value={data.current_account_size} hint="Currency unspecified; not approved trading capital." />
+      <RecordedMetric label="Stored total profit" value={data.total_profit} hint="Unverified record, not available funds." />
+      <RecordedMetric label="Legacy scale count" value={data.times_scaled} />
+    </dl>
+    <section className={tradingPanel} aria-label="Stored scaling metadata">
+      <h2 className="mep-heading text-lg font-semibold text-white">Stored progression metadata</h2>
+      <p className="mt-2 text-sm text-slate-300">Targets and tier values below are historic records, not an approved scaling plan or eligibility decision.</p>
+      <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+        {[
+          ['Recorded status', data.status], ['Legacy next tier', data.next_tier],
+          ['Stored next account size', data.next_account_size], ['Legacy target profit', data.target_profit],
+          ['Stored progress percentage', data.progress_percentage === null ? null : `${data.progress_percentage}%`],
+          ['Last recorded scale timestamp', data.last_scaled_at], ['Record created', data.created_at],
+        ].map(([label, value]) => <div key={label} className="mep-panel min-w-0 rounded-xl border p-4">
+          <dt className="text-xs text-slate-400">{label}</dt><dd className="mt-2 break-words font-mono text-sm text-slate-100">{recordedDisplay(value)}</dd>
+        </div>)}
+      </dl>
+    </section>
+  </>;
+}
+function ScalingContent({ principal }) {
+  const admin = isScalingAdmin(principal);
+  const [page, setPage] = useState(1);
+  const key = JSON.stringify([recordedIdentityKey(principal), admin, page]);
+  const load = useCallback((signal) => service.scaling({ expectedOwner: principal, admin, page, signal }), [key]);
+  const { value: view, loading, error, retry } = useRecordedTradingRead(key, load);
+  const empty = view && (admin ? view.data.length === 0 : view.data === null);
+  return <div className="mx-auto min-w-0 max-w-7xl space-y-6 p-4 text-slate-100 sm:p-6 lg:p-8">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Account records</p>
+        <h1 className="mep-heading mt-2 text-3xl font-semibold tracking-tight text-white">{admin ? 'Scoped scaling records' : 'Account scaling records'}</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{admin ? 'Review the historic records returned for your authorized management scope. This is not a list of all platform customers.' : 'Review stored progression metadata for your account. No provider-backed scale-up is available from this screen.'}</p>
       </div>
-    </UserLayout>
-  );
-};
-
-// Trader View Component
-const TraderView = ({ scalingData, onScaleUp }) => {
-  if (!scalingData) {
-    return (
-      <UserLayout>
-        <div className="p-6">
-          <p className="text-gray-400">No scaling plan found. Contact support to initialize your scaling plan.</p>
+      <button type="button" className={tradingButton} onClick={retry} disabled={loading}><RefreshCw className="h-4 w-4" aria-hidden="true" />Refresh records</button>
+    </header>
+    <RecordedBoundary scaling />
+    <RecordedReadState loading={loading} error={error} retry={retry} empty={empty}
+      emptyTitle={admin ? 'No scaling records on this page' : 'No recorded scaling plan'} />
+    {view && !loading && !error && !admin && view.data && <RecordedScalingDetail data={view.data} />}
+    {view && !loading && !error && admin && <>
+      {view.data.length > 0 && <section className="mep-panel min-w-0 overflow-hidden rounded-2xl border" aria-label="Scoped scaling records">
+        <div className="border-b border-white/10 p-5"><h2 className="mep-heading font-semibold text-white">Current management page</h2>
+          <p className="mt-2 text-xs text-slate-300">{view.data.length} records on this page · eligibility unavailable · currency unspecified</p></div>
+        <div className="max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-cyan-300" role="region" aria-label="Scrollable scaling table" tabIndex={0}>
+          <table className="w-full min-w-[800px] text-left text-sm">
+            <caption className="sr-only">Legacy scaling metadata for authorized users. No record is permission to scale or fund an account.</caption>
+            <thead className="bg-slate-950/40 text-xs text-slate-300"><tr>{['Recorded user', 'Current / next tier', 'Stored account size', 'Stored profit / target', 'Progress / count', 'Recorded status'].map((label) => <th key={label} scope="col" className="px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
+            <tbody className="divide-y divide-white/10">{view.data.map((record) => <tr key={record.user_id} className="hover:bg-white/[0.025]">
+              <td className="max-w-64 break-words px-4 py-4"><p className="font-semibold">{recordedDisplay(record.name)}</p>
+                <p className="mt-1 text-xs text-slate-400">{recordedDisplay(record.email)}</p><p className="mt-1 text-xs text-slate-400">User {record.user_id}</p></td>
+              <td className="px-4 py-4 font-mono">{recordedDisplay(record.current_tier)} / {recordedDisplay(record.next_tier)}</td>
+              <td className="px-4 py-4 font-mono">{recordedDisplay(record.current_account_size)}</td>
+              <td className="px-4 py-4 font-mono"><p>{recordedDisplay(record.total_profit)}</p><p className="mt-1 text-slate-400">{recordedDisplay(record.target_profit)}</p></td>
+              <td className="px-4 py-4 font-mono"><p>{record.progress_percentage === null ? 'Unavailable' : `${record.progress_percentage}%`}</p><p className="mt-1 text-slate-400">Count: {recordedDisplay(record.times_scaled)}</p></td>
+              <td className="px-4 py-4">{recordedDisplay(record.status)}<span className="mt-1 block text-xs text-amber-200">Not verified for scaling</span></td>
+            </tr>)}</tbody>
+          </table>
         </div>
-      </UserLayout>
-    );
-  }
-
-  const tiers = scalingData.tiers || [];
-  const currentTier = tiers.find(t => t.tier_number === scalingData.current_tier);
-  const nextTier = tiers.find(t => t.tier_number === scalingData.next_tier);
-
-  return (
-    <UserLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Account Scaling Progress</h1>
-          <p className="text-gray-400">Track your progress and scale up to larger account sizes</p>
-        </div>
-
-        {/* Current Tier Card */}
-        <div className="bg-gradient-to-r from-cyan-500/10 to-teal-500/10 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Current Tier</p>
-              <h2 className="text-4xl font-bold text-white">Tier {scalingData.current_tier}</h2>
-              <p className="text-cyan-400 text-2xl font-semibold mt-2">
-                ${scalingData.current_account_size?.toLocaleString()}
-              </p>
-            </div>
-            <Trophy className="w-16 h-16 text-cyan-400" />
-          </div>
-        </div>
-
-        {/* Progress Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <TrendingUp className="w-5 h-5 text-green-400" />
-              <p className="text-gray-400 text-sm">Total Profit</p>
-            </div>
-            <p className="text-2xl font-bold text-white">${scalingData.total_profit?.toLocaleString() || '0'}</p>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <Target className="w-5 h-5 text-cyan-400" />
-              <p className="text-gray-400 text-sm">Target Profit</p>
-            </div>
-            <p className="text-2xl font-bold text-white">${scalingData.target_profit?.toLocaleString() || '0'}</p>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <Trophy className="w-5 h-5 text-yellow-400" />
-              <p className="text-gray-400 text-sm">Times Scaled</p>
-            </div>
-            <p className="text-2xl font-bold text-white">{scalingData.times_scaled || 0}</p>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-white font-semibold">Progress to Next Tier</p>
-            <p className="text-cyan-400 font-bold">{scalingData.progress_percentage?.toFixed(1) || '0'}%</p>
-          </div>
-          <div className="w-full bg-white/10 rounded-full h-4 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all duration-500 ease-out"
-              style={{ width: `${Math.min(scalingData.progress_percentage || 0, 100)}%` }}
-            />
-          </div>
-          {nextTier && (
-            <p className="text-gray-400 text-sm mt-2">
-              Next: Tier {nextTier.tier_number} - ${nextTier.account_size?.toLocaleString()}
-            </p>
-          )}
-        </div>
-
-        {/* Scale Up Button */}
-        {scalingData.is_eligible_for_scaling && (
-          <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-6 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-white mb-1">🎉 Congratulations!</h3>
-                <p className="text-gray-300">You're eligible to scale up to Tier {scalingData.next_tier}!</p>
-              </div>
-              <button
-                onClick={onScaleUp}
-                className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full font-semibold text-white hover:shadow-lg hover:shadow-green-500/50 transition-all duration-300 flex items-center gap-2"
-              >
-                <ArrowUp className="w-5 h-5" />
-                Scale Up Now
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* All Tiers */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-sm">
-          <h3 className="text-xl font-bold text-white mb-4">All Tiers</h3>
-          <div className="space-y-3">
-            {tiers.map((tier) => {
-              const isCurrent = tier.tier_number === scalingData.current_tier;
-              const isCompleted = tier.tier_number < scalingData.current_tier;
-              const isLocked = tier.tier_number > scalingData.current_tier;
-
-              return (
-                <div
-                  key={tier.tier_number}
-                  className={`flex items-center justify-between p-4 rounded-lg border ${
-                    isCurrent
-                      ? 'bg-cyan-500/10 border-cyan-500/30'
-                      : isCompleted
-                      ? 'bg-green-500/10 border-green-500/30'
-                      : 'bg-white/5 border-white/10'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {isCompleted && <CheckCircle className="w-5 h-5 text-green-400" />}
-                    {isCurrent && <Trophy className="w-5 h-5 text-cyan-400" />}
-                    {isLocked && <Lock className="w-5 h-5 text-gray-500" />}
-                    <div>
-                      <p className={`font-semibold ${isCurrent ? 'text-cyan-400' : 'text-white'}`}>
-                        Tier {tier.tier_number}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        ${tier.account_size?.toLocaleString()} Account
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white font-semibold">${tier.profit_target?.toLocaleString()}</p>
-                    <p className="text-gray-400 text-sm">{tier.profit_split}% Split</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </UserLayout>
-  );
-};
-
-// Admin/Affiliate View Component
-const AdminView = ({ users, isAffiliate }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredUsers = users.filter(u =>
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const stats = {
-    totalUsers: users.length,
-    eligibleForScaling: users.filter(u => u.is_eligible_for_scaling).length,
-    averageProgress: users.length > 0
-      ? (users.reduce((sum, u) => sum + (u.progress_percentage || 0), 0) / users.length).toFixed(1)
-      : 0,
-    totalScaled: users.reduce((sum, u) => sum + (u.times_scaled || 0), 0)
-  };
-
-  return (
-    <UserLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            {isAffiliate ? 'My Traders' : 'All Traders'} Scaling Progress
-          </h1>
-          <p className="text-gray-400">Monitor and manage trader scaling progress</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <p className="text-gray-400 text-sm mb-1">Total Traders</p>
-            <p className="text-2xl font-bold text-white">{stats.totalUsers}</p>
-          </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <p className="text-gray-400 text-sm mb-1">Eligible for Scaling</p>
-            <p className="text-2xl font-bold text-green-400">{stats.eligibleForScaling}</p>
-          </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <p className="text-gray-400 text-sm mb-1">Avg Progress</p>
-            <p className="text-2xl font-bold text-cyan-400">{stats.averageProgress}%</p>
-          </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <p className="text-gray-400 text-sm mb-1">Total Scaled</p>
-            <p className="text-2xl font-bold text-yellow-400">{stats.totalScaled}</p>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm">
-          <input
-            type="text"
-            placeholder="Search by email or name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-transparent text-white placeholder-gray-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Users Table */}
-        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden backdrop-blur-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-white/5">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Trader</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Current Tier</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Account Size</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Progress</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Profit</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Times Scaled</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {filteredUsers.map((user, index) => (
-                  <tr key={index} className="hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="text-white font-medium">{user.name || 'N/A'}</p>
-                        <p className="text-gray-400 text-sm">{user.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-white">Tier {user.current_tier}</td>
-                    <td className="px-4 py-3 text-cyan-400 font-semibold">
-                      ${user.current_account_size?.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-white/10 rounded-full h-2">
-                          <div
-                            className="h-full bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full"
-                            style={{ width: `${Math.min(user.progress_percentage || 0, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-gray-300 text-sm">{user.progress_percentage?.toFixed(0)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-white">
-                      ${user.total_profit?.toLocaleString()} / ${user.target_profit?.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-yellow-400 font-semibold">{user.times_scaled || 0}</td>
-                    <td className="px-4 py-3">
-                      {user.is_eligible_for_scaling ? (
-                        <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold">
-                          Eligible
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded-full text-xs">
-                          In Progress
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {filteredUsers.length === 0 && (
-            <div className="p-8 text-center text-gray-400">
-              No traders found
-            </div>
-          )}
-        </div>
-      </div>
-    </UserLayout>
-  );
-};
-
-export default ScalingProgress;
+      </section>}
+      <RecordedPagination pagination={view.pagination} onPage={setPage} disabled={loading} />
+    </>}
+    <section className={`${tradingPanel} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+      <div><h2 className="mep-heading font-semibold text-white">Scale-up is not enabled</h2><p className="mt-2 text-sm text-slate-300">Verified trading evidence, approved rules and an authorized provider command are required before this can become an account action.</p></div>
+      <Link className={`${tradingButton} shrink-0`} to="/support/my-tickets">My support tickets</Link>
+    </section>
+  </div>;
+}
+export default function ScalingProgress() {
+  const user = useAuthStore((state) => state.user);
+  const principal = recordedPrincipal(user);
+  return <UserLayout>{!principal || (!isScalingAdmin(principal) && principal.tenant_id === null)
+    ? <section className={`${tradingPanel} m-4`} role="status"><h1 className="mep-heading text-xl font-semibold text-white">Scaling records unavailable</h1>
+      <p className="mt-2 text-sm text-slate-300">An authenticated account with a recorded scope is required.</p></section>
+    : <ScalingContent key={recordedIdentityKey(principal)} principal={principal} />}</UserLayout>;
+}

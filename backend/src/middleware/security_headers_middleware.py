@@ -1,5 +1,5 @@
 """
-Enhanced Security Headers Middleware for PropTradePro
+Enhanced Security Headers Middleware for MarketEdgePros
 Adds comprehensive security headers to all responses
 """
 
