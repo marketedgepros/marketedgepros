@@ -120,10 +120,10 @@ export default function Checkout() {
   const onStageChange = useCallback((stage) => {
     setProgress((old) => old.key === selectionKey && old.stage === stage ? old : { key: selectionKey, stage });
   }, [selectionKey]);
-  const onPersistOrder = useCallback((orderId) => {
+  const onPersistOrder = useCallback((orderId, { creationAttempted = true } = {}) => {
     const next = new URLSearchParams(search);
     next.set("order", normalizePaymentOrderId(orderId));
-    next.set("payment-requested", "1");
+    if (creationAttempted) next.set("payment-requested", "1");
     setSearch(next, { replace: true });
   }, [search, setSearch]);
 
@@ -164,8 +164,8 @@ export default function Checkout() {
     {!savedOrderId && (catalog.loading || catalog.error || !program) ? <CatalogState {...catalog} /> : <>
       <header className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Program selection / Order review</p>
-        <h1 className="mep-heading mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">Review your program.</h1>
-        <p className="mt-4 max-w-2xl leading-relaxed text-slate-300">Choose optional add-ons, then request a quote. Only the server calculates the final amount and records the terms. Payment is a separate, account-specific step.</p>
+        <h1 className="mep-heading mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">{stage === 3 ? 'Your purchase is confirmed.' : 'Review your program.'}</h1>
+        <p className="mt-4 max-w-2xl leading-relaxed text-slate-300">{stage === 3 ? 'Your payment is verified. The order and program details below are saved to your account.' : 'Review your program and optional add-ons, then continue to payment. The server records the final price and terms before any payment details are requested.'}</p>
       </header>
       <PurchaseProgress stage={stage} />
       {invalidSavedOrder && <p role="alert" className="mb-6 rounded-xl border border-amber-400/30 p-4 text-sm text-amber-100">The saved order reference is invalid. No order or payment has been requested. Open a valid purchase from your account records.</p>}
@@ -229,7 +229,7 @@ export default function Checkout() {
           </div>}
           <button type="button" onClick={requestQuote} disabled={visible.state === "loading" || invalidSavedOrder || (locked && !savedOrderId)} className={`${primaryAction} w-full`}>
             {visible.state === "error" ? <RefreshCw size={18} aria-hidden="true" /> : <FileText size={18} aria-hidden="true" />}
-            {visible.state === "loading" ? "Requesting server quote…" : savedOrderId ? "Reload saved quote" : visible.state === "error" ? "Retry server quote" : visible.quote ? "View recorded quote again" : "Request server quote"}
+            {visible.state === "loading" ? "Preparing your order…" : savedOrderId ? "Reload saved quote" : visible.state === "error" ? "Try preparing your order again" : visible.quote ? "View recorded quote again" : "Continue to payment"}
           </button>
           <p className="text-xs leading-relaxed text-slate-400">{savedOrderId ? "This is an owner-scoped local read. It does not request another quote or payment." : "Retries for an unchanged selection use the same request key. Changing a selection creates a new quote request."}</p>
           {!visible.quote && <PaymentBoundary />}

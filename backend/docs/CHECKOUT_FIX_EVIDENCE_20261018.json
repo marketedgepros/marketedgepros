@@ -1,0 +1,41 @@
+{
+  "recorded_date": "2026-10-18",
+  "purpose": "checkout-source-completion-not-deployment",
+  "base_sha": "8f4ad08ec9821d0a9cca1673fcd5eb1ea367f313",
+  "current_deployed_sha": "9724ae16a610da6f9daf7c938a5bd2838f64a276",
+  "schema_revision": "20261013_000002",
+  "root_cause": "ES2015 exponentiation lowering coerces BigInt through Math.pow",
+  "exact_integer_fix": "validated decimal digits plus BigInt; no exponentiation, rounding or Number coercion",
+  "local_gates": {
+    "focused_after_final_delta": 55,
+    "frontend_before_single_delta": 608,
+    "security": 1184,
+    "staging": 265,
+    "offline_migration_sql": "passed",
+    "production_build_after_delta": "passed"
+  },
+  "independent_review": {
+    "main": "approved",
+    "single_policy_consistency_delta": "approved"
+  },
+  "financial_and_runtime_boundaries": {
+    "application_backend_changed": false,
+    "schema_changed": false,
+    "runtime_changed": false,
+    "additional_live_payment_created": false,
+    "provider_wallet_or_callback_changed": false,
+    "customer_wide_checkout_enabled": false,
+    "existing_verified_purchase_preserved": true
+  },
+  "production_payment_chunk_sha256": "6096872d014f9c3db0a9ab55a6ec701ff6d2e228743121d26fa63f43f821578e",
+  "evidence_sha256": {
+    "payment-production-target-before-fix.log": "6d15c553288d27bda100e6cd1d2023c1b7ffaad5a14e8b436dd9b02ab3f1b557",
+    "checkout-fix-focused-final.log": "6ae49c1253264f36e1a24053b4ec1b36422308ff5ed94ee286a6a6d31e1f54f7",
+    "checkout-fix-frontend-junit.xml": "2e51624f1f293927b4bda84e86c7f79e36dba783d32211cb02e6a15620b12f55",
+    "checkout-fix-security.log": "d2bf2520d3039559a363ffa173f5359b6e2ebc177918d1f3111f6c60e77fa3ef",
+    "checkout-fix-staging.log": "438d61fbad7246a0461034cce03ad001ea4a72e961eeea23ce4738049521aba0",
+    "checkout-fix-production-build-final.log": "5570738a8f3622be494133fc2d72898fa9e4b5ecd41681050f3efceed60c8b1d"
+  },
+  "ci_gate": "Exact commit checked in PR before deployment; no CI success is inferred from local checks",
+  "production_acceptance": "Requires exact SHA approval and read-only verification of already-paid order; no second payment"
+}

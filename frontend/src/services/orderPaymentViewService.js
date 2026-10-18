@@ -29,7 +29,9 @@ const decimal = (value, { nullable = false, positive = false, decimals = 30 } = 
 };
 const units = (value, decimals) => {
   const [whole, fraction = ''] = value.split('.');
-  return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, '0') || '0');
+  // The ES2015 production build lowers exponentiation to Math.pow, which
+  // cannot accept BigInt. Concatenating validated decimal digits stays exact.
+  return BigInt(whole + fraction.padEnd(decimals, '0'));
 };
 const owner = (payload, principal) => {
   const context = record(payload.owner_context);
@@ -112,6 +114,16 @@ export async function getPaymentCapabilities({ principal, signal, client = api }
 export async function readOrderPayment({ quote, principal, signal, client = api }) {
   const { orderId } = quoteIdentity(quote, principal);
   return mapOrderPayment((await client.get(`/orders/${orderId}/payment`, { signal, timeout: 12000 })).data, { quote, principal });
+}
+export async function prepareOrderPaymentCreation({ quote, principal, signal, client = api }) {
+  quoteIdentity(quote, principal);
+  // GETs may renew an existing session through the shared API interceptor.
+  // The financial POST below must never be replayed by that interceptor.
+  const [capabilities, projection] = await Promise.all([
+    getPaymentCapabilities({ principal, signal, client }),
+    readOrderPayment({ quote, principal, signal, client }),
+  ]);
+  return Object.freeze({ capabilities, projection });
 }
 export async function createOrderPayment({ quote, principal, payCurrency, idempotencyKey, signal, client = api }) {
   const { orderId } = quoteIdentity(quote, principal);

@@ -14,6 +14,7 @@ const {
   isCompleteRefreshResponse,
   isSameOriginRequest,
   shouldAttachCsrfToken,
+  sessionLoginRedirect,
 } = await import('../src/services/api.js');
 
 test('same-origin CSRF helper accepts only unsafe same-origin API requests', () => {
@@ -61,4 +62,15 @@ test('refresh responses must rotate access, refresh, and CSRF tokens together', 
     false,
   );
   assert.equal(isCompleteRefreshResponse('<html>not JSON</html>'), false);
+});
+
+test('login recovery preserves an owned checkout reference, not an external target', () => {
+  const pathname = '/programs/12/checkout';
+  const search = '?order=00000000-0000-4000-8000-000000000012&payment-requested=1';
+  const target = new URL(sessionLoginRedirect({ pathname, search }), 'https://synthetic.invalid');
+  assert.equal(target.pathname, '/login');
+  assert.equal(target.searchParams.get('redirect'), pathname + search);
+  for (const path of ['//attacker.invalid', '/\\attacker.invalid', 'https://attacker.invalid', '/bad\npath']) {
+    assert.equal(sessionLoginRedirect({ pathname: path, search: '' }), '/login');
+  }
 });

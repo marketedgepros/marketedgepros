@@ -7,7 +7,7 @@ import { transformWithEsbuild } from 'vite';
 const require = createRequire(import.meta.url);
 const sourceRoot = new URL('../src/', import.meta.url).pathname;
 const packageUrl = (specifier) => /^(?:node:|file:)/.test(specifier) ? specifier : pathToFileURL(require.resolve(specifier)).href;
-export async function compilePaymentHarness(entry, { prefix = 'payment-ui', overrides = {} } = {}) {
+export async function compilePaymentHarness(entry, { prefix = 'payment-ui', overrides = {}, target: buildTarget } = {}) {
   const targets = new Map(), files = [];
   const apiMock = `const api = { get: (...args) => { if (!globalThis.__payment_client) return Promise.reject(new Error('Synthetic payment transport is not configured')); return globalThis.__payment_client.get(...args); }, post: (...args) => { if (!globalThis.__payment_client) return Promise.reject(new Error('Synthetic payment transport is not configured')); return globalThis.__payment_client.post(...args); } }; export const profileAPI = { get: config => api.get('/profile', config) }; export default api;`;
   const authMock = `const useAuthStore = selector => selector ? selector(globalThis.__payment_auth || {}) : (globalThis.__payment_auth || {}); export default useAuthStore;`;
@@ -32,7 +32,7 @@ export async function compilePaymentHarness(entry, { prefix = 'payment-ui', over
       } else href = packageUrl(specifier);
       text = text.replace(match[0], match[0].replace(new RegExp(`(['"])${specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1$`), JSON.stringify(href)));
     }
-    const transformed = await transformWithEsbuild(text, file, { loader: file.endsWith('.jsx') ? 'jsx' : 'js', jsx: 'automatic' });
+    const transformed = await transformWithEsbuild(text, file, { loader: file.endsWith('.jsx') ? 'jsx' : 'js', jsx: 'automatic', ...(buildTarget ? { target: buildTarget } : {}) });
     const code = transformed.code.replace(/\bfrom\s*['"](react\/jsx-runtime)['"]/g, `from ${JSON.stringify(packageUrl('react/jsx-runtime'))}`);
     fs.writeFileSync(target, code);
     return target.href;

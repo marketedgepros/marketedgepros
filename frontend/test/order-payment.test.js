@@ -7,6 +7,9 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { compilePaymentHarness, purchaseRecordsFixture } from './paymentHarness.js';
 import { mapOrderQuoteResponse, normalizeQuoteContext } from '../src/services/orderQuoteViewService.js';
 import * as service from '../src/services/orderPaymentViewService.js';
+import buildConfig from '../vite.config.js';
+import api from '../src/services/api.js';
+import { AxiosError } from 'axios';
 
 const policyModuleUrl = new URL('../src/services/programEvaluationPolicy.js', import.meta.url).href;
 const policyOverride = {
@@ -57,9 +60,9 @@ test('collections enforce own owner and tenant, preserve absent source rather th
   const duplicate = records(); duplicate.records.push(purchaseRow()); duplicate.pagination.total = 2; assert.throws(() => service.mapPurchaseRecords(duplicate, principal));
 });
 
-const panelBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), { prefix: 'payment-panel-contract', overrides: policyOverride });
-const recordsBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'payment-record-contract', overrides: policyOverride });
-const checkoutBuild = await compilePaymentHarness(new URL('../src/pages/Checkout.jsx', import.meta.url), { prefix: 'payment-checkout-contract', overrides: policyOverride });
+const panelBuild = await compilePaymentHarness(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), { prefix: 'payment-panel-contract', overrides: policyOverride, target: buildConfig.build.target });
+const recordsBuild = await compilePaymentHarness(new URL('../src/components/payments/ProgramPurchaseRecords.jsx', import.meta.url), { prefix: 'payment-record-contract', overrides: policyOverride, target: buildConfig.build.target });
+const checkoutBuild = await compilePaymentHarness(new URL('../src/pages/Checkout.jsx', import.meta.url), { prefix: 'payment-checkout-contract', overrides: policyOverride, target: buildConfig.build.target });
 const Panel = panelBuild.module.default, Records = recordsBuild.module.default, Checkout = checkoutBuild.module.default;
 const bootstrap = new JSDOM('<body></body>');
 Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: bootstrap.window }); Object.defineProperty(globalThis, 'document', { configurable: true, writable: true, value: bootstrap.window.document });
@@ -90,12 +93,12 @@ test('mount performs only two local reads, never creates payment, and explicit c
 test('uncertain POST is not retried; saved-order reads can recover a valid receipt without another create', async () => {
   const h = harness(); let paid = false, posts = 0;
   const client = { get: async url => ({ data: url.includes('capabilities') ? cap() : projection(paid ? 'paid' : 'not_started') }), post: async () => { posts++; throw new Error('Synthetic timeout'); } };
-  try { await h.render(React.createElement(Panel, { principal, quote: quote(), client })); await click(h.host.querySelector('input')); await click(button(h.host, 'Create payment details')); assert.equal(posts, 1); assert.match(h.host.textContent, /Do not pay twice/); assert.equal(button(h.host, 'Create payment details'), undefined); paid = true; await click(button(h.host, 'Check saved order')); assert.match(h.host.textContent, /Purchase recorded/); assert.equal(posts, 1); assert.equal(button(h.host, 'Copy exact amount').disabled, true); } finally { await h.close(); }
+  try { await h.render(React.createElement(Panel, { principal, quote: quote(), client })); await click(h.host.querySelector('input')); await click(button(h.host, 'Create payment details')); assert.equal(posts, 1); assert.match(h.host.textContent, /Do not pay twice/); assert.equal(button(h.host, 'Create payment details'), undefined); paid = true; await click(button(h.host, 'Check saved order')); assert.match(h.host.textContent, /Payment confirmed/); assert.equal(posts, 1); assert.equal(button(h.host, 'Copy exact amount'), undefined); assert.equal(h.host.textContent.includes(address), false); } finally { await h.close(); }
 });
 test('expired and manual-review payment details are references only and copy actions cannot instruct another deposit', async () => {
   for (const state of ['expired', 'manual_review', 'processing', 'paid']) {
     const h = harness(); const payload = projection(state);
-    try { await h.render(React.createElement(Panel, { principal, quote: quote(), client: { get: async url => ({ data: url.includes('capabilities') ? cap(false) : payload }) } })); assert.equal(button(h.host, 'Copy exact amount').disabled, true); assert.match(h.host.textContent, /stored reference, not an instruction/); assert.equal(button(h.host, 'Create payment details'), undefined); } finally { await h.close(); }
+    try { await h.render(React.createElement(Panel, { principal, quote: quote(), client: { get: async url => ({ data: url.includes('capabilities') ? cap(false) : payload }) } })); if (state === 'paid') { assert.equal(button(h.host, 'Copy exact amount'), undefined); assert.match(h.host.textContent, /No further deposit is needed/); } else { assert.equal(button(h.host, 'Copy exact amount').disabled, true); assert.match(h.host.textContent, /stored reference, not an instruction/); } assert.equal(button(h.host, 'Create payment details'), undefined); } finally { await h.close(); }
   }
 });
 test('owner change immediately hides prior address and late response cannot return it', async () => {
@@ -117,7 +120,7 @@ test('normal checkout requests one frozen quote, does not create payment automat
   const h = harness('/programs/12/checkout'), calls = [];
   globalThis.__payment_auth = { user: principal, isAuthenticated: true, isLoading: false };
   globalThis.__payment_client = { get: async url => { calls.push(['GET', url]); return { data: url === '/programs/12' ? catalog() : url.includes('capabilities') ? cap(false) : projection() }; }, post: async url => { calls.push(['POST', url]); assert.equal(url, '/orders/'); return { data: quotePayload() }; } };
-  try { await h.render(router()); await click(button(h.host, 'Request server quote')); assert.equal(calls.filter(x => x[0] === 'POST').length, 1); assert.equal(document.activeElement?.id, 'order-payment-title'); assert.match(h.host.textContent, /Quotes only\. Payments are not enabled/); assert.equal(h.host.querySelector('[aria-current="step"]').textContent.includes('Server quote'), true); } finally { await h.close(); }
+  try { await h.render(router()); await click(button(h.host, 'Continue to payment')); assert.equal(calls.filter(x => x[0] === 'POST').length, 1); assert.equal(document.activeElement?.id, 'order-payment-title'); assert.match(h.host.textContent, /Quotes only\. Payments are not enabled/); assert.equal(h.host.querySelector('[aria-current="step"]').textContent.includes('Server quote'), true); } finally { await h.close(); }
 });
 test('direct Instant Funding checkout is Coming soon with no displayed price, quote request or payment creation', async () => {
   const h = harness('/programs/3711/checkout'), calls = [];
@@ -170,5 +173,116 @@ test('guest login preserves the exact saved-order path rather than fabricating p
 test('payment CSS reuses short finite motion and disables it for reduced motion; no perpetual/polling animation', () => {
   const css = fs.readFileSync(new URL('../src/components/payments/paymentFlow.css', import.meta.url), 'utf8'); assert.match(css, /prefers-reduced-motion:\s*reduce/); assert.doesNotMatch(css, /infinite|backdrop-filter|@import/);
   const panel = fs.readFileSync(new URL('../src/components/payments/OrderPaymentPanel.jsx', import.meta.url), 'utf8'); assert.doesNotMatch(panel, /setInterval|requestAnimationFrame/); assert.match(panel, /remaining <= 86400000/);
+});
+
+test('preflight failure sends no payment POST and persists only the quote, not an attempt marker', async () => {
+  const h = harness(); let preflight = false, posts = 0;
+  const persisted = [];
+  const client = { get: async url => { if (preflight) throw { response: { status: 401 } }; return { data: url.includes('capabilities') ? cap() : projection() }; }, post: async () => { posts++; throw new Error('Unexpected financial POST'); } };
+  try {
+    await h.render(React.createElement(Panel, { principal, quote: quote(), client, onPersistOrder: (id, options) => persisted.push([id, options]) }));
+    await click(h.host.querySelector('input')); preflight = true; await click(button(h.host, 'Create payment details'));
+    assert.equal(posts, 0); assert.deepEqual(persisted, [[orderId, { creationAttempted: false }]]);
+    assert.equal(h.host.querySelector('[data-state="creation_uncertain"]'), null);
+    assert.ok(button(h.host, 'Create payment details'));
+  } finally { await h.close(); }
+});
+
+test('safe preflight detects an existing paid purchase and never sends a replacement POST', async () => {
+  const h = harness(); let alreadyPaid = false, posts = 0;
+  const client = { get: async url => ({ data: url.includes('capabilities') ? cap() : projection(alreadyPaid ? 'paid' : 'not_started') }), post: async () => { posts++; throw new Error('Unexpected replacement'); } };
+  try {
+    await h.render(React.createElement(Panel, { principal, quote: quote(), client }));
+    await click(h.host.querySelector('input')); alreadyPaid = true; await click(button(h.host, 'Create payment details'));
+    assert.equal(posts, 0); assert.match(h.host.textContent, /Payment confirmed/);
+    assert.equal(button(h.host, 'Create payment details'), undefined);
+  } finally { await h.close(); }
+});
+
+test('a policy change in preflight requires review again without marking or creating payment', async () => {
+  const h = harness(); let changed = false, posts = 0;
+  const persisted = [];
+  const client = { get: async url => { const value = url.includes('capabilities') ? cap() : projection(); if (changed && url.includes('capabilities')) value.policy_version = 'synthetic-v2'; return { data: value }; }, post: async () => { posts++; } };
+  try {
+    await h.render(React.createElement(Panel, { principal, quote: quote(), client, onPersistOrder: (id, options) => persisted.push(options) }));
+    await click(h.host.querySelector('input')); changed = true; await click(button(h.host, 'Create payment details'));
+    assert.equal(posts, 0); assert.match(h.host.textContent, /Payment settings changed/);
+    assert.equal(h.host.querySelector('input').checked, false); assert.equal(button(h.host, 'Create payment details').disabled, true);
+    assert.deepEqual(persisted, [{ creationAttempted: false }]);
+  } finally { await h.close(); }
+});
+
+test('different capability and projection policy versions stop before dispatch', async () => {
+  const h = harness(); let mismatched = false, posts = 0;
+  const persisted = [];
+  const client = { get: async url => { const value = url.includes('capabilities') ? cap() : projection(); if (mismatched && !url.includes('capabilities')) value.policy_version = 'synthetic-v2'; return { data: value }; }, post: async () => { posts++; return { data: projection('awaiting_payment') }; } };
+  try {
+    await h.render(React.createElement(Panel, { principal, quote: quote(), client, onPersistOrder: (id, options) => persisted.push(options) }));
+    await click(h.host.querySelector('input')); mismatched = true; await click(button(h.host, 'Create payment details'));
+    assert.equal(posts, 0); assert.match(h.host.textContent, /Payment settings changed/);
+    assert.deepEqual(persisted, [{ creationAttempted: false }]);
+    assert.equal(button(h.host, 'Create payment details').disabled, true);
+  } finally { await h.close(); }
+});
+
+test('double clicks and an owner change during preflight cannot dispatch an old-owner payment', async () => {
+  const h = harness(), held = deferred(); let checking = false, posts = 0;
+  const client = { get: async url => { if (checking) return held.promise; return { data: url.includes('capabilities') ? cap() : projection() }; }, post: async () => { posts++; } };
+  try {
+    await h.render(React.createElement(Panel, { principal, quote: quote(), client }));
+    await click(h.host.querySelector('input')); checking = true; const create = button(h.host, 'Create payment details');
+    await click(create); await click(create); assert.equal(posts, 0);
+    const nextOwner = { ...principal, id: 3 }, previous = quote();
+    await h.render(React.createElement(Panel, { principal: nextOwner, quote: { ...previous, order: { ...previous.order, userId: 3 } }, client }));
+    await act(async () => held.resolve({ data: cap() }));
+    assert.equal(posts, 0); assert.equal(h.host.textContent.includes(address), false);
+  } finally { await h.close(); }
+});
+
+test('checkout preflight rejection preserves the saved quote URL without payment-requested', async () => {
+  const h = harness('/programs/12/checkout'); let rejectPreflight = false;
+  const calls = [];
+  globalThis.__payment_auth = { user: principal, isAuthenticated: true, isLoading: false };
+  globalThis.__payment_client = { get: async url => { calls.push(['GET', url]); if (rejectPreflight && url.includes('/payment')) throw { response: { status: 401 } }; return { data: url === '/programs/12' ? catalog() : url.includes('capabilities') ? cap() : url.endsWith('/payment') ? projection() : quotePayload() }; }, post: async url => { calls.push(['POST', url]); assert.equal(url, '/orders/'); return { data: quotePayload() }; } };
+  try {
+    await h.render(router()); await click(button(h.host, 'Continue to payment')); await click(h.host.querySelector('input')); rejectPreflight = true;
+    await click(button(h.host, 'Create payment details'));
+    const saved = new URL(h.host.querySelector('[data-location]').textContent, 'https://synthetic.invalid');
+    assert.equal(saved.searchParams.get('order'), orderId); assert.equal(saved.searchParams.has('payment-requested'), false);
+    assert.deepEqual(calls.filter(([method]) => method === 'POST'), [['POST', '/orders/']]);
+  } finally { await h.close(); }
+});
+
+test('the real API interceptor renews a session on safe preflight GETs and sends one non-replayed financial POST', async () => {
+  const h = harness(), beforeStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage'), originalAdapter = api.defaults.adapter;
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: window.localStorage });
+  localStorage.setItem('access_token', 'synthetic-expired'); localStorage.setItem('refresh_token', 'synthetic-refresh'); localStorage.setItem('csrf_token', 'synthetic-old-csrf');
+  let refreshes = 0, posts = 0;
+  api.defaults.adapter = async config => {
+    if (config.url === '/auth/refresh') { refreshes++; return { data: { access_token: 'synthetic-current', refresh_token: 'synthetic-rotated', csrf_token: 'synthetic-current-csrf' }, status: 200, headers: {}, config }; }
+    if (config.headers.Authorization !== 'Bearer synthetic-current') throw new AxiosError('Synthetic expired session', 'ERR_BAD_REQUEST', config, {}, { status: 401, data: {}, config });
+    if (config.method === 'post') { posts++; assert.equal(config._skipAuthRefresh, true); assert.equal(config.headers['X-CSRF-Token'], 'synthetic-current-csrf'); return { data: projection('awaiting_payment'), status: 201, headers: {}, config }; }
+    return { data: config.url.includes('capabilities') ? cap() : projection(), status: 200, headers: {}, config };
+  };
+  try {
+    const checked = await service.prepareOrderPaymentCreation({ quote: quote(), principal, client: api });
+    assert.equal(checked.projection.canCreate, true); assert.equal(refreshes, 1);
+    await service.createOrderPayment({ quote: quote(), principal, payCurrency: 'usdttrc20', idempotencyKey: 'synthetic_payment_key_0001', client: api });
+    assert.equal(posts, 1); assert.equal(refreshes, 1);
+  } finally { api.defaults.adapter = originalAdapter; if (beforeStorage) Object.defineProperty(globalThis, 'localStorage', beforeStorage); else delete globalThis.localStorage; await h.close(); }
+});
+
+test('paid saved checkout shows the confirmed stage and dashboard link without quote or payment POST', async () => {
+  const h = harness(`/programs/12/checkout?order=${orderId}&payment-requested=1&success=true`), calls = [];
+  globalThis.__payment_auth = { user: principal, isAuthenticated: true, isLoading: false };
+  globalThis.__payment_client = { get: async url => { calls.push(['GET', url]); return { data: url === '/programs/12' ? catalog() : url.includes('capabilities') ? cap(false) : url.endsWith('/payment') ? projection('paid') : quotePayload() }; }, post: async url => { calls.push(['POST', url]); throw new Error('No POST is permitted for paid orders'); } };
+  try {
+    await h.render(router()); assert.match(h.host.textContent, /Your purchase is confirmed/); assert.match(h.host.textContent, /Payment confirmed/);
+    assert.equal(h.host.querySelector('[aria-current="step"]').textContent.includes('Recorded purchase'), true);
+    assert.equal([...h.host.querySelectorAll('a')].find(a => a.textContent.includes('Back to dashboard')).getAttribute('href'), '/trader');
+    assert.equal(h.host.textContent.includes(address), false); assert.equal(button(h.host, 'Check provider status'), undefined);
+    assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+    await click(button(h.host, 'Check saved order')); assert.equal(calls.filter(([method]) => method === 'POST').length, 0);
+  } finally { await h.close(); }
 });
 test.after(() => { panelBuild.cleanup(); recordsBuild.cleanup(); checkoutBuild.cleanup(); });

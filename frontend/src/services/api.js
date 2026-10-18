@@ -127,9 +127,16 @@ const requestRefresh = () => {
   return refreshPromise;
 };
 
+export const sessionLoginRedirect = (location) => {
+  const path = typeof location?.pathname === 'string' ? location.pathname : '/';
+  const search = typeof location?.search === 'string' ? location.search : '';
+  if (!path.startsWith('/') || path.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(path + search)) return '/login';
+  return `/login?redirect=${encodeURIComponent(path + search)}`;
+};
+
 const redirectToLogin = () => {
   if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-    window.location.assign('/login');
+    window.location.assign(sessionLoginRedirect(window.location));
   }
 };
 

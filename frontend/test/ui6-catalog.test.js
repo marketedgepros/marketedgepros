@@ -596,7 +596,7 @@ test('customer detail: successful direct and 2FA sign-in returns through real Lo
         await submit();
       }
       await waitFor(() => harness.host.querySelector('[data-location]').textContent === '/programs/12/checkout', 'actual selected checkout return');
-      await waitFor(() => button(harness.host, 'Request server quote'), 'real unpaid checkout UI');
+      await waitFor(() => button(harness.host, 'Continue to payment'), 'real unpaid checkout UI');
       assert.match(harness.host.textContent, /A quote is not a paid purchase\./);
       assert.match(harness.host.textContent, /Payment availability is checked separately for your account\./);
     }
@@ -758,7 +758,7 @@ test('UI6 catalog: checkout DOM blocks guest/admin routes and exposes a verified
     await renderRouter(harness, checkoutRoutes, '/programs/12/checkout', 'checkout-user-quote');
     await waitFor(() => harness.host.querySelector('input[type="checkbox"]'), 'add-on control');
     await click(harness.host.querySelector('input[type="checkbox"]'));
-    await click(button(harness.host, 'Request server quote'));
+    await click(button(harness.host, 'Continue to payment'));
     await waitFor(() => harness.host.querySelector('[role="alert"]'), 'owner mismatch rejection');
     assert.match(harness.host.textContent, /Quote owner and brand is unavailable or invalid/);
     const rejectedSummary = harness.host.querySelector('section[aria-labelledby="quote-summary"]');
@@ -770,7 +770,7 @@ test('UI6 catalog: checkout DOM blocks guest/admin routes and exposes a verified
     assert.equal(postCalls.length, 1);
 
     quoteMode = 'success';
-    await click(button(harness.host, 'Retry server quote'));
+    await click(button(harness.host, 'Try preparing your order again'));
     await waitFor(() => harness.host.querySelector('section[aria-labelledby="quote-summary"]').textContent.includes('Immutable quote summary'), 'matching immutable quote');
     assert.match(harness.host.querySelector('section[aria-labelledby="quote-summary"]').textContent, /USD 219\.99/);
     const retryCalls = calls.filter((config) => config.method === 'post');
@@ -1007,7 +1007,7 @@ test('UI3 account model: checkout remains the existing quote flow with no inject
     globalThis.__ui6CatalogAuth = { user: { id: 41, tenant_id: 1, role: 'user' }, isAuthenticated: true, isLoading: false };
     const routes = h(Routes, null, h(Route, { path: '/programs/:programId/checkout', element: h(Checkout) }));
     await renderRouter(harness, routes, '/programs/12/checkout', 'unchanged-checkout-model');
-    await waitFor(() => button(harness.host, 'Request server quote'), 'existing quote action');
+    await waitFor(() => button(harness.host, 'Continue to payment'), 'existing quote action');
     assert.equal(harness.host.querySelector('[data-account-model]'), null);
     assert.equal(harness.host.querySelector('dialog,[role="dialog"],[aria-modal="true"]'), null);
     assert.equal(harness.host.querySelector('input[type="checkbox"]')?.closest('fieldset') !== null, true, 'any existing checkbox belongs to the original add-on selector');

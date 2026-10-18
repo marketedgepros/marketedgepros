@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Copy, FileCheck, RefreshCw, ShieldCheck } from 'lucide-react';
 import api from '../../services/api.js';
 import { formatUsdFromMinorUnits } from '../../services/orderQuoteViewService.js';
-import { createOrderPayment, getPaymentCapabilities, paymentCreationKey, paymentErrorMessage, readOrderPayment, refreshOrderPayment } from '../../services/orderPaymentViewService.js';
+import { createOrderPayment, getPaymentCapabilities, paymentCreationKey, paymentErrorMessage, prepareOrderPaymentCreation, readOrderPayment, refreshOrderPayment } from '../../services/orderPaymentViewService.js';
 import { primaryAction, secondaryAction } from '../programs/CatalogUI';
 import './paymentFlow.css';
 
@@ -107,14 +107,31 @@ export default function OrderPaymentPanel({ quote, principal, client = api, init
     if (creating && (!visible.capabilities?.enabled || !projection?.canCreate || attempted || !selection.acknowledged || !visible.capabilities.currencies.some((item) => item.code === selection.currency))) return;
     if (!creating && !projection?.canRefresh) return;
     const scope = key, value = begin();
-    if (creating) {
-      try { creationKey.current ??= paymentCreationKey(); }
-      catch (error) { request.current.pending = false; setResult((old) => ({ ...old, error: paymentErrorMessage(error), loading: false })); return; }
-      onPersistOrder?.(quote.order.id);
-      onLockSelection?.(true);
-    }
-    setResult((old) => ({ ...old, loading: true, error: '', attempted: creating || old.attempted }));
+    let dispatched = false;
+    setResult((old) => ({ ...old, loading: true, error: '' }));
     try {
+      if (creating) {
+        // Save the immutable quote for login recovery, not a payment attempt.
+        onPersistOrder?.(quote.order.id, { creationAttempted: false });
+        const checked = await prepareOrderPaymentCreation({ quote, principal, client, signal: value.controller.signal });
+        if (!active(value, scope)) return;
+        if (!checked.capabilities.enabled || !checked.projection.canCreate) {
+          if (checked.projection.creationAttempted) onPersistOrder?.(quote.order.id, { creationAttempted: true });
+          setResult({ key: scope, loading: false, capabilities: checked.capabilities, projection: checked.projection, attempted: checked.projection.creationAttempted, error: '' });
+          return;
+        }
+        if (checked.capabilities.policyVersion !== visible.capabilities.policyVersion || checked.projection.policyVersion !== checked.capabilities.policyVersion || checked.capabilities.feePaidByUser !== visible.capabilities.feePaidByUser || !checked.capabilities.currencies.some((item) => item.code === selection.currency)) {
+          setResult({ key: scope, loading: false, capabilities: checked.capabilities, projection: checked.projection, attempted: false, error: 'Payment settings changed. Review the current details before continuing.' });
+          setChoice({ key: scope, currency: checked.capabilities.currencies[0]?.code ?? '', acknowledged: false });
+          return;
+        }
+        creationKey.current ??= paymentCreationKey();
+        // Persist the conservative attempt marker before the single POST.
+        dispatched = true;
+        onPersistOrder?.(quote.order.id, { creationAttempted: true });
+        onLockSelection?.(true);
+        setResult((old) => ({ ...old, capabilities: checked.capabilities, loading: true, attempted: true }));
+      }
       const next = creating
         ? await createOrderPayment({ quote, principal, payCurrency: selection.currency, idempotencyKey: creationKey.current, client, signal: value.controller.signal })
         : await refreshOrderPayment({ quote, principal, client, signal: value.controller.signal });
@@ -123,7 +140,7 @@ export default function OrderPaymentPanel({ quote, principal, client = api, init
       setCopyStatus({ key: scope, text: '' });
     } catch (error) {
       if (!active(value, scope)) return;
-      setResult((old) => ({ ...old, loading: false, projection: creating ? null : old.projection, attempted: creating || old.attempted, error: paymentErrorMessage(error, { creating }) }));
+      setResult((old) => ({ ...old, loading: false, projection: dispatched ? null : old.projection, attempted: dispatched || old.attempted, error: paymentErrorMessage(error, { creating: dispatched }) }));
     } finally { if (request.current.serial === value.serial) request.current.pending = false; }
   };
   const copy = async (value, label) => {
@@ -143,8 +160,8 @@ export default function OrderPaymentPanel({ quote, principal, client = api, init
     <div className="flex items-start gap-3">
       <span className="mep-payment-symbol" aria-hidden="true"><ShieldCheck size={22} /></span>
       <div className="min-w-0"><p className="text-xs uppercase tracking-[0.15em] text-cyan-300">Order-bound payment</p>
-        <h2 id="order-payment-title" tabIndex={-1} className="mep-heading mt-2 text-2xl font-semibold focus-visible:outline-cyan-300">Payment details</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-400">Only an enabled checkout for this account can request payment. A recorded quote is not a paid purchase.</p>
+        <h2 id="order-payment-title" tabIndex={-1} className="mep-heading mt-2 text-2xl font-semibold focus-visible:outline-cyan-300">{state === 'paid' ? 'Purchase confirmation' : 'Payment details'}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400">{state === 'paid' ? 'Your payment has been verified and this purchase is saved to your account.' : 'Review your order, get the provider’s payment details, then return here to confirm the payment status.'}</p>
       </div>
     </div>
     <div className="mep-payment-state mt-6 rounded-xl border p-4" data-state={state} role="status" aria-live="polite">
@@ -171,7 +188,7 @@ export default function OrderPaymentPanel({ quote, principal, client = api, init
       </label>
       <button type="button" className={`${primaryAction} w-full`} disabled={!selection.acknowledged} onClick={() => operate(true)}>Create payment details<ArrowRight size={18} aria-hidden="true" /></button>
     </div>}
-    {payment && <div className="mt-6 space-y-5">
+    {payment && state !== 'paid' && <div className="mt-6 space-y-5">
       <div className="mep-payment-amount rounded-xl border p-5"><p className="text-xs uppercase tracking-wider text-slate-400">Provider-requested deposit</p><p className="mt-2 text-2xl font-semibold tabular-nums text-cyan-100">{payment.payAmount} <span className="text-base">{payment.label}</span></p><p className="mt-2 text-sm font-medium text-cyan-200">Network: {payment.network}</p></div>
       <p className="text-sm leading-relaxed text-amber-100">{payable ? 'Use exactly this asset and network. Do not use another network or reuse these details for another order. If you already sent funds, check this order instead of sending again.' : 'These details are a stored reference, not an instruction to send more funds. Do not make another deposit or use them for another order.'}</p>
       <div><p className="text-xs text-slate-400">Deposit address</p><div className="mep-payment-copy mt-2"><code className="mep-payment-value">{payment.address}</code><button type="button" className={secondaryAction} disabled={!payable || visible.loading} onClick={() => copy(payment.address, 'Address')} aria-label="Copy deposit address"><Copy size={17} aria-hidden="true" />Copy</button></div></div>
@@ -185,9 +202,15 @@ export default function OrderPaymentPanel({ quote, principal, client = api, init
       </dl>
       {copyStatus.key === key && copyStatus.text && <p role="status" className="text-sm text-cyan-200">{copyStatus.text}</p>}
     </div>}
-    {state === 'paid' && <div className="mt-5 flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-4 text-sm text-emerald-100"><FileCheck size={20} className="shrink-0" aria-hidden="true" /><p>The purchase record is stored for this account. Trading provisioning and payouts remain unavailable.</p></div>}
+    {state === 'paid' && <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-5 sm:p-6 text-emerald-100">
+      <div className="flex items-start gap-3"><FileCheck size={24} className="shrink-0" aria-hidden="true" /><div><h3 className="mep-heading text-xl font-semibold">Payment confirmed</h3><p className="mt-2 text-sm">{quote.order.snapshot?.terms?.name ?? `Program #${quote.context.programId}`}</p></div></div>
+      <dl className="mt-5 space-y-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><dt>Order total</dt><dd className="font-semibold tabular-nums">{formatUsdFromMinorUnits(quote.order.amountMinor)}</dd></div><div className="flex flex-wrap justify-between gap-2"><dt>Verified payment received</dt><dd className="tabular-nums">{payment.actuallyPaid} {payment.label}</dd></div><div className="flex flex-wrap justify-between gap-2"><dt>Network</dt><dd>{payment.network}</dd></div></dl>
+      <p className="mt-4 text-sm leading-relaxed">No further deposit is needed for this order. Your purchase record is stored; trading provisioning and payouts remain unavailable.</p>
+      <details className="mt-4 text-xs leading-relaxed"><summary className="cursor-pointer focus-visible:outline-cyan-300">Recorded provider settlement</summary><p className="mt-2">Provider-reported outcome: {payment.outcomeAmount} {payment.outcomeCurrency}. This is not a customer wallet balance or trading profit.</p></details>
+      <Link to="/trader" className={`${primaryAction} mt-5 w-full`}>Back to dashboard<ArrowRight size={18} aria-hidden="true" /></Link>
+    </div>}
     <div className="mt-6 flex flex-wrap gap-3">
-      {projection?.canRefresh && <button type="button" className={secondaryAction} disabled={visible.loading} onClick={() => operate(false)}><RefreshCw size={17} aria-hidden="true" />Check provider status</button>}
+      {projection?.canRefresh && state !== 'paid' && <button type="button" className={secondaryAction} disabled={visible.loading} onClick={() => operate(false)}><RefreshCw size={17} aria-hidden="true" />Check provider status</button>}
       <button type="button" className={secondaryAction} disabled={visible.loading} onClick={load}><RefreshCw size={17} aria-hidden="true" />Check saved order</button>
       <Link className={secondaryAction} to="/support/create-ticket">Support with this order</Link>
     </div>
