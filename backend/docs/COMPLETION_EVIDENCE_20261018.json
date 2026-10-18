@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "as_of_date": "2026-10-18",
+  "application_deployed_sha": "9724ae16a610da6f9daf7c938a5bd2838f64a276",
+  "database_revision": "20261013_000002",
+  "documentation_only_update": true,
+  "registration": {
+    "public_enabled": true,
+    "provider": "brevo",
+    "verification_and_reset_delivered": true,
+    "one_time_codes_and_old_session_revocation_verified": true
+  },
+  "catalog": {
+    "total_programs": 24,
+    "isolated_purchasable_quotes_and_provider_request_amounts_verified": 21,
+    "instant_coming_soon_blocked": 3,
+    "public_catalog_details_consistent": true,
+    "real_payments_executed_for_all_programs": false
+  },
+  "real_payment": {
+    "scope": "one_verified_test_principal_only",
+    "program": "Three Phase Challenge - 10K",
+    "account_size_usd": "10000.00",
+    "addon_count": 0,
+    "quote_usd": "79.00",
+    "asset": "usdttrc20",
+    "network": "TRC20",
+    "provider_status": "finished",
+    "requested_asset_amount": "78.766856",
+    "received_asset_amount": "78.766856",
+    "reported_outcome_amount": "74.859754",
+    "reported_outcome_currency": "usdttrc20",
+    "provider_order_and_address_matches": true,
+    "recipient_matches_user_evidence": true,
+    "signed_finished_ipn_recorded": true,
+    "receipt_count": 1,
+    "settlement_journal_count": 1,
+    "recorded_purchase_grant_count": 1,
+    "balanced_journal_entries": [
+      {
+        "line_number": 1,
+        "side": "debit",
+        "amount_minor": 7900
+      },
+      {
+        "line_number": 2,
+        "side": "credit",
+        "amount_minor": 7900
+      }
+    ],
+    "nominal_usd_journal_is_not_wallet_balance": true
+  },
+  "not_completed_or_not_enabled": [
+    "checkout_creation_authentication_preflight_fix",
+    "post_payment_customer_confirmation_display_fix",
+    "final_operator_policies_and_service_delivery_acceptance",
+    "public_customer_payment_activation",
+    "ongoing_operations_acceptance",
+    "live_kyc_money_eligibility",
+    "reward_refund_and_affiliate_disbursement",
+    "mt5_provisioning",
+    "google_login"
+  ],
+  "private_evidence_sha256": {
+    "application_deployment": "172a1a5e8a58f3eea4741cd0c1238e5780cc7015ceac3ec63f6ffecbb5640c16",
+    "registration_real_flow": "16a735e26716aa639cabaa37d4f66cac6a3d16eb601a09f52e51151a54001fe7",
+    "catalog_isolated_matrix": "216102c36805cd46fe7c5da6a4d2e1cec58b2bf88ba7fa5e1915ead8253b415a",
+    "catalog_public_routes": "def627e8fe5f000e84572e9150b050cfeceb67847a606ea3889620647b4e1dae",
+    "provider_read_and_reconciliation": "9716ade5957a36ff3ede92f8be926feb90e42928257871228617a9f2612f69c4",
+    "signed_events_receipt_and_purchase": "529cd5e46bc521700809d99ac8ad4cee402b7f7b9b494be7e96840e91d4c9a5e"
+  },
+  "privacy": "No email, principal/tenant ID, order/payment ID, address, session, credential or raw private source included; detailed evidence retained privately."
+}
